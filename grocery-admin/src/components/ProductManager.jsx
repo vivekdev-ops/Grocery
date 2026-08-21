@@ -1,12 +1,14 @@
 // src/components/ProductManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, Trash2, Edit, X, Layers, Upload, ImageIcon } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter } from 'lucide-react';
 import ExcelProductUpload from './ExcelProductUpload';
 
 export default function ProductManager() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [shopkeepers, setShopkeepers] = useState([]);
+  const [selectedShopkeeperFilter, setSelectedShopkeeperFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' or 'approvals'
   const [loading, setLoading] = useState(true);
 
@@ -23,10 +25,10 @@ export default function ProductManager() {
   });
 
   // Multiple Images State
-  const [imageFiles, setImageFiles] = useState([]); // Newly selected files from browse
-  const [existingImages, setExistingImages] = useState([]); // Already uploaded image URLs
+  const [imageFiles, setImageFiles] = useState([]); 
+  const [existingImages, setExistingImages] = useState([]); 
 
-  // Variants State for the product being added/edited
+  // Variants State
   const [variants, setVariants] = useState([]); 
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,23 +38,51 @@ export default function ProductManager() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [prodRes, catRes, varRes] = await Promise.all([
-      supabase.from('products').select('*, categories(name), shopkeeper_profiles(store_name)').order('name'),
-      supabase.from('categories').select('*').order('name'),
-      supabase.from('product_variants').select('*')
-    ]);
+    try {
+      const [prodRes, catRes, varRes, shopRes] = await Promise.all([
+        supabase.from('products').select('*').order('name'),
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('product_variants').select('*'),
+        supabase.from('shopkeeper_profiles').select('*')
+      ]);
 
-    if (!prodRes.error && !varRes.error) {
       const rawProducts = prodRes.data || [];
+      const rawCategories = catRes.data || [];
       const rawVariants = varRes.data || [];
-      const combined = rawProducts.map(p => ({
-        ...p,
-        variants: rawVariants.filter(v => v.product_id === p.id)
-      }));
+      const shopkeepersList = shopRes.data || [];
+
+      // DEBUG LOGS TO INSPECT PROFILES AND IDS IN CONSOLE
+      console.log("Admin Panel - Fetched Shopkeepers List:", shopkeepersList);
+      console.log("Admin Panel - All Products shopkeeper_ids:", rawProducts.map(p => ({ name: p.name, shopkeeper_id: p.shopkeeper_id })));
+
+      setShopkeepers(shopkeepersList);
+
+      const combined = rawProducts.map(p => {
+        const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
+        const jsonVariants = p.variants || [];
+        const mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
+        const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
+        
+        // Robust ID matching (converting both to strings to prevent type mismatches)
+        const ownerProfile = shopkeepersList.find(s => String(s.id).trim() === String(p.shopkeeper_id).trim());
+        const categoryObj = rawCategories.find(c => c.id === p.category_id);
+
+        return {
+          ...p,
+          categories: categoryObj || { name: 'General' },
+          shopkeeper_profiles: ownerProfile || { store_name: 'Admin / Direct', email: 'admin@hub.com' },
+          images: mergedImages,
+          variants: mergedVariants
+        };
+      });
+
       setProducts(combined);
+      setCategories(rawCategories);
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+    } finally {
+      setLoading(false);
     }
-    if (!catRes.error) setCategories(catRes.data || []);
-    setLoading(false);
   };
 
   const handleUpdateApproval = async (productId, status) => {
@@ -89,7 +119,7 @@ export default function ProductManager() {
       category_id: product.category_id || '',
       description: product.description || ''
     });
-    setExistingImages(product.images || (product.image_url ? [product.image_url] : []));
+    setExistingImages(product.images || product.gallery || (product.image_url ? [product.image_url] : []));
     setImageFiles([]);
     setVariants(product.variants || []);
     setIsModalOpen(true);
@@ -143,6 +173,8 @@ export default function ProductManager() {
         category_id: form.category_id || null,
         image_url: primaryImageUrl,
         images: allImageUrls,
+        gallery: allImageUrls,
+        variants: variants,
         description: form.description,
         approval_status: 'approved'
       };
@@ -152,7 +184,6 @@ export default function ProductManager() {
       if (editingProduct) {
         const { error } = await supabase.from('products').update(productPayload).eq('id', editingProduct.id);
         if (error) throw error;
-        
         await supabase.from('product_variants').delete().eq('product_id', editingProduct.id);
       } else {
         const { data, error } = await supabase.from('products').insert([productPayload]).select().single();
@@ -163,7 +194,7 @@ export default function ProductManager() {
       if (variants.length > 0) {
         const variantPayloads = variants.map(v => ({
           product_id: productId,
-          unit_label: v.unit_label,
+          unit_label: v.unit_label || v.label,
           price: parseFloat(v.price || 0),
           mrp: parseFloat(v.mrp || v.price || 0),
           stock: parseInt(v.stock || 0)
@@ -173,7 +204,7 @@ export default function ProductManager() {
         if (varError) throw varError;
       }
 
-      alert('Product, images, and variants saved successfully!');
+      alert('Product saved successfully!');
       setIsModalOpen(false);
       fetchData();
     } catch (err) {
@@ -183,41 +214,63 @@ export default function ProductManager() {
     }
   };
 
-  const pendingProducts = products.filter(p => p.approval_status === 'pending' || !p.approval_status);
+  const filteredProducts = products.filter(p => {
+    const matchesTab = activeTab === 'inventory' ? true : (p.approval_status === 'pending' || !p.approval_status);
+    const matchesShopkeeper = selectedShopkeeperFilter === 'all' || String(p.shopkeeper_id).trim() === String(selectedShopkeeperFilter).trim();
+    return matchesTab && matchesShopkeeper;
+  });
+
+  const pendingCount = products.filter(p => p.approval_status === 'pending' || !p.approval_status).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Product Inventory & Gallery</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Manage products, multi-image galleries, and pack variants.</p>
+          <h2 className="text-2xl font-bold text-gray-800">Product Inventory & Shopkeeper Moderation</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Filter products by store owner, check galleries, and approve listings.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2 bg-white p-1 rounded-xl border shadow-sm">
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Shopkeeper Filter Dropdown */}
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border shadow-2xs">
+            <Filter size={14} className="text-gray-400" />
+            <select 
+              className="text-xs font-bold text-gray-700 bg-transparent outline-none cursor-pointer"
+              value={selectedShopkeeperFilter}
+              onChange={e => setSelectedShopkeeperFilter(e.target.value)}
+            >
+              <option value="all">All Shopkeepers (Stores)</option>
+              {shopkeepers.map(sk => (
+                <option key={sk.id} value={sk.id}>{sk.store_name} ({sk.email})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-2 bg-white p-1 rounded-xl border shadow-2xs">
             <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'inventory' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
               All Inventory ({products.length})
             </button>
             <button onClick={() => setActiveTab('approvals')} className={`px-4 py-2 rounded-lg text-xs font-bold transition relative ${activeTab === 'approvals' ? 'bg-amber-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-              Pending Approvals {pendingProducts.length > 0 && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1.5">{pendingProducts.length}</span>}
+              Pending Approvals {pendingCount > 0 && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1.5">{pendingCount}</span>}
             </button>
           </div>
+
           <button 
             onClick={openAddModal}
             className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
           >
-            <Plus size={16} /> Add Product with Gallery
+            <Plus size={16} /> Add Product
           </button>
         </div>
       </div>
 
-      {/* Excel Bulk Upload Widget */}
       <ExcelProductUpload onUploadSuccess={fetchData} />
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b text-xs uppercase text-gray-500 font-semibold">
-              <th className="p-4">Product</th>
+              <th className="p-4">Product & Store</th>
               <th className="p-4">Images</th>
               <th className="p-4">Variants</th>
               <th className="p-4">Price / Stock</th>
@@ -228,57 +281,66 @@ export default function ProductManager() {
           <tbody className="divide-y text-xs">
             {loading ? (
               <tr><td colSpan="6" className="p-8 text-center text-gray-500">Loading inventory...</td></tr>
-            ) : (activeTab === 'approvals' ? pendingProducts : products).length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-gray-400">No products found.</td></tr>
+            ) : filteredProducts.length === 0 ? (
+              <tr><td colSpan="6" className="p-8 text-center text-gray-400">No products found matching this filter.</td></tr>
             ) : (
-              (activeTab === 'approvals' ? pendingProducts : products).map(p => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0 border">
-                      {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={18} className="text-gray-400 m-2"/>}
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900 block">{p.name}</span>
-                      <span className="text-[10px] text-gray-400">{p.shopkeeper_profiles?.store_name || 'Admin / Direct'}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-gray-600 font-medium">
-                    {(p.images?.length || (p.image_url ? 1 : 0))} loaded
-                  </td>
-                  <td className="p-4">
-                    {p.variants?.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.variants.map(v => (
-                          <span key={v.id} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md text-[10px] font-bold border">
-                            {v.unit_label}: ₹{v.price}
-                          </span>
-                        ))}
+              filteredProducts.map(p => {
+                const imgList = p.images || p.gallery || [];
+                return (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0 border">
+                        {p.image_url || imgList.length > 0 ? (
+                          <img src={p.image_url || imgList[0]} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={18} className="text-gray-400 m-2"/>
+                        )}
                       </div>
-                    ) : (
-                      <span className="text-gray-400 italic">No variants</span>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <span className="font-bold block">₹{p.price.toFixed(2)}</span>
-                    <span className="text-gray-400 text-[10px]">Stock: {p.stock}</span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
-                      p.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
-                      p.approval_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {p.approval_status || 'pending'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    {(!p.approval_status || p.approval_status === 'pending') && (
-                      <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-green-600 text-white px-3 py-1 rounded-lg font-bold">Approve</button>
-                    )}
-                    <button onClick={() => openEditModal(p)} className="text-blue-600 hover:text-blue-800 p-1.5" title="Edit"><Edit size={16}/></button>
-                    <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1.5" title="Delete"><Trash2 size={16}/></button>
-                  </td>
-                </tr>
-              ))
+                      <div>
+                        <span className="font-bold text-gray-900 block">{p.name}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5 border border-emerald-200">
+                          <Store size={10} /> {p.shopkeeper_profiles?.store_name || 'Admin Store'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-gray-600 font-medium">
+                      {imgList.length} loaded
+                    </td>
+                    <td className="p-4">
+                      {p.variants?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {p.variants.map((v, i) => (
+                            <span key={v.id || i} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md text-[10px] font-bold border">
+                              {v.unit_label || v.label}: ₹{Number(v.price || 0)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">No variants</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <span className="font-bold block">₹{Number(p.price || 0).toFixed(2)}</span>
+                      <span className="text-gray-400 text-[10px]">Stock: {p.stock}</span>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
+                        p.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
+                        p.approval_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {p.approval_status || 'pending'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      {(!p.approval_status || p.approval_status === 'pending') && (
+                        <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-green-600 text-white px-3 py-1 rounded-lg font-bold shadow-2xs">Approve</button>
+                      )}
+                      <button onClick={() => openEditModal(p)} className="text-blue-600 hover:text-blue-800 p-1.5" title="Edit"><Edit size={16}/></button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1.5" title="Delete"><Trash2 size={16}/></button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -378,7 +440,7 @@ export default function ProductManager() {
                         <input 
                           type="text" placeholder="Unit Label (e.g. 1 kg)" required 
                           className="flex-1 border p-2 rounded-lg text-xs bg-white"
-                          value={v.unit_label} onChange={e => updateVariantRow(index, 'unit_label', e.target.value)}
+                          value={v.unit_label || v.label} onChange={e => updateVariantRow(index, 'unit_label', e.target.value)}
                         />
                         <input 
                           type="number" step="0.01" placeholder="Price (₹)" required 

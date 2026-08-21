@@ -1,19 +1,16 @@
 // src/components/DeliveryPortal.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut, ShieldCheck, Mail, Lock, Eye, X } from 'lucide-react';
+import { Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut, ShieldCheck, Mail, Lock, Eye, X, Navigation, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function DeliveryPortal() {
   const [session, setSession] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('available'); // 'available', 'active', 'completed'
+  const [activeTab, setActiveTab] = useState('available');
 
-  // Modal State for viewing full order details
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
-
-  // OTP Verification Modal State
   const [verifyingOrder, setVerifyingOrder] = useState(null);
   const [enteredOtp, setEnteredOtp] = useState('');
 
@@ -26,28 +23,83 @@ export default function DeliveryPortal() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchDeliveryOrders();
+      if (session) fetchDeliveryOrders(session);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchDeliveryOrders();
+      if (session) fetchDeliveryOrders(session);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchDeliveryOrders = async () => {
-    const { data, error } = await supabase
+  useEffect(() => {
+    if (!session) return;
+    const interval = setInterval(() => fetchDeliveryOrders(session), 5000);
+    return () => clearInterval(interval);
+  }, [session]);
+
+  const fetchDeliveryOrders = async (currentSession) => {
+    const activeSession = currentSession || session;
+    if (!activeSession?.user?.email) return;
+
+    const userEmail = activeSession.user.email;
+    const userId = activeSession.user.id;
+
+    console.log("Fetching orders for staff email:", userEmail, "and ID:", userId);
+
+    // 1. Find if this user exists in staff_profiles to get their staff record ID
+    const { data: staffData } = await supabase
+      .from('staff_profiles')
+      .select('id')
+      .eq('email', userEmail)
+      .single();
+
+    const staffId = staffData ? staffData.id : null;
+
+    // 2. Fetch available orders (unassigned & processing)
+    const { data: availData } = await supabase
       .from('orders')
       .select('*, order_items(*, products(name, image_url))')
-      .order('created_at', { ascending: false });
+      .eq('status', 'processing')
+      .is('delivery_agent_id', null);
 
-    if (!error && data) {
-      setOrders(data);
+    // 3. Fetch orders assigned to ME (checking both Auth ID and Staff Profile ID)
+    let activeQuery = supabase
+      .from('orders')
+      .select('*, order_items(*, products(name, image_url))')
+      .neq('status', 'delivered');
+
+    if (staffId) {
+      activeQuery = activeQuery.or(`delivery_agent_id.eq.${userId},delivery_agent_id.eq.${staffId}`);
+    } else {
+      activeQuery = activeQuery.eq('delivery_agent_id', userId);
     }
+
+    const { data: activeData } = await activeQuery;
+
+    // 4. Fetch completed orders by ME
+    let completedQuery = supabase
+      .from('orders')
+      .select('*, order_items(*, products(name, image_url))')
+      .eq('status', 'delivered');
+
+    if (staffId) {
+      completedQuery = completedQuery.or(`delivery_agent_id.eq.${userId},delivery_agent_id.eq.${staffId}`);
+    } else {
+      completedQuery = completedQuery.eq('delivery_agent_id', userId);
+    }
+
+    const { data: completedData } = await completedQuery;
+
+    const allFetched = [...(availData || []), ...(activeData || []), ...(completedData || [])];
+    const uniqueOrders = Array.from(new Map(allFetched.map(item => [item.id, item])).values());
+    
+    console.log("Total unique orders loaded:", uniqueOrders.length);
+    setOrders(uniqueOrders);
   };
 
   const handleLogin = async (e) => {
@@ -59,7 +111,7 @@ export default function DeliveryPortal() {
       alert("Login failed: " + error.message);
     } else if (data.session) {
       setSession(data.session);
-      fetchDeliveryOrders();
+      fetchDeliveryOrders(data.session);
     }
     setLoggingIn(false);
   };
@@ -68,7 +120,9 @@ export default function DeliveryPortal() {
     const updatePayload = { status: newStatus };
     
     if (newStatus === 'accepted' && session) {
-      updatePayload.delivery_agent_id = session.user.id;
+      // Fetch staff ID or fallback to user ID
+      const { data: staffData } = await supabase.from('staff_profiles').select('id').eq('email', session.user.email).single();
+      updatePayload.delivery_agent_id = staffData ? staffData.id : session.user.id;
     }
 
     const { error } = await supabase
@@ -109,13 +163,16 @@ export default function DeliveryPortal() {
   };
 
   const availableOrders = orders.filter(o => o.status === 'processing' && !o.delivery_agent_id);
+  
   const myActiveOrders = orders.filter(o => 
-    o.delivery_agent_id === session?.user?.id && 
-    ['accepted', 'pickup', 'out_for_delivery', 'shipped'].includes(o.status)
+    o.delivery_agent_id && o.status !== 'delivered'
   );
-  const myCompletedOrders = orders.filter(o => o.delivery_agent_id === session?.user?.id && o.status === 'delivered');
 
-  const totalEarnings = myCompletedOrders.length * 40; // ₹40 fixed commission per order
+  const myCompletedOrders = orders.filter(o => 
+    o.delivery_agent_id && o.status === 'delivered'
+  );
+
+  const totalEarnings = myCompletedOrders.length * 40;
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-stone-600 font-medium">Loading delivery portal...</div>;
 
@@ -225,6 +282,21 @@ export default function DeliveryPortal() {
                       <span className="text-lg font-black text-stone-900">₹{order.total_amount.toFixed(2)}</span>
                     </div>
                     <p className="text-xs text-stone-700 font-medium">Address: {order.delivery_address}</p>
+                    
+                    {order.latitude && order.longitude && (
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
+                        <span className="text-emerald-800 font-mono">📍 GPS Location Available</span>
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 shadow-2xs"
+                        >
+                          <Navigation size={12} /> Open Maps
+                        </a>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center pt-2">
                       <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
                         <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
@@ -242,7 +314,7 @@ export default function DeliveryPortal() {
           <div className="space-y-6">
             <h2 className="text-2xl font-black text-stone-900">Active Deliveries Workflow</h2>
             {myActiveOrders.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border text-center text-stone-500 font-medium shadow-sm">No orders in progress.</div>
+              <div className="bg-white p-12 rounded-3xl border text-center text-stone-500 font-medium shadow-sm">No orders in progress or assigned to you yet.</div>
             ) : (
               <div className="space-y-4">
                 {myActiveOrders.map(order => (
@@ -265,14 +337,30 @@ export default function DeliveryPortal() {
                       </div>
                     </div>
 
+                    {order.latitude && order.longitude && (
+                      <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between text-xs shadow-2xs">
+                        <div>
+                          <span className="font-black text-emerald-900 block">Customer GPS Coordinates</span>
+                          <span className="font-mono text-emerald-700">{order.latitude}, {order.longitude}</span>
+                        </div>
+                        <a 
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 transition shadow-sm"
+                        >
+                          <Navigation size={14} /> Open Google Maps <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2">
                       <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
                         <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
                       </button>
 
-                      {/* Multi-Step Action Buttons */}
                       <div className="flex flex-wrap gap-2 justify-end items-center">
-                        {(order.status === 'accepted' || order.status === 'shipped') && (
+                        {(order.status === 'accepted' || order.status === 'shipped' || order.status === 'processing' || order.status === 'pending') && (
                           <button onClick={() => handleUpdateStatus(order.id, 'pickup')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition">
                             Reached Store / Pickup
                           </button>
@@ -385,6 +473,12 @@ export default function DeliveryPortal() {
                 <span className="font-bold text-stone-400 uppercase">Customer Phone</span>
                 <p className="text-stone-900 font-medium mt-0.5">{selectedOrderDetails.phone || 'N/A'}</p>
               </div>
+              {selectedOrderDetails.latitude && selectedOrderDetails.longitude && (
+                <div>
+                  <span className="font-bold text-stone-400 uppercase">GPS Coordinates</span>
+                  <p className="font-mono text-emerald-700 mt-0.5">{selectedOrderDetails.latitude}, {selectedOrderDetails.longitude}</p>
+                </div>
+              )}
             </div>
 
             <div>

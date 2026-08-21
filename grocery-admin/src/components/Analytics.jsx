@@ -1,10 +1,15 @@
 // src/components/Analytics.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { LayoutDashboard, ShoppingBag, Users, DollarSign, Package, Calendar, Filter } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Users, DollarSign, Package, Filter, Store, Truck } from 'lucide-react';
 
 export default function Analytics() {
   const [orders, setOrders] = useState([]);
+  const [orderItems, setOrderItems] = useState([]);
+  const [shopkeepers, setShopkeepers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [deliveryBoys, setDeliveryBoys] = useState([]);
+  
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalOrders: 0,
@@ -30,11 +35,25 @@ export default function Analytics() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-    if (!error && data) {
-      setOrders(data);
+    try {
+      const [ordRes, itemRes, shopRes, prodRes, staffRes] = await Promise.all([
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('order_items').select('*, products(name, shopkeeper_id, price)'),
+        supabase.from('shopkeeper_profiles').select('*'),
+        supabase.from('products').select('*'),
+        supabase.from('staff_profiles').select('*')
+      ]);
+
+      if (ordRes.data) setOrders(ordRes.data);
+      if (itemRes.data) setOrderItems(itemRes.data);
+      if (shopRes.data) setShopkeepers(shopRes.data);
+      if (prodRes.data) setProducts(prodRes.data);
+      if (staffRes.data) setDeliveryBoys(staffRes.data);
+    } catch (err) {
+      console.error('Error loading analytics data:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const applyFilters = () => {
@@ -43,7 +62,6 @@ export default function Analytics() {
     if (filterType === 'date' && selectedDate) {
       result = result.filter(o => o.created_at.startsWith(selectedDate));
     } else if (filterType === 'month' && selectedMonth) {
-      // selectedMonth format from input type="month" is "YYYY-MM"
       result = result.filter(o => o.created_at.startsWith(selectedMonth));
     } else if (filterType === 'year' && selectedYear) {
       result = result.filter(o => o.created_at.startsWith(selectedYear));
@@ -64,6 +82,44 @@ export default function Analytics() {
     setFilteredOrders(result);
   };
 
+  // Compute Shopkeeper Performance Metrics
+  const shopkeeperMetrics = shopkeepers.map(sk => {
+    const skProducts = products.filter(p => String(p.shopkeeper_id).trim() === String(sk.id).trim());
+    const skProductIds = skProducts.map(p => p.id);
+    
+    const relevantItems = orderItems.filter(item => skProductIds.includes(item.product_id));
+    const revenue = relevantItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalSold = relevantItems.reduce((sum, item) => sum + item.quantity, 0);
+
+    return {
+      ...sk,
+      productCount: skProducts.length,
+      revenue,
+      totalSold
+    };
+  });
+
+  // Compute Delivery Boy / Staff Performance Metrics
+  const deliveryMetrics = deliveryBoys.map(db => {
+    const assignedOrders = orders.filter(o => 
+      o.delivery_boy_id === db.id || 
+      o.staff_id === db.id || 
+      o.delivery_partner_id === db.id || 
+      o.assigned_to === db.id || 
+      o.delivery_person === db.name ||
+      o.delivery_person === db.full_name
+    );
+    const deliveredCount = assignedOrders.filter(o => o.status === 'delivered').length;
+    const activeCount = assignedOrders.filter(o => o.status === 'out_for_delivery' || o.status === 'shipped').length;
+
+    return {
+      ...db,
+      totalAssigned: assignedOrders.length,
+      deliveredCount,
+      activeCount
+    };
+  });
+
   if (loading) return <div className="text-center py-20 text-gray-500 font-medium">Loading dashboard analytics...</div>;
 
   return (
@@ -73,7 +129,7 @@ export default function Analytics() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border shadow-sm">
         <div>
           <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2"><LayoutDashboard size={24} className="text-green-600"/> Business Dashboard</h2>
-          <p className="text-xs text-gray-500 mt-1">Real-time performance metrics and store overview.</p>
+          <p className="text-xs text-gray-500 mt-1">Real-time performance metrics, store overview, and staff tracking.</p>
         </div>
 
         {/* Filters Toolbar */}
@@ -165,6 +221,71 @@ export default function Analytics() {
             <Package size={24} />
           </div>
         </div>
+      </div>
+
+      {/* Shopkeeper & Staff Performance Analytics Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Shopkeeper Performance Breakdown */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Store className="text-emerald-600" size={20} />
+            <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">Shopkeeper Store Performance</h3>
+          </div>
+
+          {shopkeeperMetrics.length === 0 ? (
+            <p className="text-xs text-gray-400 italic text-center py-6">No shopkeeper profiles registered.</p>
+          ) : (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {shopkeeperMetrics.map(sk => (
+                <div key={sk.id} className="flex justify-between items-center p-3.5 bg-gray-50 rounded-xl border text-xs">
+                  <div>
+                    <span className="font-bold text-gray-900 block text-sm">{sk.store_name}</span>
+                    <span className="text-gray-400">{sk.productCount} products listed | {sk.totalSold} items sold</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-emerald-600 text-sm block">₹{sk.revenue.toFixed(2)}</span>
+                    <span className="text-[10px] text-gray-400 uppercase font-bold">Revenue</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Staff / Delivery Personnel Performance Breakdown */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Truck className="text-blue-600" size={20} />
+            <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">Delivery Staff Performance</h3>
+          </div>
+
+          {deliveryMetrics.length === 0 ? (
+            <p className="text-xs text-gray-400 italic text-center py-6">No staff profiles registered.</p>
+          ) : (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {deliveryMetrics.map(db => (
+                <div key={db.id} className="flex justify-between items-center p-3.5 bg-gray-50 rounded-xl border text-xs">
+                  <div>
+                    <span className="font-bold text-gray-900 block text-sm">{db.name || db.full_name || db.email || 'Delivery Staff'}</span>
+                    <span className="text-gray-400">Phone: {db.phone || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-right">
+                    <div className="bg-blue-50 px-2.5 py-1 rounded-lg">
+                      <span className="font-bold text-blue-800 block text-xs">{db.deliveredCount}</span>
+                      <span className="text-[9px] text-blue-600 uppercase font-semibold">Delivered</span>
+                    </div>
+                    <div className="bg-amber-50 px-2.5 py-1 rounded-lg">
+                      <span className="font-bold text-amber-800 block text-xs">{db.activeCount}</span>
+                      <span className="text-[9px] text-amber-600 uppercase font-semibold">Active</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* Filtered Orders Table / Overview */}

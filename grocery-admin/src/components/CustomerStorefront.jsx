@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import TestimonialsSection from './TestimonialsSection';
 import Footer from './Footer';
+import CustomerFeedbackModal from './CustomerFeedbackModal'; // <-- Imported Feedback Modal
 import { calculateDistanceKm } from '../utils/distance';
 
 export default function CustomerStorefront() {
@@ -19,7 +20,7 @@ export default function CustomerStorefront() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const productsPerPage = 15;
+  const productsPerPage = 12;
 
   // Store & Sale Data
   const [storeLocation, setStoreLocation] = useState({ latitude: 26.7900, longitude: 82.6000 });
@@ -33,6 +34,9 @@ export default function CustomerStorefront() {
   const [wishlistIds, setWishlistIds] = useState([]);
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Feedback Modal State
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   // Product Details Modal State & Gallery Preview
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
@@ -106,7 +110,6 @@ export default function CustomerStorefront() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Reset pagination on search or category filter change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, activeCategory]);
@@ -160,11 +163,21 @@ export default function CustomerStorefront() {
       const rawVariants = varRes.data || [];
 
       const productsWithVariants = rawProducts.map(p => {
-        const pVariants = rawVariants.filter(v => v.product_id === p.id);
-        if (pVariants.length > 0) {
-          setSelectedVariants(prev => ({ ...prev, [p.id]: pVariants[0].id }));
+        const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
+        const jsonVariants = p.variants || [];
+        const mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
+
+        if (mergedVariants.length > 0) {
+          setSelectedVariants(prev => ({ ...prev, [p.id]: mergedVariants[0].id || mergedVariants[0].label }));
         }
-        return { ...p, variants: pVariants };
+
+        const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
+
+        return { 
+          ...p, 
+          images: mergedImages,
+          variants: mergedVariants 
+        };
       });
 
       setProducts(productsWithVariants);
@@ -347,19 +360,19 @@ export default function CustomerStorefront() {
   };
 
   const addToCart = (product) => {
-    const variantId = selectedVariants[product.id];
-    const variant = product.variants?.find(v => v.id === variantId);
+    const variantKey = selectedVariants[product.id];
+    const variant = product.variants?.find(v => (v.id === variantKey || v.label === variantKey || v.unit_label === variantKey));
     
-    const stockCheck = variant ? variant.stock : product.stock;
+    const stockCheck = Number(variant ? variant.stock : product.stock || 0);
     if (stockCheck <= 0) {
       alert("Sorry, this item is currently out of stock.");
       return;
     }
 
-    const cartItemId = variant ? `${product.id}-${variant.id}` : product.id;
-    const itemTitle = variant ? `${product.name} (${variant.unit_label})` : product.name;
-    const itemPrice = variant ? variant.price : product.price;
-    const itemStock = variant ? variant.stock : product.stock;
+    const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
+    const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
+    const itemPrice = Number(variant ? variant.price : product.price || 0);
+    const itemStock = stockCheck;
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
@@ -453,7 +466,7 @@ export default function CustomerStorefront() {
 
     try {
       for (const item of cart) {
-        if (item.variant) {
+        if (item.variant && item.variant.id) {
           const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variant.id).single();
           if (!vData || vData.stock < item.quantity) {
             alert(`Sorry! "${item.title}" is now out of stock.`);
@@ -471,6 +484,7 @@ export default function CustomerStorefront() {
       }
 
       const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      const selectedAddrObj = savedAddresses.find(a => a.id === selectedAddressId);
 
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
@@ -481,7 +495,9 @@ export default function CustomerStorefront() {
           status: 'pending',
           delivery_address: addressForm.address,
           phone: addressForm.phone,
-          otp: generatedOtp
+          otp: generatedOtp,
+          latitude: selectedAddrObj?.latitude || null,
+          longitude: selectedAddrObj?.longitude || null
         }])
         .select()
         .single();
@@ -499,7 +515,7 @@ export default function CustomerStorefront() {
       if (itemsError) throw itemsError;
 
       for (const item of cart) {
-        if (item.variant) {
+        if (item.variant && item.variant.id) {
           await supabase.from('product_variants').update({ stock: item.variant.stock - item.quantity }).eq('id', item.variant.id);
         } else {
           await supabase.from('products').update({ stock: item.product.stock - item.quantity }).eq('id', item.product.id);
@@ -520,7 +536,6 @@ export default function CustomerStorefront() {
     }
   };
 
-  // Filter and Paginate Products
   const filteredProducts = products.filter(product => {
     const matchesCategory = activeCategory === 'All' || product.category_id === activeCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -565,6 +580,14 @@ export default function CustomerStorefront() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Feedback / Complaint Button */}
+            <button 
+              onClick={() => setIsFeedbackOpen(true)}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-1.5 transition shadow-2xs border border-emerald-200"
+            >
+              <MessageSquarePlus size={16} /> Feedback
+            </button>
+
             {session ? (
               <button 
                 onClick={() => setIsProfileOpen(true)}
@@ -837,10 +860,10 @@ export default function CustomerStorefront() {
                             )}
                             <div>
                               <span className="font-bold text-stone-900 block">{item.products?.name || 'Product'}</span>
-                              <span className="text-xs text-stone-500">Qty: {item.quantity} × ₹{item.price.toFixed(2)}</span>
+                              <span className="text-xs text-stone-500">Qty: {item.quantity} × ₹{Number(item.price || 0).toFixed(2)}</span>
                             </div>
                           </div>
-                          <span className="font-black text-stone-900">₹{(item.price * item.quantity).toFixed(2)}</span>
+                          <span className="font-black text-stone-900">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -859,7 +882,7 @@ export default function CustomerStorefront() {
 
                   <div className="border-t pt-4 flex justify-between items-center font-bold">
                     <span className="text-stone-600">Total Amount Paid:</span>
-                    <span className="text-xl font-black text-stone-900">₹{order.total_amount.toFixed(2)}</span>
+                    <span className="text-xl font-black text-stone-900">₹{Number(order.total_amount || 0).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -885,16 +908,18 @@ export default function CustomerStorefront() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {wishlistProducts.map(product => {
-                const currentVariantId = selectedVariants[product.id];
-                const activeVariant = product.variants?.find(v => v.id === currentVariantId);
-                const displayPrice = activeVariant ? activeVariant.price : product.price;
-                const isOutOfStock = (activeVariant ? activeVariant.stock : product.stock) <= 0;
+                const currentVariantKey = selectedVariants[product.id];
+                const activeVariant = product.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
+                const displayPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
+                const isOutOfStock = Number(activeVariant ? activeVariant.stock : product.stock || 0) <= 0;
+
+                const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
 
                 return (
                  <div key={product.id} className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs flex flex-col justify-between relative group hover:shadow-xl transition duration-300">
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
-                      className="absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-xs rounded-full shadow-md text-rose-600 hover:scale-110 transition"
+                      className={`absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-xs rounded-full shadow-md text-rose-600 hover:scale-110 transition`}
                       title="Remove from wishlist"
                     >
                       <Heart size={16} fill="currentColor" />
@@ -902,8 +927,8 @@ export default function CustomerStorefront() {
 
                     <div>
                       <div className="h-40 bg-stone-50 rounded-2xl relative overflow-hidden mb-3 flex items-center justify-center border border-stone-100">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                        {productImages.length > 0 ? (
+                          <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                         ) : (
                           <Package size={36} className="text-stone-300" />
                         )}
@@ -1010,27 +1035,29 @@ export default function CustomerStorefront() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                 {currentProducts.map(product => {
-                  const currentVariantId = selectedVariants[product.id];
-                  const activeVariant = product.variants?.find(v => v.id === currentVariantId);
+                  const currentVariantKey = selectedVariants[product.id];
+                  const activeVariant = product.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
                   
-                  const displayPrice = activeVariant ? activeVariant.price : product.price;
-                  const displayMrp = activeVariant ? (activeVariant.mrp || activeVariant.price) : (product.mrp || product.price);
-                  const displayStock = activeVariant ? activeVariant.stock : product.stock;
+                  const displayPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
+                  const displayMrp = Number(activeVariant ? (activeVariant.mrp || activeVariant.price) : (product.mrp || product.price || 0));
+                  const displayStock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
                   const isOutOfStock = displayStock <= 0;
 
                   const discountPercent = displayMrp > displayPrice ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100) : 0;
                   const isWishlisted = wishlistIds.includes(product.id);
 
-                  const cartItemId = activeVariant ? `${product.id}-${activeVariant.id}` : product.id;
+                  const cartItemId = activeVariant ? `${product.id}-${activeVariant.id || activeVariant.label || activeVariant.unit_label}` : product.id;
                   const cartItem = cart.find(item => item.cartItemId === cartItemId);
                   const qtyInCart = cartItem ? cartItem.quantity : 0;
+
+                  const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
 
                   return (
                     <div 
                       key={product.id} 
                       onClick={() => {
                         setSelectedProductDetails(product);
-                        setActiveGalleryImage(product.images?.[0] || product.image_url || '');
+                        setActiveGalleryImage(productImages[0] || '');
                       }}
                       className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
                     >
@@ -1052,8 +1079,8 @@ export default function CustomerStorefront() {
                         </div>
 
                         <div className="h-40 bg-stone-50/80 rounded-2xl relative overflow-hidden mb-3.5 flex items-center justify-center border border-stone-100">
-                          {product.image_url ? (
-                            <img src={product.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          {productImages.length > 0 ? (
+                            <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                           ) : (
                             <Package size={36} className="text-stone-300" />
                           )}
@@ -1069,12 +1096,14 @@ export default function CustomerStorefront() {
                         {product.variants && product.variants.length > 0 && (
                           <select 
                             className="mt-2.5 w-full border border-stone-200 rounded-xl p-2 text-xs bg-stone-50 font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                            value={currentVariantId || ''}
+                            value={currentVariantKey || product.variants[0]?.id || product.variants[0]?.label || product.variants[0]?.unit_label || ''}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => setSelectedVariants({...selectedVariants, [product.id]: e.target.value})}
                           >
-                            {product.variants.map(v => (
-                              <option key={v.id} value={v.id}>{v.unit_label} - ₹{v.price.toFixed(2)}</option>
+                            {product.variants.map((v, vIdx) => (
+                              <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
+                                {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)}
+                              </option>
                             ))}
                           </select>
                         )}
@@ -1161,88 +1190,104 @@ export default function CustomerStorefront() {
               <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500"><X size={18}/></button>
             </div>
 
-            <div className="space-y-3">
-              <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner">
-                {activeGalleryImage ? (
-                  <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Package size={48} className="text-stone-300" />
-                )}
-              </div>
+            {(() => {
+              const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
+              const currentVariantKey = selectedVariants[selectedProductDetails.id];
+              const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
+              const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
 
-              {selectedProductDetails.images && selectedProductDetails.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {selectedProductDetails.images.map((imgUrl, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setActiveGalleryImage(imgUrl)}
-                      className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-stone-100 ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
-                    >
-                      <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
-              <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
-                <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'Harraiya Super Market'}
-              </p>
-              <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
-            </div>
-
-            {selectedProductDetails.variants && selectedProductDetails.variants.length > 0 && (
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Select Variant / Weight</label>
-                <select 
-                  className="w-full border p-3 rounded-xl text-xs bg-stone-50 font-bold outline-none"
-                  value={selectedVariants[selectedProductDetails.id] || ''}
-                  onChange={(e) => setSelectedVariants({...selectedVariants, [selectedProductDetails.id]: e.target.value})}
-                >
-                  {selectedProductDetails.variants.map(v => (
-                    <option key={v.id} value={v.id}>{v.unit_label} - ₹{v.price.toFixed(2)} (Stock: {v.stock})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Frequently Bought Together Suggestions */}
-            <div className="pt-3 border-t">
-              <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider mb-2.5">Frequently Bought Together</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {products
-                  .filter(p => p.category_id === selectedProductDetails.category_id && p.id !== selectedProductDetails.id)
-                  .slice(0, 3)
-                  .map(suggestion => (
-                    <div 
-                      key={suggestion.id} 
-                      onClick={() => {
-                        setSelectedProductDetails(suggestion);
-                        setActiveGalleryImage(suggestion.image_url || '');
-                      }}
-                      className="bg-stone-50 hover:bg-stone-100 p-2.5 rounded-2xl border text-center cursor-pointer transition shadow-2xs group"
-                    >
-                      <img src={suggestion.image_url} alt="" className="w-12 h-12 object-cover mx-auto mb-1.5 rounded-xl border group-hover:scale-105 transition" />
-                      <p className="text-[11px] font-bold text-stone-800 truncate">{suggestion.name}</p>
-                      <p className="text-[10px] font-black text-emerald-700 mt-0.5">₹{suggestion.price.toFixed(2)}</p>
+              return (
+                <>
+                  <div className="space-y-3">
+                    <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner">
+                      {activeGalleryImage ? (
+                        <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={48} className="text-stone-300" />
+                      )}
                     </div>
-                  ))}
-              </div>
-            </div>
 
-            <div className="pt-4 border-t flex justify-between items-center">
-              <span className="text-xl font-black text-stone-900">
-                ₹{(selectedProductDetails.variants?.find(v => v.id === selectedVariants[selectedProductDetails.id])?.price || selectedProductDetails.price).toFixed(2)}
-              </span>
-              <button 
-                onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition"
-              >
-                Add to Cart
-              </button>
-            </div>
+                    {modalImages.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {modalImages.map((imgUrl, i) => (
+                          <button 
+                            key={i} 
+                            onClick={() => setActiveGalleryImage(imgUrl)}
+                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-stone-100 ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
+                          >
+                            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
+                    <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
+                      <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'Harraiya Super Market'}
+                    </p>
+                    <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
+                  </div>
+
+                  {selectedProductDetails.variants && selectedProductDetails.variants.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 mb-1">Select Variant / Weight</label>
+                      <select 
+                        className="w-full border p-3 rounded-xl text-xs bg-stone-50 font-bold outline-none"
+                        value={currentVariantKey || selectedProductDetails.variants[0]?.id || selectedProductDetails.variants[0]?.label || selectedProductDetails.variants[0]?.unit_label || ''}
+                        onChange={(e) => setSelectedVariants({...selectedVariants, [selectedProductDetails.id]: e.target.value})}
+                      >
+                        {selectedProductDetails.variants.map((v, vIdx) => (
+                          <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
+                            {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)} (Stock: {v.stock})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Frequently Bought Together Suggestions */}
+                  <div className="pt-3 border-t">
+                    <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider mb-2.5">Frequently Bought Together</h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      {products
+                        .filter(p => p.category_id === selectedProductDetails.category_id && p.id !== selectedProductDetails.id)
+                        .slice(0, 3)
+                        .map(suggestion => {
+                          const suggImages = suggestion.images || suggestion.gallery || [suggestion.image_url].filter(Boolean);
+                          return (
+                            <div 
+                              key={suggestion.id} 
+                              onClick={() => {
+                                setSelectedProductDetails(suggestion);
+                                setActiveGalleryImage(suggImages[0] || '');
+                              }}
+                              className="bg-stone-50 hover:bg-stone-100 p-2.5 rounded-2xl border text-center cursor-pointer transition shadow-2xs group"
+                            >
+                              <img src={suggImages[0]} alt="" className="w-12 h-12 object-cover mx-auto mb-1.5 rounded-xl border group-hover:scale-105 transition" />
+                              <p className="text-[11px] font-bold text-stone-800 truncate">{suggestion.name}</p>
+                              <p className="text-[10px] font-black text-emerald-700 mt-0.5">₹{Number(suggestion.price || 0).toFixed(2)}</p>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t flex justify-between items-center">
+                    <span className="text-xl font-black text-stone-900">
+                      ₹{modalPrice.toFixed(2)}
+                    </span>
+                    <button 
+                      onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition"
+                    >
+                      Add to Cart
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1280,9 +1325,9 @@ export default function CustomerStorefront() {
                   <div key={item.cartItemId} className="flex items-center justify-between gap-3 bg-stone-50/80 p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
                     <div className="flex-1 min-w-0">
                       <span className="font-bold text-sm text-stone-900 block truncate">{item.title}</span>
-                      <span className="text-xs text-stone-500 font-medium">₹{item.price.toFixed(2)} each</span>
+                      <span className="text-xs text-stone-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
                     </div>
-                    <span className="text-sm font-black text-stone-900">₹{(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="text-sm font-black text-stone-900">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
                     <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200 shadow-2xs">
                       <button onClick={() => updateQuantity(item.cartItemId, -1)} className="p-1 hover:bg-stone-100 rounded-lg transition"><Minus size={14}/></button>
                       <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
@@ -1398,6 +1443,9 @@ export default function CustomerStorefront() {
         isOpen={Boolean(selectedInvoiceOrder)} 
         onClose={() => setSelectedInvoiceOrder(null)} 
       />
+
+      {/* Feedback & Suggestion Modal */}
+      <CustomerFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
       <Footer />
     </div>

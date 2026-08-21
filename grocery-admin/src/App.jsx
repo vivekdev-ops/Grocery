@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare } from 'lucide-react';
 
 import HomeSelector from './components/HomeSelector';
 import CustomerStorefront from './components/CustomerStorefront';
@@ -23,7 +23,8 @@ import TestimonialManager from './components/TestimonialManager';
 import ShopkeeperDetailsAdmin from './components/ShopkeeperDetailsAdmin';
 import CategoryManager from './components/CategoryManager';
 import FlashSaleManager from './components/FlashSaleManager';
-import StoreLocationManager from './components/StoreLocationManager'; // <-- Added StoreLocationManager
+import StoreLocationManager from './components/StoreLocationManager';
+import FeedbackAdmin from './components/FeedbackAdmin'; // <-- Imported Customer Feedback Admin View
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
 
@@ -59,11 +60,12 @@ function AdminLayout() {
       case 'customers': return <CustomerManagement />;
       case 'shopkeeperDetails': return <ShopkeeperDetailsAdmin />;
       case 'deliveryFees': return <DeliveryFeeManager />;
-      case 'storeLocation': return <StoreLocationManager />; // <-- Render Store Location Manager
+      case 'storeLocation': return <StoreLocationManager />;
       case 'coupons': return <CouponManager />;
       case 'banners': return <BannerManager />;
       case 'flashSales': return <FlashSaleManager />;
       case 'testimonials': return <TestimonialManager />;
+      case 'feedback': return <FeedbackAdmin />; // <-- Render Feedback Admin View
       default: return <Analytics />;
     }
   };
@@ -89,6 +91,7 @@ function AdminLayout() {
           <button onClick={() => setActiveView('banners')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'banners' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Image size={18} />Banners</button>
           <button onClick={() => setActiveView('flashSales')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'flashSales' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Flame size={18} />Flash Sales</button>
           <button onClick={() => setActiveView('testimonials')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'testimonials' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MessageSquareQuote size={18} />Testimonials</button>
+          <button onClick={() => setActiveView('feedback')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'feedback' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MessageSquare size={18} />Feedback & Complaints</button>
         </nav>
         <div className="p-4 border-t border-stone-200 space-y-2">
           <button onClick={() => navigate('/select')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition-colors"><Store size={18} />Switch App</button>
@@ -114,9 +117,8 @@ export default function App() {
       <Route path="/admin" element={<AdminLayout />} />
       <Route path="/shopkeeper" element={<ShopkeeperPortal />} />
       <Route path="/delivery" element={<DeliveryPortal />} />
-      <Route path="/" element={<CustomerStorefront />} />
-  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-  <Route path="/terms-of-service" element={<TermsOfService />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-of-service" element={<TermsOfService />} />
     </Routes>
   );
 }
