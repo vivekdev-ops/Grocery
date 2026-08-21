@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin } from 'lucide-react';
 
 import HomeSelector from './components/HomeSelector';
 import CustomerStorefront from './components/CustomerStorefront';
@@ -21,7 +21,9 @@ import BannerManager from './components/BannerManager';
 import OrderTracker from './components/OrderTracker';
 import TestimonialManager from './components/TestimonialManager';
 import ShopkeeperDetailsAdmin from './components/ShopkeeperDetailsAdmin';
-import CategoryManager from './components/CategoryManager'; // <-- Added CategoryManager import
+import CategoryManager from './components/CategoryManager';
+import FlashSaleManager from './components/FlashSaleManager';
+import StoreLocationManager from './components/StoreLocationManager'; // <-- Added StoreLocationManager
 
 function AdminLayout() {
   const [session, setSession] = useState(null);
@@ -49,14 +51,16 @@ function AdminLayout() {
     switch (activeView) {
       case 'analytics': return <Analytics />;
       case 'inventory': return <ProductManager />;
-      case 'categories': return <CategoryManager />; // <-- Render Category Manager
+      case 'categories': return <CategoryManager />;
       case 'orders': return <Orders />;
       case 'staff': return <Staff />;
       case 'customers': return <CustomerManagement />;
       case 'shopkeeperDetails': return <ShopkeeperDetailsAdmin />;
       case 'deliveryFees': return <DeliveryFeeManager />;
+      case 'storeLocation': return <StoreLocationManager />; // <-- Render Store Location Manager
       case 'coupons': return <CouponManager />;
       case 'banners': return <BannerManager />;
+      case 'flashSales': return <FlashSaleManager />;
       case 'testimonials': return <TestimonialManager />;
       default: return <Analytics />;
     }
@@ -78,8 +82,10 @@ function AdminLayout() {
           <button onClick={() => setActiveView('shopkeeperDetails')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'shopkeeperDetails' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Store size={18} />Shopkeeper Details</button>
           <button onClick={() => setActiveView('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'customers' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Users size={18} />Customers</button>
           <button onClick={() => setActiveView('deliveryFees')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'deliveryFees' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Truck size={18} />Delivery Fees</button>
+          <button onClick={() => setActiveView('storeLocation')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'storeLocation' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MapPin size={18} />Store Location</button>
           <button onClick={() => setActiveView('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'coupons' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Tag size={18} />Coupons</button>
           <button onClick={() => setActiveView('banners')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'banners' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Image size={18} />Banners</button>
+          <button onClick={() => setActiveView('flashSales')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'flashSales' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Flame size={18} />Flash Sales</button>
           <button onClick={() => setActiveView('testimonials')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'testimonials' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MessageSquareQuote size={18} />Testimonials</button>
         </nav>
         <div className="p-4 border-t border-stone-200 space-y-2">

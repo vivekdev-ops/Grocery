@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, LogOut, Trash2, FileText, Heart, Sparkles, ArrowRight, Store } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, LogOut, Trash2, FileText, Heart, Sparkles, ArrowRight, Store, Zap, Flame, Navigation } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import TestimonialsSection from './TestimonialsSection';
 import Footer from './Footer';
+import { calculateDistanceKm } from '../utils/distance';
 
 export default function CustomerStorefront() {
   const [products, setProducts] = useState([]);
@@ -15,6 +16,11 @@ export default function CustomerStorefront() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Store & Sale Data
+  const [storeLocation, setStoreLocation] = useState({ latitude: 26.7900, longitude: 82.6000 });
+  const [activeFlashSale, setActiveFlashSale] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   // User & View State
   const [session, setSession] = useState(null);
@@ -42,17 +48,29 @@ export default function CustomerStorefront() {
 
   // Delivery Fee Rules & Coupons State
   const [deliveryRules, setDeliveryRules] = useState([]);
-  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(40);
+  const [selectedAddressDistance, setSelectedAddressDistance] = useState(null);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  // Addresses State
+  // Addresses State with Default Location Values
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
-  const [newAddressForm, setNewAddressForm] = useState({ title: 'Home', address: '', phone: '' });
   const [showAddAddressBox, setShowAddAddressBox] = useState(false);
-  const [addressForm, setAddressForm] = useState({ name: '', phone: '', address: '' });
+  const [newAddressForm, setNewAddressForm] = useState({
+    title: 'Home',
+    house_no: '',
+    ward_no_name: '',
+    city: 'Harraiya',
+    district: 'Basti',
+    state: 'Uttar Pradesh',
+    pincode: '272155',
+    phone: '',
+    latitude: null,
+    longitude: null
+  });
+  const [addressForm, setAddressForm] = useState({ phone: '', address: '' });
 
   const navigate = useNavigate();
 
@@ -76,10 +94,41 @@ export default function CustomerStorefront() {
     });
 
     fetchStoreData();
+    fetchStoreLocation();
     fetchDeliveryRules();
     fetchBanners();
+    fetchActiveFlashSale();
+
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchStoreLocation = async () => {
+    const { data } = await supabase.from('store_settings').select('*').limit(1).single();
+    if (data) setStoreLocation(data);
+  };
+
+  const fetchActiveFlashSale = async () => {
+    const { data } = await supabase.from('flash_sales').select('*').eq('is_active', true).single();
+    if (data) {
+      setActiveFlashSale(data);
+      const difference = new Date(data.end_time).getTime() - new Date().getTime();
+      setTimeLeft(Math.max(0, Math.floor(difference / 1000)));
+    }
+  };
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -182,26 +231,70 @@ export default function CustomerStorefront() {
     if (!error && data) {
       setSavedAddresses(data);
       if (data.length > 0) {
-        setSelectedAddressId(data[0].id);
-        setAddressForm(prev => ({ ...prev, phone: data[0].phone || '', address: data[0].address || '' }));
+        handleSelectAddress(data[0]);
       }
+    }
+  };
+
+  const detectCustomerLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setNewAddressForm(prev => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          }));
+          alert("GPS location captured successfully!");
+        },
+        (err) => {
+          alert("Unable to retrieve location: " + err.message);
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
     }
   };
 
   const handleAddAddress = async (e) => {
     e.preventDefault();
     if (!session) return;
+
+    const fullFormattedAddress = `${newAddressForm.house_no}, ${newAddressForm.ward_no_name}, ${newAddressForm.city}, ${newAddressForm.district}, ${newAddressForm.state} - ${newAddressForm.pincode}`;
+
     const { error } = await supabase.from('customer_addresses').insert([{
       user_id: session.user.id,
       title: newAddressForm.title,
-      address: newAddressForm.address,
-      phone: newAddressForm.phone
+      house_no: newAddressForm.house_no,
+      ward_no_name: newAddressForm.ward_no_name,
+      city: newAddressForm.city,
+      district: newAddressForm.district,
+      state: newAddressForm.state,
+      pincode: newAddressForm.pincode,
+      phone: newAddressForm.phone,
+      latitude: newAddressForm.latitude,
+      longitude: newAddressForm.longitude,
+      address: fullFormattedAddress
     }]);
 
     if (!error) {
-      setNewAddressForm({ title: 'Home', address: '', phone: '' });
+      setNewAddressForm({
+        title: 'Home',
+        house_no: '',
+        ward_no_name: '',
+        city: 'Harraiya',
+        district: 'Basti',
+        state: 'Uttar Pradesh',
+        pincode: '272155',
+        phone: '',
+        latitude: null,
+        longitude: null
+      });
       setShowAddAddressBox(false);
       fetchSavedAddresses(session.user.id);
+    } else {
+      alert("Error adding address: " + error.message);
     }
   };
 
@@ -210,15 +303,51 @@ export default function CustomerStorefront() {
     if (session) fetchSavedAddresses(session.user.id);
   };
 
+  // Robust delivery fee evaluation
+  const calculateFee = (subtotal, distKm) => {
+    if (!deliveryRules || deliveryRules.length === 0) return 40;
+
+    const matchedRule = deliveryRules.find(r => {
+      const minCart = r.min_cart_value || 0;
+      const maxCart = r.max_cart_value || 999999;
+      const minDst = r.min_distance_km || 0;
+      const maxDst = r.max_distance_km || 999;
+
+      return subtotal >= minCart && subtotal <= maxCart && distKm >= minDst && distKm <= maxDst;
+    });
+
+    if (matchedRule) return matchedRule.delivery_fee;
+
+    const cartOnlyRule = deliveryRules.find(r => subtotal >= (r.min_cart_value || 0) && subtotal <= (r.max_cart_value || 999999));
+    return cartOnlyRule ? cartOnlyRule.delivery_fee : 40;
+  };
+
   const handleSelectAddress = (addrObj) => {
     setSelectedAddressId(addrObj.id);
     setAddressForm(prev => ({ ...prev, phone: addrObj.phone, address: addrObj.address }));
+
+    const lat = addrObj.latitude || storeLocation.latitude;
+    const lon = addrObj.longitude || storeLocation.longitude;
+    const distanceKm = calculateDistanceKm(storeLocation.latitude, storeLocation.longitude, lat, lon);
+    
+    setSelectedAddressDistance(distanceKm);
+
+    const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const fee = calculateFee(cartSubtotal, distanceKm);
+    
+    setDeliveryFee(fee);
   };
 
   const addToCart = (product) => {
     const variantId = selectedVariants[product.id];
     const variant = product.variants?.find(v => v.id === variantId);
     
+    const stockCheck = variant ? variant.stock : product.stock;
+    if (stockCheck <= 0) {
+      alert("Sorry, this item is currently out of stock.");
+      return;
+    }
+
     const cartItemId = variant ? `${product.id}-${variant.id}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label})` : product.name;
     const itemPrice = variant ? variant.price : product.price;
@@ -252,8 +381,13 @@ export default function CustomerStorefront() {
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   useEffect(() => {
-    const matchedRule = deliveryRules.find(r => cartSubtotal >= r.min_cart_value && cartSubtotal <= r.max_cart_value);
-    setDeliveryFee(matchedRule ? matchedRule.delivery_fee : (deliveryRules.length > 0 ? 0 : 40));
+    if (savedAddresses.length > 0 && selectedAddressId) {
+      const currentAddr = savedAddresses.find(a => a.id === selectedAddressId);
+      if (currentAddr) handleSelectAddress(currentAddr);
+    } else {
+      const fee = calculateFee(cartSubtotal, selectedAddressDistance || 0);
+      setDeliveryFee(fee);
+    }
   }, [cartSubtotal, deliveryRules]);
 
   useEffect(() => {
@@ -310,7 +444,25 @@ export default function CustomerStorefront() {
     setCheckingOut(true);
 
     try {
-      // Generate 4-digit OTP for delivery verification
+      // Live stock validation right before checkout
+      for (const item of cart) {
+        if (item.variant) {
+          const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variant.id).single();
+          if (!vData || vData.stock < item.quantity) {
+            alert(`Sorry! "${item.title}" is now out of stock.`);
+            setCheckingOut(false);
+            return;
+          }
+        } else {
+          const { data: pData } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
+          if (!pData || pData.stock < item.quantity) {
+            alert(`Sorry! "${item.title}" is now out of stock.`);
+            setCheckingOut(false);
+            return;
+          }
+        }
+      }
+
       const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
       const { data: orderData, error: orderError } = await supabase
@@ -368,30 +520,31 @@ export default function CustomerStorefront() {
   });
 
   return (
-    <div className="min-h-screen bg-stone-50/70 pb-32 font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-emerald-50/20 to-stone-100 pb-40 font-sans selection:bg-emerald-500 selection:text-white">
       
-      {/* Header */}
-      <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-stone-200">
+      {/* Sticky Glassmorphic Header */}
+      <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-40 border-b border-stone-200/60 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+          
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setViewTab('shop')}>
-            <div className="w-11 h-11 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
-              <span className="text-white font-black text-xl">HS</span>
+            <div className="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-600/30 group-hover:scale-105 transition transform">
+              <span className="text-white font-black text-xl tracking-tighter">HS</span>
             </div>
             <div className="flex flex-col">
               <span className="text-lg sm:text-xl font-black tracking-tight text-stone-900 leading-tight">Harraiya Super Market</span>
-              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full w-max flex items-center gap-1 mt-0.5 border border-emerald-200">
-                <Sparkles size={10} /> Quick
+              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full w-max flex items-center gap-1 mt-0.5 border border-emerald-200/60 shadow-2xs">
+                <Zap size={10} className="fill-emerald-600 text-emerald-600" /> 10 MINS SUPERFAST DELIVERY
               </span>
             </div>
           </div>
 
-          <div className="flex-1 max-w-xl mx-2 hidden sm:block">
+          <div className="flex-1 max-w-xl mx-4 hidden md:block">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition" size={18} />
               <input 
                 type="text" 
-                placeholder='Search products...' 
-                className="w-full pl-11 pr-4 py-3 bg-stone-50 focus:bg-white rounded-2xl text-sm font-medium text-stone-900 outline-none border-2 border-stone-200 focus:border-emerald-500 transition shadow-inner"
+                placeholder='Search fresh vegetables, fruits, dairy & essentials...' 
+                className="w-full pl-11 pr-4 py-3 bg-stone-100/70 focus:bg-white rounded-2xl text-sm font-medium text-stone-900 outline-none border-2 border-transparent focus:border-emerald-500 focus:shadow-lg focus:shadow-emerald-500/10 transition"
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -402,22 +555,22 @@ export default function CustomerStorefront() {
             {session ? (
               <button 
                 onClick={() => setIsProfileOpen(true)}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-800 px-3.5 py-2.5 rounded-2xl shadow-2xs transition duration-200 flex items-center gap-2.5 font-bold text-sm border border-stone-200 active:scale-95"
+                className="bg-white hover:bg-stone-50 text-stone-800 px-4 py-2.5 rounded-2xl shadow-xs transition duration-200 flex items-center gap-2.5 font-bold text-sm border border-stone-200/80 active:scale-95"
               >
-                <div className="w-7 h-7 bg-emerald-600 text-white rounded-full flex items-center justify-center font-black text-xs shadow-2xs">
+                <div className="w-7 h-7 bg-emerald-600 text-white rounded-full flex items-center justify-center font-black text-xs shadow-xs">
                   {session.user.email[0].toUpperCase()}
                 </div>
-                <span className="hidden md:inline">Account</span>
+                <span className="hidden sm:inline">Account</span>
               </button>
             ) : (
-              <Link to="/login" className="bg-stone-100 hover:bg-stone-200 text-stone-800 px-4 py-2.5 rounded-2xl text-sm font-bold shadow-2xs transition duration-200 border border-stone-200 active:scale-95">
+              <Link to="/login" className="bg-white hover:bg-stone-50 text-stone-800 px-5 py-2.5 rounded-2xl text-sm font-bold shadow-xs transition duration-200 border border-stone-200/80 active:scale-95">
                 Login
               </Link>
             )}
 
             <button 
               onClick={() => setIsCartOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-black flex items-center gap-2.5 shadow-md transition duration-200 transform active:scale-95"
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-2xl font-black flex items-center gap-2.5 shadow-xl shadow-emerald-600/30 transition duration-200 transform active:scale-95"
             >
               <ShoppingCart size={18} />
               <span>{totalItemsCount > 0 ? `${totalItemsCount} items` : 'Cart'}</span>
@@ -426,9 +579,23 @@ export default function CustomerStorefront() {
         </div>
       </header>
 
-      {/* Profile & Wishlist Drawer */}
+      {/* Mobile Search Bar Row */}
+      <div className="md:hidden px-4 pt-3 pb-1">
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+          <input 
+            type="text" 
+            placeholder='Search products...' 
+            className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl text-sm font-medium text-stone-900 outline-none border border-stone-200/80 shadow-xs"
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Profile & Structured Address Drawer */}
       {isProfileOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-end z-50 transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
             <div className="p-6 border-b flex justify-between items-center bg-stone-50/80">
               <h3 className="font-black text-lg text-stone-900 flex items-center gap-2.5"><User size={20} className="text-emerald-600" /> My Profile & Dashboard</h3>
@@ -436,7 +603,7 @@ export default function CustomerStorefront() {
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
-              <div className="bg-emerald-50/80 border border-emerald-100 p-4 rounded-2xl shadow-sm">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl shadow-xs">
                 <p className="text-xs text-emerald-800 uppercase font-extrabold tracking-wider">Signed in as</p>
                 <p className="font-bold text-stone-900 mt-0.5 truncate text-sm">{session?.user?.email}</p>
               </div>
@@ -444,20 +611,21 @@ export default function CustomerStorefront() {
               <div className="space-y-2">
                 <button 
                   onClick={() => { setIsProfileOpen(false); setViewTab('orders'); }}
-                  className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-sm"
+                  className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-2xs"
                 >
                   <span className="flex items-center gap-3"><Package size={18} className="text-emerald-600" /> My Orders & Live Tracking</span>
                   <ChevronRight size={16} className="text-stone-400" />
                 </button>
                 <button 
                   onClick={() => { setIsProfileOpen(false); setViewTab('wishlist'); }}
-                  className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-sm"
+                  className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-2xs"
                 >
                   <span className="flex items-center gap-3"><Heart size={18} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})</span>
                   <ChevronRight size={16} className="text-stone-400" />
                 </button>
               </div>
 
+              {/* Saved Addresses Section with Distance Badges */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-black text-stone-400 uppercase tracking-wider">Saved Addresses ({savedAddresses.length})</h4>
@@ -467,39 +635,91 @@ export default function CustomerStorefront() {
                 </div>
 
                 {showAddAddressBox && (
-                  <form onSubmit={handleAddAddress} className="bg-stone-50 p-4 rounded-2xl border space-y-3 shadow-inner">
+                  <form onSubmit={handleAddAddress} className="bg-stone-50 p-4 rounded-2xl border space-y-3 shadow-inner text-xs">
                     <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">Label (e.g. Home, Work)</label>
-                      <input type="text" required className="w-full border border-stone-300 p-2.5 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
+                      <label className="block font-bold text-stone-700 mb-1">Address Label</label>
+                      <input type="text" placeholder="Home, Work" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
                     </div>
+
+                    <button 
+                      type="button" 
+                      onClick={detectCustomerLocation}
+                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition"
+                    >
+                      <Navigation size={14} /> Detect My GPS Location
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">House No.</label>
+                        <input type="text" placeholder="House/Flat No." required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">Ward No. & Name</label>
+                        <input type="text" placeholder="Ward No / Colony" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">City</label>
+                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.city} onChange={e => setNewAddressForm({...newAddressForm, city: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">District</label>
+                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.district} onChange={e => setNewAddressForm({...newAddressForm, district: e.target.value})} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">State</label>
+                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.state} onChange={e => setNewAddressForm({...newAddressForm, state: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block font-medium text-stone-600 mb-1">Pin Code</label>
+                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.pincode} onChange={e => setNewAddressForm({...newAddressForm, pincode: e.target.value})} />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">Full Address</label>
-                      <textarea required rows="2" className="w-full border border-stone-300 p-2.5 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="House/Flat No, Street, Landmark" value={newAddressForm.address} onChange={e => setNewAddressForm({...newAddressForm, address: e.target.value})} />
+                      <label className="block font-medium text-stone-600 mb-1">Phone Number</label>
+                      <input type="tel" placeholder="9876543210" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">Phone Number</label>
-                      <input type="tel" required className="w-full border border-stone-300 p-2.5 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="9876543210" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                    </div>
-                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs transition shadow-md active:scale-95">Save Address</button>
+
+                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition shadow-md">Save Address</button>
                   </form>
                 )}
 
                 {savedAddresses.length === 0 && !showAddAddressBox ? (
                   <p className="text-sm text-stone-500 italic p-4 bg-stone-50 rounded-2xl border text-center">No saved addresses yet.</p>
                 ) : (
-                  savedAddresses.map(addr => (
-                    <div key={addr.id} className="p-3.5 bg-stone-50/80 rounded-2xl border text-sm text-stone-700 flex items-start justify-between gap-3 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <MapPin size={18} className="text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold text-stone-900 block">{addr.title}</span>
-                          <span className="text-xs text-stone-600 mt-0.5 block">{addr.address}</span>
-                          <span className="text-[11px] text-stone-400 block mt-1 font-mono">Phone: {addr.phone}</span>
+                  savedAddresses.map(addr => {
+                    const dist = (addr.latitude && addr.longitude) 
+                      ? calculateDistanceKm(storeLocation.latitude, storeLocation.longitude, addr.latitude, addr.longitude) 
+                      : null;
+
+                    return (
+                      <div key={addr.id} className="p-3.5 bg-stone-50/80 rounded-2xl border text-sm text-stone-700 flex items-start justify-between gap-3 shadow-2xs">
+                        <div className="flex items-start gap-3 flex-1">
+                          <MapPin size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="w-full">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-stone-900">{addr.title}</span>
+                              {dist !== null && (
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">
+                                  📍 {dist} KM away
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-stone-600 mt-0.5 block">{addr.address}</span>
+                            <span className="text-[11px] text-stone-400 block mt-1 font-mono">Phone: {addr.phone}</span>
+                          </div>
                         </div>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1.5 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14}/></button>
                       </div>
-                      <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1.5 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14}/></button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -507,7 +727,7 @@ export default function CustomerStorefront() {
             <div className="p-6 border-t bg-stone-50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-sm shadow-sm"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-sm shadow-2xs"
               >
                 <LogOut size={16} /> Logout
               </button>
@@ -518,7 +738,7 @@ export default function CustomerStorefront() {
 
       {/* Success Modal */}
       {orderSuccess && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-stone-100">
             <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
               <CheckCircle size={40} />
@@ -527,7 +747,7 @@ export default function CustomerStorefront() {
             <p className="text-stone-600 text-sm mb-6">Your quick delivery order <span className="font-mono font-bold text-stone-900">#{orderSuccess}</span> has been confirmed.</p>
             <button 
               onClick={() => { setOrderSuccess(null); setViewTab('orders'); }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-bold transition duration-200 shadow-lg active:scale-95 flex items-center justify-center gap-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-bold transition duration-200 shadow-lg shadow-emerald-600/30 active:scale-95 flex items-center justify-center gap-2"
             >
               Track My Order <ArrowRight size={16} />
             </button>
@@ -539,7 +759,7 @@ export default function CustomerStorefront() {
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-stone-900">My Orders & Live Tracking</h2>
-            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-emerald-50 px-3 py-1.5 rounded-xl">Back to Shop</button>
+            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-white px-4 py-2.5 rounded-xl border border-stone-200 shadow-2xs">Back to Shop</button>
           </div>
 
           {!session ? (
@@ -556,7 +776,7 @@ export default function CustomerStorefront() {
           ) : (
             <div className="space-y-6">
               {myOrders.map(order => (
-                <div key={order.id} className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-sm transition duration-300 hover:shadow-md space-y-4">
+                <div key={order.id} className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs transition duration-300 hover:shadow-md space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-stone-100 gap-2">
                     <div>
                       <span className="font-mono font-bold text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
@@ -566,7 +786,7 @@ export default function CustomerStorefront() {
                       {order.status === 'delivered' && (
                         <button 
                           onClick={() => setSelectedInvoiceOrder(order)}
-                          className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition duration-200 active:scale-95 flex items-center gap-1.5 shadow-sm"
+                          className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition duration-200 active:scale-95 flex items-center gap-1.5 shadow-2xs"
                         >
                           <FileText size={14} /> Download Invoice
                         </button>
@@ -581,7 +801,6 @@ export default function CustomerStorefront() {
                     </div>
                   </div>
 
-                  {/* Delivery Verification OTP Display */}
                   {order.status !== 'delivered' && order.status !== 'cancelled' && order.otp && (
                     <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between">
                       <div>
@@ -601,7 +820,7 @@ export default function CustomerStorefront() {
                         <div key={item.id} className="flex items-center justify-between text-sm py-1.5 border-b border-stone-200/50 last:border-0">
                           <div className="flex items-center gap-3">
                             {item.products?.image_url && (
-                              <img src={item.products.image_url} alt="" className="w-11 h-11 object-cover rounded-xl border bg-white shadow-sm" />
+                              <img src={item.products.image_url} alt="" className="w-11 h-11 object-cover rounded-xl border bg-white shadow-2xs" />
                             )}
                             <div>
                               <span className="font-bold text-stone-900 block">{item.products?.name || 'Product'}</span>
@@ -641,7 +860,7 @@ export default function CustomerStorefront() {
               <h2 className="text-2xl font-black text-stone-900">My Wishlist</h2>
               <p className="text-xs text-stone-500 mt-0.5">Quickly access items you saved for later.</p>
             </div>
-            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-emerald-50 px-3 py-1.5 rounded-xl">Back to Shop</button>
+            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-white px-4 py-2.5 rounded-xl border border-stone-200">Back to Shop</button>
           </div>
 
           {wishlistProducts.length === 0 ? (
@@ -651,28 +870,34 @@ export default function CustomerStorefront() {
               <button onClick={() => setViewTab('shop')} className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-md inline-block">Explore Store</button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {wishlistProducts.map(product => {
                 const currentVariantId = selectedVariants[product.id];
                 const activeVariant = product.variants?.find(v => v.id === currentVariantId);
                 const displayPrice = activeVariant ? activeVariant.price : product.price;
+                const isOutOfStock = (activeVariant ? activeVariant.stock : product.stock) <= 0;
 
                 return (
-                 <div key={product.id} className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-sm flex flex-col justify-between relative group hover:shadow-xl transition duration-300">
+                 <div key={product.id} className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs flex flex-col justify-between relative group hover:shadow-xl transition duration-300">
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
-                      className="absolute top-5 right-5 z-10 p-2.5 bg-white/90 backdrop-blur rounded-full shadow-md text-rose-600 hover:scale-110 transition"
+                      className="absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-xs rounded-full shadow-md text-rose-600 hover:scale-110 transition"
                       title="Remove from wishlist"
                     >
                       <Heart size={16} fill="currentColor" />
                     </button>
 
                     <div>
-                      <div className="h-36 bg-stone-50 rounded-2xl relative overflow-hidden mb-3 flex items-center justify-center border border-stone-100">
+                      <div className="h-40 bg-stone-50 rounded-2xl relative overflow-hidden mb-3 flex items-center justify-center border border-stone-100">
                         {product.image_url ? (
                           <img src={product.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                         ) : (
                           <Package size={36} className="text-stone-300" />
+                        )}
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+                            <span className="bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">Sold Out</span>
+                          </div>
                         )}
                       </div>
                       <h3 className="font-bold text-stone-900 text-sm line-clamp-2 leading-snug">{product.name}</h3>
@@ -681,9 +906,12 @@ export default function CustomerStorefront() {
 
                     <button 
                       onClick={() => addToCart(product)}
-                      className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-2xl text-xs font-bold shadow-md transition active:scale-95"
+                      disabled={isOutOfStock}
+                      className={`mt-4 w-full py-2.5 rounded-2xl text-xs font-bold shadow-md transition active:scale-95 ${
+                        isOutOfStock ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                     >
-                      Add to Cart
+                      {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                     </button>
                   </div>
                 );
@@ -696,16 +924,19 @@ export default function CustomerStorefront() {
           
           {/* Stunning Banner Slider */}
           {banners.length > 0 && (
-            <div className="mb-8 relative rounded-3xl overflow-hidden shadow-xl h-48 sm:h-64 bg-stone-900 border border-stone-200">
+            <div className="mb-8 relative rounded-3xl overflow-hidden shadow-2xl h-52 sm:h-72 bg-stone-900 border border-stone-200/50">
               {banners.map((banner, index) => (
                 <div 
                   key={banner.id} 
                   className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
-                  <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover transform scale-105 animate-pulse duration-1000" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex items-end p-6">
+                  <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover transform scale-105 transition duration-1000" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/30 to-transparent flex items-end p-6 sm:p-8">
                     {banner.title && (
-                      <h2 className="text-white font-black text-xl sm:text-2xl drop-shadow-md">{banner.title}</h2>
+                      <div className="space-y-1.5">
+                        <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md">Special Offer</span>
+                        <h2 className="text-white font-black text-2xl sm:text-3xl drop-shadow-md tracking-tight">{banner.title}</h2>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -713,11 +944,33 @@ export default function CustomerStorefront() {
             </div>
           )}
 
-          {/* Sleek Category Pills */}
-          <div className="flex gap-2.5 overflow-x-auto pb-4 mb-8 scrollbar-none">
+          {/* Admin-Managed Flash Sale Banner */}
+          {activeFlashSale && activeFlashSale.is_active && timeLeft > 0 && (
+            <div className="mb-8 bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 rounded-3xl p-6 text-white shadow-xl flex items-center justify-between border border-rose-400/30">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-3.5 rounded-2xl backdrop-blur-md shadow-inner">
+                  <Flame size={28} className="text-white animate-bounce" />
+                </div>
+                <div>
+                  <span className="bg-black/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">Limited Time</span>
+                  <h3 className="font-black text-xl sm:text-2xl mt-1 tracking-tight">{activeFlashSale.title}</h3>
+                  <p className="text-xs text-rose-100 font-medium mt-0.5">{activeFlashSale.subtitle}</p>
+                </div>
+              </div>
+              <div className="text-right bg-black/20 px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
+                <p className="text-[10px] font-black uppercase tracking-wider text-rose-200">Sale Ends In</p>
+                <div className="font-mono font-black text-2xl sm:text-3xl tracking-wider text-white mt-0.5">
+                  {formatTime(timeLeft)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Gorgeous Pill Categories */}
+          <div className="flex gap-3 overflow-x-auto pb-4 mb-8 scrollbar-none items-center">
             <button
               onClick={() => setActiveCategory('All')}
-              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-sm ${activeCategory === 'All' ? 'bg-stone-900 text-white shadow-md' : 'bg-white text-stone-700 hover:bg-stone-100 border border-stone-200'}`}
+              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === 'All' ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
             >
               All Items
             </button>
@@ -725,7 +978,7 @@ export default function CustomerStorefront() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-sm ${activeCategory === cat.id ? 'bg-stone-900 text-white shadow-md' : 'bg-white text-stone-700 hover:bg-stone-100 border border-stone-200'}`}
+                className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === cat.id ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
               >
                 {cat.name}
               </button>
@@ -735,13 +988,13 @@ export default function CustomerStorefront() {
           {loading ? (
             <div className="text-center py-24 text-stone-500 font-bold text-sm">Loading fresh catalog...</div>
           ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-3xl border shadow-sm space-y-2">
+            <div className="text-center py-20 bg-white rounded-3xl border shadow-xs space-y-2">
               <Package className="mx-auto text-stone-300 mb-2" size={48} />
               <h3 className="text-lg font-bold text-stone-800">No products found</h3>
               <p className="text-stone-500 text-sm">Try searching for something else or pick another category.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {filteredProducts.map(product => {
                 const currentVariantId = selectedVariants[product.id];
                 const activeVariant = product.variants?.find(v => v.id === currentVariantId);
@@ -765,34 +1018,34 @@ export default function CustomerStorefront() {
                       setSelectedProductDetails(product);
                       setActiveGalleryImage(product.images?.[0] || product.image_url || '');
                     }}
-                    className="bg-white rounded-3xl border border-stone-200/80 p-3.5 shadow-sm transition duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col justify-between relative group cursor-pointer"
+                    className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
                   >
                     
                     {/* Wishlist Button */}
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
-                      className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur text-stone-400 hover:text-rose-600'}`}
+                      className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur-xs text-stone-400 hover:text-rose-600'}`}
                       title="Wishlist"
                     >
                       <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
                     </button>
 
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-800 w-max shadow-2xs">
-                          <Timer size={10} className="text-emerald-600"/> INSTANT
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-800 w-max shadow-2xs border border-emerald-200/50">
+                          <Timer size={10} className="text-emerald-600"/> 10 MINS
                         </div>
                       </div>
 
-                      <div className="h-36 bg-stone-50 rounded-2xl relative overflow-hidden mb-3 flex items-center justify-center border border-stone-100">
+                      <div className="h-40 bg-stone-50/80 rounded-2xl relative overflow-hidden mb-3.5 flex items-center justify-center border border-stone-100">
                         {product.image_url ? (
                           <img src={product.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         ) : (
                           <Package size={36} className="text-stone-300" />
                         )}
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-black/50 backdrop-blur-2xs flex items-center justify-center">
-                            <span className="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow">Sold Out</span>
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+                            <span className="bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">Sold Out</span>
                           </div>
                         )}
                       </div>
@@ -813,7 +1066,7 @@ export default function CustomerStorefront() {
                       )}
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-2 pt-2 border-t border-stone-100">
+                    <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
                       <div>
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-black text-stone-900">₹{displayPrice.toFixed(2)}</p>
@@ -822,7 +1075,7 @@ export default function CustomerStorefront() {
                           )}
                         </div>
                         {discountPercent > 0 && (
-                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md mt-0.5 inline-block">
+                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md mt-0.5 inline-block border border-emerald-100">
                             {discountPercent}% OFF
                           </span>
                         )}
@@ -836,15 +1089,15 @@ export default function CustomerStorefront() {
                         ) : qtyInCart === 0 ? (
                           <button 
                             onClick={() => addToCart(product)}
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-black px-4 py-2 rounded-2xl text-xs transition duration-200 transform active:scale-95 shadow-2xs uppercase tracking-wide"
+                            className="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200 font-black px-4 py-2 rounded-xl text-xs transition duration-200 transform active:scale-95 shadow-2xs uppercase tracking-wide"
                           >
                             ADD
                           </button>
                         ) : (
-                          <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-2xl p-1 shadow-md">
-                            <button onClick={() => updateQuantity(cartItemId, -1)} className="p-1 hover:bg-emerald-700 transition rounded-xl"><Minus size={12} /></button>
+                          <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl p-1 shadow-md">
+                            <button onClick={() => updateQuantity(cartItemId, -1)} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Minus size={12} /></button>
                             <span className="font-black text-xs w-5 text-center">{qtyInCart}</span>
-                            <button onClick={() => addToCart(product)} disabled={qtyInCart >= displayStock} className="p-1 hover:bg-emerald-700 transition rounded-xl"><Plus size={12} /></button>
+                            <button onClick={() => addToCart(product)} disabled={qtyInCart >= displayStock} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Plus size={12} /></button>
                           </div>
                         )}
                       </div>
@@ -855,21 +1108,19 @@ export default function CustomerStorefront() {
             </div>
           )}
 
-          {/* Testimonials */}
           <TestimonialsSection />
         </main>
       )}
 
-      {/* Product Details Modal with Multiple Image Gallery */}
+      {/* Product Details Modal with Gallery & Frequently Bought Together */}
       {selectedProductDetails && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-lg text-stone-900">Product Details & Gallery</h3>
+              <h3 className="font-black text-lg text-stone-900">Product Details</h3>
               <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500"><X size={18}/></button>
             </div>
 
-            {/* Gallery Viewer */}
             <div className="space-y-3">
               <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner">
                 {activeGalleryImage ? (
@@ -879,7 +1130,6 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Thumbnails Row */}
               {selectedProductDetails.images && selectedProductDetails.images.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {selectedProductDetails.images.map((imgUrl, i) => (
@@ -897,7 +1147,7 @@ export default function CustomerStorefront() {
 
             <div className="space-y-2">
               <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
-              <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1">
+              <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
                 <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'Harraiya Super Market'}
               </p>
               <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
@@ -918,6 +1168,30 @@ export default function CustomerStorefront() {
               </div>
             )}
 
+            {/* Frequently Bought Together Suggestions */}
+            <div className="pt-3 border-t">
+              <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider mb-2.5">Frequently Bought Together</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {products
+                  .filter(p => p.category_id === selectedProductDetails.category_id && p.id !== selectedProductDetails.id)
+                  .slice(0, 3)
+                  .map(suggestion => (
+                    <div 
+                      key={suggestion.id} 
+                      onClick={() => {
+                        setSelectedProductDetails(suggestion);
+                        setActiveGalleryImage(suggestion.image_url || '');
+                      }}
+                      className="bg-stone-50 hover:bg-stone-100 p-2.5 rounded-2xl border text-center cursor-pointer transition shadow-2xs group"
+                    >
+                      <img src={suggestion.image_url} alt="" className="w-12 h-12 object-cover mx-auto mb-1.5 rounded-xl border group-hover:scale-105 transition" />
+                      <p className="text-[11px] font-bold text-stone-800 truncate">{suggestion.name}</p>
+                      <p className="text-[10px] font-black text-emerald-700 mt-0.5">₹{suggestion.price.toFixed(2)}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
             <div className="pt-4 border-t flex justify-between items-center">
               <span className="text-xl font-black text-stone-900">
                 ₹{(selectedProductDetails.variants?.find(v => v.id === selectedVariants[selectedProductDetails.id])?.price || selectedProductDetails.price).toFixed(2)}
@@ -935,7 +1209,7 @@ export default function CustomerStorefront() {
 
       {/* Floating Bottom Cart Bar */}
       {totalItemsCount > 0 && !isCartOpen && (
-        <div className="fixed bottom-4 left-4 right-4 bg-emerald-600 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-emerald-500 animate-slideUp">
+        <div className="fixed bottom-6 left-4 right-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-emerald-400/30 animate-slideUp">
           <div className="flex items-center gap-3">
             <div className="bg-white text-emerald-700 px-3.5 py-1.5 rounded-2xl font-black text-xs shadow-md">
               {totalItemsCount} ITEMS
@@ -944,16 +1218,16 @@ export default function CustomerStorefront() {
           </div>
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-emerald-900 hover:bg-black px-6 py-3 rounded-2xl transition duration-200 shadow-lg active:scale-95"
+            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-stone-900 hover:bg-black px-6 py-3 rounded-2xl transition duration-200 shadow-lg active:scale-95"
           >
             View Cart <ChevronRight size={16} />
           </button>
         </div>
       )}
 
-      {/* Cart & Checkout Drawer */}
+      {/* Cart & Checkout Slide-Over Drawer */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-end z-50 transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
             <div className="p-6 border-b flex justify-between items-center bg-stone-50/80">
               <h3 className="font-black text-lg text-stone-900 flex items-center gap-2"><ShoppingCart size={20} className="text-emerald-600" /> My Cart ({totalItemsCount})</h3>
@@ -1048,6 +1322,12 @@ export default function CustomerStorefront() {
                     <span>-₹{discountAmount.toFixed(2)}</span>
                   </div>
                 )}
+                {selectedAddressDistance !== null && (
+                  <div className="flex justify-between text-stone-500 text-xs font-medium">
+                    <span>Distance from Store:</span>
+                    <span className="font-bold text-stone-800">{selectedAddressDistance} KM</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-stone-600 font-medium">
                   <span>Delivery Fee:</span>
                   <span>{deliveryFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₹${deliveryFee.toFixed(2)}`}</span>
@@ -1062,7 +1342,7 @@ export default function CustomerStorefront() {
                 type="button" 
                 onClick={session ? handleCheckout : () => { setIsCartOpen(false); navigate('/login'); }}
                 disabled={checkingOut || (session && savedAddresses.length === 0)}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl transition duration-200 transform active:scale-95 flex items-center justify-center gap-2.5 text-sm disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black py-4 rounded-2xl shadow-xl transition duration-200 transform active:scale-95 flex items-center justify-center gap-2.5 text-sm disabled:opacity-50"
               >
                 <ShieldCheck size={18} />
                 {checkingOut ? 'Placing Order...' : session ? 'Place Secure Order' : 'Login to Checkout'}
@@ -1079,7 +1359,6 @@ export default function CustomerStorefront() {
         onClose={() => setSelectedInvoiceOrder(null)} 
       />
 
-      {/* Footer */}
       <Footer />
     </div>
   );

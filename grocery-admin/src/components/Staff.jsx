@@ -102,8 +102,6 @@ export default function Staff() {
       }
     } else {
       // CREATE NEW RECORD
-      // Note: signUp logs the user in on the frontend. To prevent your admin session 
-      // from being overridden, capture the current session first if needed.
       const currentSession = await supabase.auth.getSession();
 
       const { data, error: authError } = await supabase.auth.signUp({
@@ -119,14 +117,14 @@ export default function Staff() {
       if (data?.user) {
         const userId = data.user.id;
 
-        // Restore admin session just in case signUp overwrote it
+        // Restore admin session
         if (currentSession?.data?.session) {
           await supabase.auth.setSession(currentSession.data.session);
         }
 
         if (form.role === 'shopkeeper') {
           const { error: shopError } = await supabase.from('shopkeeper_profiles').insert([{
-            id: userId,
+            user_id: userId, // Satisfies foreign key constraint referencing auth.users(id)
             store_name: form.store_name || 'My Store',
             phone: form.phone || '',
             address: form.address || ''
