@@ -1,5 +1,6 @@
 // src/components/Footer.jsx
 import { ShieldCheck, Truck, Clock, Headphones, MapPin, Phone, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -65,9 +66,8 @@ export default function Footer() {
           <div>
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">Useful Links</h4>
             <ul className="space-y-2 text-xs text-gray-600 font-medium">
-              <li><a href="/" className="hover:text-[#0c831f] transition">Home Store</a></li>
-              <li><a href="/track" className="hover:text-[#0c831f] transition">Track Order</a></li>
-              <li><a href="/login" className="hover:text-[#0c831f] transition">Customer Login</a></li>
+              <li><Link to="/" className="hover:text-[#0c831f] transition">Home Store</Link></li>
+              <li><Link to="/login" className="hover:text-[#0c831f] transition">Customer Login</Link></li>
             </ul>
           </div>
 
@@ -103,12 +103,12 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom Copyright */}
+        {/* Bottom Copyright & Working Legal Links */}
         <div className="border-t border-gray-100 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center text-xs text-gray-400 gap-4">
           <p>© {new Date().getFullYear()} Harraiya Super Market. All rights reserved.</p>
-          <div className="flex gap-6">
-            <span className="hover:text-gray-600 cursor-pointer">Privacy Policy</span>
-            <span className="hover:text-gray-600 cursor-pointer">Terms of Service</span>
+          <div className="flex gap-6 font-bold">
+            <Link to="/privacy-policy" className="hover:text-gray-600 transition">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-gray-600 transition">Terms of Service</Link>
           </div>
         </div>
       </div>

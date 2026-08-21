@@ -24,6 +24,8 @@ import ShopkeeperDetailsAdmin from './components/ShopkeeperDetailsAdmin';
 import CategoryManager from './components/CategoryManager';
 import FlashSaleManager from './components/FlashSaleManager';
 import StoreLocationManager from './components/StoreLocationManager'; // <-- Added StoreLocationManager
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
 
 function AdminLayout() {
   const [session, setSession] = useState(null);
@@ -112,6 +114,9 @@ export default function App() {
       <Route path="/admin" element={<AdminLayout />} />
       <Route path="/shopkeeper" element={<ShopkeeperPortal />} />
       <Route path="/delivery" element={<DeliveryPortal />} />
+      <Route path="/" element={<CustomerStorefront />} />
+  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+  <Route path="/terms-of-service" element={<TermsOfService />} />
     </Routes>
   );
 }

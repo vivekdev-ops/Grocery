@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Package, Plus, Trash2, Edit, X, Layers, Upload, ImageIcon } from 'lucide-react';
+import ExcelProductUpload from './ExcelProductUpload';
 
 export default function ProductManager() {
   const [products, setProducts] = useState([]);
@@ -131,7 +132,6 @@ export default function ProductManager() {
     setSubmitting(true);
 
     try {
-      // 1. Upload files to storage bucket
       const allImageUrls = await uploadImagesToStorage();
       const primaryImageUrl = allImageUrls.length > 0 ? allImageUrls[0] : null;
 
@@ -150,20 +150,16 @@ export default function ProductManager() {
       let productId = editingProduct?.id;
 
       if (editingProduct) {
-        // UPDATE PRODUCT
         const { error } = await supabase.from('products').update(productPayload).eq('id', editingProduct.id);
         if (error) throw error;
         
-        // Clear old variants and re-insert
         await supabase.from('product_variants').delete().eq('product_id', editingProduct.id);
       } else {
-        // CREATE PRODUCT
         const { data, error } = await supabase.from('products').insert([productPayload]).select().single();
         if (error) throw error;
         productId = data.id;
       }
 
-      // INSERT VARIANTS IF ANY
       if (variants.length > 0) {
         const variantPayloads = variants.map(v => ({
           product_id: productId,
@@ -213,6 +209,9 @@ export default function ProductManager() {
           </button>
         </div>
       </div>
+
+      {/* Excel Bulk Upload Widget */}
+      <ExcelProductUpload onUploadSuccess={fetchData} />
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
@@ -339,7 +338,6 @@ export default function ProductManager() {
                   <p className="text-[10px] text-gray-400 mt-1">Select multiple files from your device to form the product gallery.</p>
                 </div>
 
-                {/* Preview existing uploaded images */}
                 {existingImages.length > 0 && (
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {existingImages.map((url, i) => (
