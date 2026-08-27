@@ -1,14 +1,17 @@
 // src/components/CustomerStorefront.jsx
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus, Ban, Star, RotateCcw, MessageCircle } from 'lucide-react';
+import { Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, Star, RotateCcw, MessageCircle, CheckCircle } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
-import TestimonialsSection from './TestimonialsSection';
 import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
-import ValueGoLogo from './ValueGoLogo';
 import { calculateDistanceKm } from '../utils/distance';
+
+// Import Modular Components
+import StoreHeader from './store/StoreHeader';
+import ProductGrid from './store/ProductGrid';
+import CartDrawer from './store/CartDrawer';
 
 export default function CustomerStorefront() {
   const [products, setProducts] = useState([]);
@@ -39,7 +42,7 @@ export default function CustomerStorefront() {
   const [openSection, setOpenSection] = useState(null);
   const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
   const [deliveredProductIds, setDeliveredProductIds] = useState([]);
-  const [userReviewsMap, setUserReviewsMap] = useState({}); // productId -> reviewObj
+  const [userReviewsMap, setUserReviewsMap] = useState({});
 
   // Order Section Review Modal State
   const [reviewModalProduct, setReviewModalProduct] = useState(null);
@@ -73,7 +76,7 @@ export default function CustomerStorefront() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  // Addresses State with Default Location Values
+  // Addresses State
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [showAddAddressBox, setShowAddAddressBox] = useState(false);
@@ -123,7 +126,7 @@ export default function CustomerStorefront() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Realtime subscription for instant live sync of reviews deletion/updates across clients
+  // Realtime review synchronization
   useEffect(() => {
     const reviewsChannel = supabase
       .channel('public:product_reviews')
@@ -179,7 +182,7 @@ export default function CustomerStorefront() {
     if (banners.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide(prev => (prev + 1) % banners.length);
-    }, 4500);
+    }, 5000);
     return () => clearInterval(timer);
   }, [banners]);
 
@@ -631,7 +634,7 @@ export default function CustomerStorefront() {
   const shareOnWhatsApp = (product) => {
     const productUrl = window.location.href;
     const message = encodeURIComponent(
-      `Hey! Check out *${product.name}* available on ValueGo for just ₹${product.price} (10-minute delivery)! 🛒✨\n\nView here: ${productUrl}`
+      `Hey! Check out *${product.name}* on ValueGo delivered in 10 minutes! 🛒✨\n\nView here: ${productUrl}`
     );
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
@@ -729,141 +732,84 @@ export default function CustomerStorefront() {
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-emerald-50/20 to-stone-100 pb-40 font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-[#F0FDF4] text-slate-900 pb-44 font-sans selection:bg-emerald-500 selection:text-white">
       
-      {/* Sticky Glassmorphic Header */}
-      <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-40 border-b border-stone-200/60 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
-          
-          <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <ValueGoLogo />
-          </div>
+      {/* 1. Header Component */}
+      <StoreHeader 
+        session={session}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        totalItemsCount={totalItemsCount}
+        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
 
-          <div className="flex-1 max-w-xl mx-4 hidden md:block">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition" size={18} />
-              <input 
-                type="text" 
-                placeholder='Search fresh vegetables, fruits, dairy & essentials...' 
-                className="w-full pl-11 pr-4 py-3 bg-stone-100/70 focus:bg-white rounded-2xl text-sm font-medium text-stone-900 outline-none border-2 border-transparent focus:border-emerald-500 focus:shadow-lg focus:shadow-emerald-500/10 transition"
-                value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            {session ? (
-              <button 
-                onClick={() => setIsProfileOpen(true)}
-                className="w-11 h-11 bg-white hover:bg-stone-50 text-stone-800 rounded-2xl shadow-xs transition duration-200 flex items-center justify-center border border-stone-200/80 active:scale-95"
-                title="My Profile"
-              >
-                <User size={20} className="text-stone-700" />
-              </button>
-            ) : (
-              <Link to="/login" className="bg-white hover:bg-stone-50 text-stone-800 px-4 py-2.5 rounded-2xl text-sm font-bold shadow-xs transition duration-200 border border-stone-200/80 active:scale-95">
-                Login
-              </Link>
-            )}
-
-            <button 
-              onClick={() => setIsCartOpen(true)}
-              className="w-11 h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-600/30 transition duration-200 transform active:scale-95 relative"
-              title="Cart"
-            >
-              <ShoppingCart size={20} />
-              {totalItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                  {totalItemsCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-        </div>
-      </header>
-
-      {/* Mobile Search Bar Row */}
-      <div className="md:hidden px-4 pt-3 pb-1">
-        <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-          <input 
-            type="text" 
-            placeholder='Search products...' 
-            className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl text-sm font-medium text-stone-900 outline-none border border-stone-200/80 shadow-xs"
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Profile & Collapsible Accordion Drawer */}
+      {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-end z-50 transition-opacity duration-300">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
-            <div className="p-6 border-b flex justify-between items-center bg-stone-50/80">
-              <h3 className="font-black text-lg text-stone-900 flex items-center gap-2.5"><User size={20} className="text-emerald-600" /> My Profile & Dashboard</h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-stone-200/80 rounded-full text-stone-600 hover:bg-stone-300 transition"><X size={18} /></button>
+            <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
+              <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5"><User size={20} className="text-emerald-700" /> My Account & Dashboard</h3>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl shadow-xs">
-                <p className="text-[10px] text-emerald-800 uppercase font-extrabold tracking-wider">Signed in as</p>
-                <p className="font-bold text-stone-900 mt-0.5 truncate text-sm">{session?.user?.email}</p>
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
+                <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
+                <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
 
               {/* Collapsible Accordion: Recent Orders */}
-              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Package size={16} className="text-emerald-600" /> My Orders ({myOrders.length})
+                    <Package size={16} className="text-emerald-700" /> My Orders ({myOrders.length})
                   </span>
                   {openSection === 'orders' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
 
                 {openSection === 'orders' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-stone-100">
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     {myOrders.length === 0 ? (
-                      <p className="text-stone-400 italic py-2 text-center">No orders found.</p>
+                      <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
                     ) : (
                       myOrders.map(order => (
-                        <div key={order.id} className="p-3 bg-stone-50 rounded-xl border space-y-2">
+                        <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="font-mono font-bold text-stone-900">#{order.id.slice(0, 8)}</span>
-                            <span className={`px-2 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                            <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
+                            <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
                               order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
                               order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                             }`}>{order.status}</span>
                           </div>
-                          <div className="flex justify-between items-center text-stone-600">
+                          <div className="flex justify-between items-center text-slate-500">
                             <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                            <span className="font-black text-stone-900">₹{order.total_amount}</span>
+                            <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
                           </div>
                           <div className="flex gap-2 pt-1">
                             <button 
                               onClick={() => setSelectedProfileOrder(order)}
-                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
+                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
                             >
-                              <FileText size={12} /> View Details
+                              <FileText size={13} /> Details
                             </button>
                             {order.status === 'delivered' && (
                               <button 
                                 onClick={() => handleReorder(order)}
-                                className="bg-stone-900 hover:bg-black text-white px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs"
                               >
-                                <RotateCcw size={12} /> Re-order
+                                <RotateCcw size={13} /> Reorder
                               </button>
                             )}
                             {order.status === 'delivered' && (
                               <button 
                                 onClick={() => setSelectedInvoiceOrder(order)}
-                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-2.5 py-1.5 rounded-lg font-bold transition"
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200"
                               >
-                                Invoice
+                                Bill
                               </button>
                             )}
                           </div>
@@ -875,10 +821,10 @@ export default function CustomerStorefront() {
               </div>
 
               {/* Collapsible Accordion: Wishlist */}
-              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
                 >
                   <span className="flex items-center gap-2.5">
                     <Heart size={16} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})
@@ -887,39 +833,27 @@ export default function CustomerStorefront() {
                 </button>
 
                 {openSection === 'wishlist' && (
-                  <div className="p-4 pt-0 space-y-2 bg-white border-t border-stone-100">
+                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-emerald-100">
                     {wishlistProducts.length === 0 ? (
-                      <p className="text-stone-400 italic py-2 text-center">Your wishlist is empty.</p>
+                      <p className="text-slate-400 italic py-3 text-center">Your wishlist is empty.</p>
                     ) : (
                       wishlistProducts.map(p => {
                         const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
-                        const hasVariants = p.variants && p.variants.length > 0;
-                        const isWishlistOutOfStock = hasVariants 
-                          ? p.variants.every(v => Number(v.stock || 0) <= 0)
-                          : Number(p.stock || 0) <= 0;
-
                         return (
-                          <div key={p.id} className="p-2.5 bg-stone-50 rounded-xl border flex items-center justify-between gap-3 relative overflow-hidden">
-                            <div className="flex items-center gap-2.5 relative">
-                              <img src={pImages[0] || ''} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white" />
+                          <div key={p.id} className="p-3 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white" />
                               <div>
-                                <span className="font-bold text-stone-900 block line-clamp-1">{p.name}</span>
+                                <span className="font-bold text-slate-900 block line-clamp-1">{p.name}</span>
                                 <span className="font-black text-emerald-700">₹{p.price}</span>
                               </div>
                             </div>
-
-                            {isWishlistOutOfStock ? (
-                              <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
-                                Sold Out
-                              </span>
-                            ) : (
-                              <button 
-                                onClick={() => addToCart(p)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold shrink-0 transition"
-                              >
-                                Add
-                              </button>
-                            )}
+                            <button 
+                              onClick={() => addToCart(p)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition"
+                            >
+                              Add
+                            </button>
                           </div>
                         );
                       })
@@ -928,124 +862,130 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Collapsible Accordion: Saved Addresses */}
-              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
+              {/* Collapsible Accordion: Addresses */}
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin size={16} className="text-emerald-600" /> Saved Addresses ({savedAddresses.length})
+                    <MapPin size={16} className="text-emerald-700" /> Saved Addresses ({savedAddresses.length})
                   </span>
                   {openSection === 'addresses' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
 
                 {openSection === 'addresses' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-stone-100">
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     <div className="flex justify-between items-center pt-2">
-                      <span className="font-bold text-stone-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => setShowAddAddressBox(!showAddAddressBox)} className="text-emerald-600 font-bold hover:underline">
-                        {showAddAddressBox ? 'Cancel' : '+ Add New'}
+                      <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
+                      <button onClick={() => setShowAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline">
+                        {showAddAddressBox ? 'Cancel' : '+ Add Address'}
                       </button>
                     </div>
 
                     {showAddAddressBox && (
-                      <form onSubmit={handleAddAddress} className="bg-stone-50 p-3 rounded-xl border space-y-2">
-                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
-                        <button type="button" onClick={detectCustomerLocation} className="w-full bg-emerald-50 text-emerald-700 py-1.5 rounded-lg font-bold flex items-center justify-center gap-1 border border-emerald-200">
-                          <Navigation size={12} /> Detect GPS
+                      <form onSubmit={handleAddAddress} className="bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-200 space-y-2.5">
+                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
+                        <button type="button" onClick={detectCustomerLocation} className="w-full bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 border border-emerald-300">
+                          <Navigation size={13} /> Detect GPS Location
                         </button>
-                        <input type="text" placeholder="House No." required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
-                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
-                        <input type="tel" placeholder="Phone Number" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                        <button type="submit" className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold">Save Address</button>
+                        <input type="text" placeholder="House No." required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
+                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
+                        <input type="tel" placeholder="Phone Number" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
+                        <button type="submit" className="w-full bg-emerald-700 text-white py-2.5 rounded-xl font-black">Save Address</button>
                       </form>
                     )}
 
                     {savedAddresses.map(addr => (
-                      <div key={addr.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-start">
+                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start">
                         <div>
-                          <span className="font-bold text-stone-900 block">{addr.title}</span>
-                          <span className="text-stone-600 block mt-0.5">{addr.address}</span>
-                          <span className="text-stone-400 font-mono text-[10px] block mt-1">Phone: {addr.phone}</span>
+                          <span className="font-black text-slate-900 block">{addr.title}</span>
+                          <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
+                          <span className="text-slate-400 font-mono text-[10px] block mt-1">Phone: {addr.phone}</span>
                         </div>
-                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700"><Trash2 size={13}/></button>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={14}/></button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Feedback Button inside Profile */}
+              {/* Feedback */}
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
-                className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 p-4 rounded-2xl font-bold flex items-center justify-between border border-emerald-200 transition shadow-2xs"
+                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition"
               >
                 <span className="flex items-center gap-2.5">
-                  <MessageSquarePlus size={16} className="text-emerald-600" /> Send Feedback / Suggestions
+                  <MessageSquarePlus size={16} className="text-emerald-700" /> Send Feedback & Suggestions
                 </span>
                 <ChevronRight size={16} />
               </button>
 
             </div>
 
-            <div className="p-6 border-t bg-stone-50">
+            <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-sm shadow-2xs"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200"
               >
-                <LogOut size={16} /> Logout
+                <LogOut size={16} /> Logout Account
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Expanded Order Details Modal inside Profile */}
+      {/* Expanded Order Details Modal */}
       {selectedProfileOrder && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-base text-stone-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
-              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-stone-50 p-3 rounded-xl border flex justify-between items-center">
-                <span className="text-stone-500 font-bold">Status:</span>
-                <span className="font-extrabold uppercase text-emerald-700">{selectedProfileOrder.status}</span>
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                <span className="text-slate-500 font-bold">Order Status:</span>
+                <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                  selectedProfileOrder.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                  selectedProfileOrder.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                }`}>{selectedProfileOrder.status}</span>
               </div>
 
-              {selectedProfileOrder.status === 'cancelled' && selectedProfileOrder.cancellation_remark && (
-                <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 flex justify-between items-center text-rose-700">
-                  <span className="font-bold">Remark:</span>
-                  <span className="font-extrabold">{selectedProfileOrder.cancellation_remark}</span>
+              {/* Cancellation Remark Box */}
+              {selectedProfileOrder.status === 'cancelled' && (
+                <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1">
+                  <span className="text-rose-900 font-black uppercase text-[10px] tracking-wider block">Cancellation Reason</span>
+                  <p className="text-rose-700 font-medium leading-snug">
+                    {selectedProfileOrder.cancellation_remark || 'No specific remark provided.'}
+                  </p>
                 </div>
               )}
 
               {selectedProfileOrder.otp && selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
-                <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex justify-between items-center">
-                  <span className="text-emerald-800 font-bold">Delivery OTP:</span>
-                  <span className="font-mono font-black text-emerald-700 text-sm">{selectedProfileOrder.otp}</span>
+                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 flex justify-between items-center">
+                  <span className="text-emerald-900 font-bold">Delivery Verification OTP:</span>
+                  <span className="font-mono font-black text-emerald-700 text-sm tracking-widest bg-white px-3 py-1 rounded-xl border border-emerald-200">{selectedProfileOrder.otp}</span>
                 </div>
               )}
 
               <div className="space-y-1">
-                <span className="font-bold text-stone-400 uppercase text-[10px]">Ordered Items & Reviews</span>
-                <div className="space-y-2 bg-stone-50 p-3 rounded-xl border">
+                <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Items</span>
+                <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100">
                   {selectedProfileOrder.order_items?.map(item => {
                     const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
                     const itemImg = itemImages[0] || '';
                     const hasReviewed = userReviewsMap[item.product_id];
 
                     return (
-                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-stone-200/50 last:border-0">
+                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
-                            <img src={itemImg} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white shrink-0 shadow-xs" />
+                          <div className="flex items-center gap-3">
+                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
                             <div>
-                              <span className="font-bold text-stone-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
-                              <span className="text-stone-500 text-[10px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
+                              <span className="font-black text-slate-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
+                              <span className="text-slate-500 font-medium text-[11px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
                             </div>
                           </div>
 
@@ -1059,13 +999,13 @@ export default function CustomerStorefront() {
                                   setNewReviewForm({ rating: 5, review_text: '' });
                                 }
                               }}
-                              className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ${
+                              className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 ${
                                 hasReviewed 
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' 
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                               }`}
                             >
-                              {hasReviewed ? <><Star size={12} className="fill-amber-500 text-amber-500" /> Edit Review</> : <><Star size={12} /> Write Review</>}
+                              {hasReviewed ? <><Star size={12} className="fill-amber-500 text-amber-500" /> Edit Review</> : <><Star size={12} /> Rate Item</>}
                             </button>
                           )}
                         </div>
@@ -1075,14 +1015,14 @@ export default function CustomerStorefront() {
                 </div>
               </div>
 
-              <div className="bg-stone-50 p-3 rounded-xl border space-y-1">
-                <p className="text-stone-400 font-bold uppercase text-[10px]">Delivery Address</p>
-                <p className="text-stone-800 font-medium">{selectedProfileOrder.delivery_address}</p>
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
+                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
+                <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
               </div>
 
-              <div className="pt-2 border-t flex justify-between items-center font-black text-sm">
+              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
                 <span>Total Amount Paid:</span>
-                <span>₹{selectedProfileOrder.total_amount}</span>
+                <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
               </div>
             </div>
 
@@ -1090,71 +1030,71 @@ export default function CustomerStorefront() {
               {selectedProfileOrder.status === 'pending' && (
                 <button 
                   onClick={() => handleCancelOrder(selectedProfileOrder.id)}
-                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition"
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition"
                 >
                   <Ban size={15} /> Cancel Order
                 </button>
               )}
               <button 
                 onClick={() => setSelectedProfileOrder(null)}
-                className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-xs"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase"
               >
-                Close Details
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Dedicated Review Modal */}
+      {/* Review Modal */}
       {reviewModalProduct && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-sm text-stone-900">
-                {userReviewsMap[reviewModalProduct.id] ? 'Edit Your Review' : 'Write a Product Review'}
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900">
+                {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
               </h3>
-              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
             </div>
 
-            <form onSubmit={handleAddOrUpdateReview} className="space-y-3 text-xs">
-              <div className="flex items-center gap-3 bg-stone-50 p-2.5 rounded-xl border">
+            <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
+              <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
                 <img 
                   src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
                   alt="" 
-                  className="w-10 h-10 object-cover rounded-lg bg-white border" 
+                  className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
                 />
-                <span className="font-bold text-stone-900 truncate">{reviewModalProduct.name}</span>
+                <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
               </div>
 
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Select Rating</label>
+                <label className="block font-bold text-slate-700 mb-1">Star Rating</label>
                 <select 
                   value={newReviewForm.rating} 
                   onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
-                  className="w-full border p-2.5 rounded-xl bg-stone-50 font-bold outline-none"
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
                 >
-                  <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
-                  <option value="4">⭐⭐⭐⭐ (4/5)</option>
-                  <option value="3">⭐⭐⭐ (3/5)</option>
-                  <option value="2">⭐⭐ (2/5)</option>
-                  <option value="1">⭐ (1/5)</option>
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
+                  <option value="3">⭐⭐⭐ (3/5 - Average)</option>
+                  <option value="2">⭐⭐ (2/5 - Poor)</option>
+                  <option value="1">⭐ (1/5 - Terrible)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Review Comments</label>
+                <label className="block font-bold text-slate-700 mb-1">Your Review</label>
                 <textarea 
                   rows="3"
-                  placeholder="Share your experience with this item..." 
+                  placeholder="Share details of your experience with this item..." 
                   required
                   value={newReviewForm.review_text}
                   onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
-                  className="w-full border p-2.5 rounded-xl bg-stone-50 outline-none resize-none"
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
                 />
               </div>
 
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition shadow-md">
+              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20">
                 {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
               </button>
             </form>
@@ -1164,257 +1104,62 @@ export default function CustomerStorefront() {
 
       {/* Success Modal */}
       {orderSuccess && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-stone-100">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto border border-emerald-200">
               <CheckCircle size={40} />
             </div>
-            <h2 className="text-2xl font-black text-stone-900 mb-2">Order Placed Successfully!</h2>
-            <p className="text-stone-600 text-sm mb-6">Your quick delivery order <span className="font-mono font-bold text-stone-900">#{orderSuccess}</span> has been confirmed.</p>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">Order Placed!</h2>
+              <p className="text-slate-500 text-xs mt-1">Your quick delivery order <span className="font-mono font-bold text-slate-900">#{orderSuccess}</span> is being packed.</p>
+            </div>
             <button 
               onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-bold transition duration-200 shadow-lg shadow-emerald-600/30 active:scale-95 flex items-center justify-center gap-2"
+              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2"
             >
-              View My Orders <ArrowRight size={16} />
+              Track Order Status <ArrowRight size={16} />
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Home Screen */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        
-        {banners.length > 0 && (
-          <div className="mb-8 relative rounded-3xl overflow-hidden shadow-2xl h-52 sm:h-72 bg-stone-900 border border-stone-200/50">
-            {banners.map((banner, index) => (
-              <div 
-                key={banner.id} 
-                className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-              >
-                <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover transform scale-105 transition duration-1000" />
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/30 to-transparent flex items-end p-6 sm:p-8">
-                  {banner.title && (
-                    <div className="space-y-1.5">
-                      <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md">Special Offer</span>
-                      <h2 className="text-white font-black text-2xl sm:text-3xl drop-shadow-md tracking-tight">{banner.title}</h2>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* 2. Product Grid Component */}
+      <ProductGrid 
+        banners={banners}
+        currentSlide={currentSlide}
+        activeFlashSale={activeFlashSale}
+        timeLeft={timeLeft}
+        formatTime={formatTime}
+        categories={categories}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+        loading={loading}
+        currentProducts={currentProducts}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        wishlistIds={wishlistIds}
+        toggleWishlist={toggleWishlist}
+        selectedVariants={selectedVariants}
+        setSelectedVariants={setSelectedVariants}
+        cart={cart}
+        addToCart={addToCart}
+        updateQuantity={updateQuantity}
+        onSelectProduct={async (product) => {
+          setSelectedProductDetails(product);
+          const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+          setActiveGalleryImage(pImages[0] || '');
+          await fetchProductReviews(product.id);
+        }}
+      />
 
-        {activeFlashSale && activeFlashSale.is_active && timeLeft > 0 && (
-          <div className="mb-8 bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 rounded-3xl p-6 text-white shadow-xl flex items-center justify-between border border-rose-400/30">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 p-3.5 rounded-2xl backdrop-blur-md shadow-inner">
-                <Flame size={28} className="text-white animate-bounce" />
-              </div>
-              <div>
-                <span className="bg-black/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">Limited Time</span>
-                <h3 className="font-black text-xl sm:text-2xl mt-1 tracking-tight">{activeFlashSale.title}</h3>
-                <p className="text-xs text-rose-100 font-medium mt-0.5">{activeFlashSale.subtitle}</p>
-              </div>
-            </div>
-            <div className="text-right bg-black/20 px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
-              <p className="text-[10px] font-black uppercase tracking-wider text-rose-200">Sale Ends In</p>
-              <div className="font-mono font-black text-2xl sm:text-3xl tracking-wider text-white mt-0.5">
-                {formatTime(timeLeft)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-3 overflow-x-auto pb-4 mb-8 scrollbar-none items-center">
-          <button
-            onClick={() => setActiveCategory('All')}
-            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === 'All' ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
-          >
-            All Items
-          </button>
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === cat.id ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="text-center py-24 text-stone-500 font-bold text-sm">Loading fresh catalog...</div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border shadow-xs space-y-2">
-            <Package className="mx-auto text-stone-300 mb-2" size={48} />
-            <h3 className="text-lg font-bold text-stone-800">No products found</h3>
-            <p className="text-stone-500 text-sm">Try searching for something else or pick another category.</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-              {currentProducts.map(product => {
-                const currentVariantKey = selectedVariants[product.id];
-                const activeVariant = product.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
-                
-                const displayPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
-                const displayMrp = Number(activeVariant ? (activeVariant.mrp || activeVariant.price) : (product.mrp || product.price || 0));
-                const displayStock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
-                const isOutOfStock = displayStock <= 0;
-
-                const discountPercent = displayMrp > displayPrice ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100) : 0;
-                const isWishlisted = wishlistIds.includes(product.id);
-
-                const cartItemId = activeVariant ? `${product.id}-${activeVariant.id || activeVariant.label || activeVariant.unit_label}` : product.id;
-                const cartItem = cart.find(item => item.cartItemId === cartItemId);
-                const qtyInCart = cartItem ? cartItem.quantity : 0;
-
-                const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-
-                return (
-                  <div 
-                    key={product.id} 
-                    onClick={async () => {
-                      setSelectedProductDetails(product);
-                      setActiveGalleryImage(productImages[0] || '');
-                      await fetchProductReviews(product.id);
-                    }}
-                    className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
-                  >
-                    
-                    <button 
-                      onClick={(e) => toggleWishlist(product.id, e)}
-                      className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur-xs text-stone-400 hover:text-rose-600'}`}
-                      title="Wishlist"
-                    >
-                      <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
-                    </button>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-800 w-max shadow-2xs border border-emerald-200/50">
-                          <Timer size={10} className="text-emerald-600"/> 10 MINS
-                        </div>
-                      </div>
-
-                      <div className="h-40 bg-stone-50/80 rounded-2xl relative overflow-hidden mb-3.5 flex items-center justify-center border border-stone-100">
-                        {productImages.length > 0 ? (
-                          <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                        ) : (
-                          <Package size={36} className="text-stone-300" />
-                        )}
-                        {isOutOfStock && (
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
-                            <span className="bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">Sold Out</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <h3 className="font-bold text-stone-900 text-sm line-clamp-2 leading-snug">{product.name}</h3>
-                      
-                      {product.variants && product.variants.length > 0 && (
-                        <select 
-                          className="mt-2.5 w-full border border-stone-200 rounded-xl p-2 text-xs bg-stone-50 font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                          value={currentVariantKey || product.variants[0]?.id || product.variants[0]?.label || product.variants[0]?.unit_label || ''}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setSelectedVariants({...selectedVariants, [product.id]: e.target.value})}
-                        >
-                          {product.variants.map((v, vIdx) => (
-                            <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
-                              {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-black text-stone-900">₹{displayPrice.toFixed(2)}</p>
-                          {displayMrp > displayPrice && (
-                            <p className="text-xs text-stone-400 line-through font-medium">₹{displayMrp.toFixed(2)}</p>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mt-1">
-                          {discountPercent > 0 && (
-                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                              {discountPercent}% OFF
-                            </span>
-                          )}
-                          {product.avgRating && (
-                            <span className="flex items-center gap-1 text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                              <Star size={10} className="fill-amber-500 text-amber-500" /> {product.avgRating}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div onClick={(e) => e.stopPropagation()}>
-                        {isOutOfStock ? (
-                          <button disabled className="bg-stone-100 text-stone-400 font-bold px-3.5 py-2 rounded-xl text-xs cursor-not-allowed">
-                            Sold
-                          </button>
-                        ) : qtyInCart === 0 ? (
-                          <button 
-                            onClick={() => addToCart(product)}
-                            className="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200 font-black px-4 py-2 rounded-xl text-xs transition duration-200 transform active:scale-95 shadow-2xs uppercase tracking-wide"
-                          >
-                            ADD
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl p-1 shadow-md">
-                            <button onClick={() => updateQuantity(cartItemId, -1)} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Minus size={12} /></button>
-                            <span className="font-black text-xs w-5 text-center">{qtyInCart}</span>
-                            <button onClick={() => addToCart(product)} disabled={qtyInCart >= displayStock} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Plus size={12} /></button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-3 mt-12">
-                <button 
-                  onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
-                  disabled={currentPage === 1}
-                  className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
-                >
-                  Previous
-                </button>
-
-                <span className="text-xs font-bold text-stone-600 px-3 font-mono">
-                  Page {currentPage} of {totalPages}
-                </span>
-
-                <button 
-                  onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
-                  disabled={currentPage === totalPages}
-                  className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        <TestimonialsSection />
-      </main>
-
-      {/* Product Details Modal (Read-Only Reviews Viewer & WhatsApp Share Icon) */}
+      {/* Product Details Modal */}
       {selectedProductDetails && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-lg text-stone-900">Product Details & Reviews</h3>
-              <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500"><X size={18}/></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-base text-slate-900">Product Details</h3>
+              <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18}/></button>
             </div>
 
             {(() => {
@@ -1429,14 +1174,14 @@ export default function CustomerStorefront() {
               return (
                 <>
                   <div className="space-y-3">
-                    <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner relative">
+                    <div className="h-60 bg-emerald-50/40 rounded-2xl overflow-hidden flex items-center justify-center border border-emerald-100 relative">
                       {activeGalleryImage ? (
                         <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <Package size={48} className="text-stone-300" />
+                        <Package size={48} className="text-emerald-300" />
                       )}
                       {isModalOutOfStock && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+                        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center">
                           <span className="bg-rose-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow">Sold Out</span>
                         </div>
                       )}
@@ -1448,7 +1193,7 @@ export default function CustomerStorefront() {
                           <button 
                             key={i} 
                             onClick={() => setActiveGalleryImage(imgUrl)}
-                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-stone-100 ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
+                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-emerald-50/30 ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-emerald-100 opacity-70 hover:opacity-100'}`}
                           >
                             <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                           </button>
@@ -1459,52 +1204,52 @@ export default function CustomerStorefront() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
-                      <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
+                      <h2 className="text-xl font-black text-slate-900">{selectedProductDetails.name}</h2>
                       {selectedProductDetails.avgRating && (
                         <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
                           <Star size={14} className="fill-amber-500 text-amber-500" />
-                          <span>{selectedProductDetails.avgRating} ({selectedProductDetails.reviewCount} reviews)</span>
+                          <span>{selectedProductDetails.avgRating} ({selectedProductDetails.reviewCount})</span>
                         </div>
                       )}
                     </div>
                     <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
                       <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
                     </p>
-                    <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
+                    <p className="text-sm text-slate-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
                   </div>
 
-                  <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider">Customer Ratings & Reviews</h4>
+                  <div className="pt-4 border-t border-emerald-100 space-y-3">
+                    <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider">Customer Ratings & Reviews</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {productReviews.length === 0 ? (
-                        <p className="text-xs text-stone-400 italic">No reviews yet for this product.</p>
+                        <p className="text-xs text-slate-400 italic">No reviews yet for this product.</p>
                       ) : (
                         productReviews.map(rev => (
-                          <div key={rev.id} className="p-3 bg-stone-50 rounded-2xl border space-y-1 text-xs">
+                          <div key={rev.id} className="p-3 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-1 text-xs">
                             <div className="flex justify-between items-center">
-                              <span className="font-bold text-stone-900">{rev.user_email.split('@')[0]}</span>
+                              <span className="font-bold text-slate-900">{rev.user_email.split('@')[0]}</span>
                               <div className="flex items-center gap-0.5 text-amber-500">
                                 {[...Array(rev.rating)].map((_, i) => (
                                   <Star key={i} size={12} className="fill-amber-500" />
                                 ))}
                               </div>
                             </div>
-                            <p className="text-stone-600">{rev.review_text}</p>
+                            <p className="text-slate-600">{rev.review_text}</p>
                           </div>
                         ))
                       )}
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t flex items-center justify-between gap-3">
-                    <span className="text-xl font-black text-stone-900">
+                  <div className="pt-4 border-t border-emerald-100 flex items-center justify-between gap-3">
+                    <span className="text-xl font-black text-slate-900">
                       ₹{modalPrice.toFixed(2)}
                     </span>
                     <div className="flex items-center gap-2">
                       <button 
                         type="button"
                         onClick={() => shareOnWhatsApp(selectedProductDetails)}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 p-3 rounded-2xl transition shadow-2xs flex items-center justify-center"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 p-3 rounded-2xl transition flex items-center justify-center"
                         title="Share on WhatsApp"
                       >
                         <MessageCircle size={20} />
@@ -1512,13 +1257,13 @@ export default function CustomerStorefront() {
                       <button 
                         onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
                         disabled={isModalOutOfStock}
-                        className={`font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition ${
+                        className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition ${
                           isModalOutOfStock 
-                            ? 'bg-stone-100 text-stone-400 cursor-not-allowed' 
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                            : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-700/20'
                         }`}
                       >
-                        {isModalOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                        {isModalOutOfStock ? 'Sold Out' : 'Add to Cart'}
                       </button>
                     </div>
                   </div>
@@ -1531,151 +1276,54 @@ export default function CustomerStorefront() {
 
       {/* Floating Bottom Cart Bar */}
       {totalItemsCount > 0 && !isCartOpen && (
-        <div className="fixed bottom-6 left-4 right-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-emerald-400/30 animate-slideUp">
+        <div className="fixed bottom-6 left-4 right-4 bg-slate-900 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-emerald-800/40 animate-slideUp">
           <div className="flex items-center gap-3">
-            <div className="bg-white text-emerald-700 px-3.5 py-1.5 rounded-2xl font-black text-xs shadow-md">
+            <div className="bg-emerald-500 text-slate-950 px-3 py-1 rounded-xl font-black text-xs">
               {totalItemsCount} ITEMS
             </div>
-            <span className="font-black text-lg">₹{cartTotal.toFixed(2)}</span>
+            <span className="font-black text-base tracking-tight text-white">₹{cartTotal.toFixed(2)}</span>
           </div>
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-stone-900 hover:bg-black px-6 py-3 rounded-2xl transition duration-200 shadow-lg active:scale-95"
+            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 px-6 py-3 rounded-2xl transition duration-200 shadow-lg shadow-emerald-500/30 active:scale-95 text-slate-950"
           >
             View Cart <ChevronRight size={16} />
           </button>
         </div>
       )}
 
-      {/* Cart & Checkout Slide-Over Drawer */}
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-end z-50 transition-opacity duration-300">
-          <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
-            <div className="p-6 border-b flex justify-between items-center bg-stone-50/80">
-              <h3 className="font-black text-lg text-stone-900 flex items-center gap-2"><ShoppingCart size={20} className="text-emerald-600" /> My Cart ({totalItemsCount})</h3>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 bg-stone-200/80 rounded-full text-stone-600 hover:bg-stone-300 transition"><X size={18} /></button>
-            </div>
-
-            <div className="p-6 flex-1 overflow-y-auto space-y-6">
-              <div className="space-y-3">
-                {cart.map(item => (
-                  <div key={item.cartItemId} className="flex items-center justify-between gap-3 bg-stone-50/80 p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <img src={item.image || ''} alt="" className="w-12 h-12 object-cover rounded-xl border bg-white shrink-0 shadow-xs" />
-                      <div className="min-w-0">
-                        <span className="font-bold text-sm text-stone-900 block truncate">{item.title}</span>
-                        <span className="text-xs text-stone-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
-                      </div>
-                    </div>
-                    <span className="text-sm font-black text-stone-900 shrink-0">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
-                    <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200 shadow-2xs shrink-0">
-                      <button onClick={() => updateQuantity(item.cartItemId, -1)} className="p-1 hover:bg-stone-100 rounded-lg transition"><Minus size={14}/></button>
-                      <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.cartItemId, 1)} className="p-1 hover:bg-stone-100 rounded-lg transition"><Plus size={14}/></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {session ? (
-                <div className="space-y-4 pt-4 border-t border-stone-200">
-                  <h4 className="font-black text-stone-900 text-sm flex items-center gap-2"><MapPin size={18} className="text-emerald-600"/> Select Delivery Address</h4>
-                  
-                  {savedAddresses.length > 0 ? (
-                    <div className="space-y-2">
-                      {savedAddresses.map(addr => (
-                        <div 
-                          key={addr.id} 
-                          onClick={() => handleSelectAddress(addr)}
-                          className={`p-3.5 rounded-2xl border cursor-pointer transition duration-200 shadow-2xs ${selectedAddressId === addr.id ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-600/20' : 'bg-stone-50 hover:bg-stone-100 border-stone-200'}`}
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-black text-xs uppercase text-stone-900">{addr.title}</span>
-                            {selectedAddressId === addr.id && <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-black">Selected</span>}
-                          </div>
-                          <p className="text-xs text-stone-600">{addr.address}</p>
-                          <p className="text-[11px] text-stone-400 mt-1 font-mono">Phone: {addr.phone}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-amber-800 bg-amber-50 p-4 rounded-2xl border border-amber-200 font-medium">
-                      No saved addresses. Please open your **Profile** menu above to add a delivery address.
-                    </p>
-                  )}
-
-                  {/* Coupon Section */}
-                  <div className="pt-2 border-t border-stone-200">
-                    <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider mb-2">Promo Code</h4>
-                    {appliedCoupon ? (
-                      <div className="flex justify-between items-center bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200">
-                        <div>
-                          <span className="font-mono font-black text-emerald-800 text-sm">{appliedCoupon.code}</span>
-                          <p className="text-xs text-emerald-600">Discount applied successfully!</p>
-                        </div>
-                        <button onClick={removeCoupon} className="text-xs text-rose-600 font-bold hover:underline">Remove</button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" placeholder="Enter coupon code" 
-                          className="flex-1 border border-stone-300 p-2.5 rounded-xl text-xs uppercase outline-none font-bold focus:ring-2 focus:ring-emerald-500"
-                          value={couponInput} onChange={e => setCouponInput(e.target.value)}
-                        />
-                        <button onClick={handleApplyCoupon} className="bg-stone-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow">Apply</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-5 bg-amber-50 border border-amber-200 rounded-3xl text-center space-y-3">
-                  <p className="text-xs font-bold text-amber-900">Please log in to complete your order checkout.</p>
-                  <Link to="/login" className="inline-block bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-md">Login Now</Link>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t bg-stone-50 space-y-4 shadow-lg">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Items Total:</span>
-                  <span>₹{cartSubtotal.toFixed(2)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-bold">
-                    <span>Discount ({appliedCoupon?.code}):</span>
-                    <span>-₹{discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {selectedAddressDistance !== null && (
-                  <div className="flex justify-between text-stone-500 text-xs font-medium">
-                    <span>Distance from Store:</span>
-                    <span className="font-bold text-stone-800">{selectedAddressDistance} KM</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Delivery Fee:</span>
-                  <span>{deliveryFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₹${deliveryFee.toFixed(2)}`}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg font-black text-stone-900 pt-3 border-t border-stone-200">
-                  <span>To Pay:</span>
-                  <span>₹{cartTotal.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <button 
-                type="button" 
-                onClick={session ? handleCheckout : () => { setIsCartOpen(false); navigate('/login'); }}
-                disabled={checkingOut || (session && savedAddresses.length === 0)}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black py-4 rounded-2xl shadow-xl transition duration-200 transform active:scale-95 flex items-center justify-center gap-2.5 text-sm disabled:opacity-50"
-              >
-                <ShieldCheck size={18} />
-                {checkingOut ? 'Placing Order...' : session ? 'Place Secure Order' : 'Login to Checkout'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 3. Cart Drawer Component */}
+      <CartDrawer 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        totalItemsCount={totalItemsCount}
+        session={session}
+        savedAddresses={savedAddresses}
+        selectedAddressId={selectedAddressId}
+        handleSelectAddress={handleSelectAddress}
+        showAddAddressBox={showAddAddressBox}
+        setShowAddAddressBox={setShowAddAddressBox}
+        newAddressForm={newAddressForm}
+        setNewAddressForm={setNewAddressForm}
+        detectCustomerLocation={detectCustomerLocation}
+        handleAddAddress={handleAddAddress}
+        handleDeleteAddress={handleDeleteAddress}
+        updateQuantity={updateQuantity}
+        appliedCoupon={appliedCoupon}
+        couponInput={couponInput}
+        setCouponInput={setCouponInput}
+        handleApplyCoupon={handleApplyCoupon}
+        removeCoupon={removeCoupon}
+        cartSubtotal={cartSubtotal}
+        discountAmount={discountAmount}
+        selectedAddressDistance={selectedAddressDistance}
+        deliveryFee={deliveryFee}
+        cartTotal={cartTotal}
+        checkingOut={checkingOut}
+        handleCheckout={handleCheckout}
+        navigate={navigate}
+      />
 
       {/* Invoice Modal */}
       <InvoiceModal 

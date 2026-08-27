@@ -1,7 +1,7 @@
 // src/components/CategoryManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { FolderTree, Plus, Trash2, Edit, X } from 'lucide-react';
+import { FolderTree, Plus, Trash2, Edit, X, Upload, Image as ImageIcon } from 'lucide-react';
 
 export default function CategoryManager() {
   const [categories, setCategories] = useState([]);
@@ -11,6 +11,10 @@ export default function CategoryManager() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryImageUrl, setCategoryImageUrl] = useState('');
+  
+  // Local File Upload State
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -29,13 +33,46 @@ export default function CategoryManager() {
   const openAddModal = () => {
     setEditingCategory(null);
     setCategoryName('');
+    setCategoryImageUrl('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (cat) => {
     setEditingCategory(cat);
     setCategoryName(cat.name || '');
+    setCategoryImageUrl(cat.image_url || '');
     setIsModalOpen(true);
+  };
+
+  // Handle local file upload to Supabase Storage bucket
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Upload to 'category-icons' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('category-icons')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('category-icons')
+        .getPublicUrl(filePath);
+
+      setCategoryImageUrl(publicUrl);
+    } catch (err) {
+      alert('Image upload failed: ' + err.message + '\n(Make sure you have created a public bucket named "category-icons" in Supabase Storage)');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSaveCategory = async (e) => {
@@ -47,7 +84,10 @@ export default function CategoryManager() {
       if (editingCategory) {
         const { error } = await supabase
           .from('categories')
-          .update({ name: categoryName.trim() })
+          .update({ 
+            name: categoryName.trim(),
+            image_url: categoryImageUrl.trim() 
+          })
           .eq('id', editingCategory.id);
 
         if (error) throw error;
@@ -55,7 +95,10 @@ export default function CategoryManager() {
       } else {
         const { error } = await supabase
           .from('categories')
-          .insert([{ name: categoryName.trim() }]);
+          .insert([{ 
+            name: categoryName.trim(),
+            image_url: categoryImageUrl.trim() 
+          }]);
 
         if (error) throw error;
         alert('Category created successfully!');
@@ -88,7 +131,7 @@ export default function CategoryManager() {
           <h2 className="text-2xl font-black text-stone-900 flex items-center gap-2">
             <FolderTree size={24} className="text-emerald-600" /> Category Management
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">Create, update, or remove store categories for customer navigation.</p>
+          <p className="text-xs text-stone-500 mt-0.5">Create, update, or remove store categories and icons for customer navigation.</p>
         </div>
         <button 
           onClick={openAddModal}
@@ -102,6 +145,7 @@ export default function CategoryManager() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-stone-50 border-b border-stone-200 text-xs uppercase text-stone-500 font-semibold">
+              <th className="p-4">Icon</th>
               <th className="p-4">Category Name</th>
               <th className="p-4">Category ID</th>
               <th className="p-4 text-right">Actions</th>
@@ -109,12 +153,21 @@ export default function CategoryManager() {
           </thead>
           <tbody className="divide-y divide-stone-100 text-xs">
             {loading ? (
-              <tr><td colSpan="3" className="p-8 text-center text-stone-500 font-medium">Loading categories...</td></tr>
+              <tr><td colSpan="4" className="p-8 text-center text-stone-500 font-medium">Loading categories...</td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="3" className="p-8 text-center text-stone-400 italic">No categories created yet.</td></tr>
+              <tr><td colSpan="4" className="p-8 text-center text-stone-400 italic">No categories created yet.</td></tr>
             ) : (
               categories.map(cat => (
                 <tr key={cat.id} className="hover:bg-stone-50/80 transition">
+                  <td className="p-4">
+                    <div className="w-10 h-10 rounded-xl bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center">
+                      {cat.image_url ? (
+                        <img src={cat.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon size={16} className="text-stone-400" />
+                      )}
+                    </div>
+                  </td>
                   <td className="p-4 font-bold text-stone-900 text-sm">{cat.name}</td>
                   <td className="p-4 font-mono text-stone-400 text-[11px]">{cat.id}</td>
                   <td className="p-4 text-right space-x-2">
@@ -152,9 +205,29 @@ export default function CategoryManager() {
                 />
               </div>
 
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">Category Icon / Image</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
+                    {categoryImageUrl ? (
+                      <img src={categoryImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={20} className="text-stone-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label className="cursor-pointer bg-stone-900 hover:bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold transition inline-flex items-center gap-1.5 text-xs shadow-sm">
+                      <Upload size={14} /> {uploading ? 'Uploading...' : 'Browse Local File'}
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                    <p className="text-[10px] text-stone-400">Recommended: Square PNG or JPG (max 2MB)</p>
+                  </div>
+                </div>
+              </div>
+
               <button 
-                type="submit" disabled={submitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition text-sm shadow-md flex items-center justify-center gap-2 mt-2"
+                type="submit" disabled={submitting || uploading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition text-sm shadow-md flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
               </button>
