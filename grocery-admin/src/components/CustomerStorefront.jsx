@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus, Ban } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus, Ban, Star, RotateCcw, MessageCircle } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import TestimonialsSection from './TestimonialsSection';
 import Footer from './Footer';
@@ -38,13 +38,20 @@ export default function CustomerStorefront() {
   // Profile Collapsible Accordion & Detail States
   const [openSection, setOpenSection] = useState(null);
   const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
+  const [deliveredProductIds, setDeliveredProductIds] = useState([]);
+  const [userReviewsMap, setUserReviewsMap] = useState({}); // productId -> reviewObj
+
+  // Order Section Review Modal State
+  const [reviewModalProduct, setReviewModalProduct] = useState(null);
+  const [newReviewForm, setNewReviewForm] = useState({ rating: 5, review_text: '' });
 
   // Feedback Modal State
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
-  // Product Details Modal State & Gallery Preview
+  // Product Details Modal State & Gallery Preview & Reviews
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   const [activeGalleryImage, setActiveGalleryImage] = useState('');
+  const [productReviews, setProductReviews] = useState([]);
 
   // Cart & Checkout State
   const [cart, setCart] = useState([]);
@@ -93,6 +100,7 @@ export default function CustomerStorefront() {
         fetchMyOrders(session.user.email);
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
+        fetchUserReviews(session.user.id);
       }
     });
 
@@ -102,6 +110,7 @@ export default function CustomerStorefront() {
         fetchMyOrders(session.user.email);
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
+        fetchUserReviews(session.user.id);
       }
     });
 
@@ -113,6 +122,26 @@ export default function CustomerStorefront() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Realtime subscription for instant live sync of reviews deletion/updates across clients
+  useEffect(() => {
+    const reviewsChannel = supabase
+      .channel('public:product_reviews')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_reviews' }, () => {
+        fetchStoreData();
+        if (selectedProductDetails) {
+          fetchProductReviews(selectedProductDetails.id);
+        }
+        if (session) {
+          fetchUserReviews(session.user.id);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reviewsChannel);
+    };
+  }, [selectedProductDetails, session]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -157,14 +186,16 @@ export default function CustomerStorefront() {
   const fetchStoreData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, varRes] = await Promise.all([
+      const [prodRes, catRes, varRes, revRes] = await Promise.all([
         supabase.from('products').select('*, categories(name), shopkeeper_profiles(store_name)').eq('approval_status', 'approved').order('name'),
         supabase.from('categories').select('*').order('name'),
-        supabase.from('product_variants').select('*')
+        supabase.from('product_variants').select('*'),
+        supabase.from('product_reviews').select('*')
       ]);
 
       const rawProducts = prodRes.data || [];
       const rawVariants = varRes.data || [];
+      const rawReviews = revRes.data || [];
 
       const productsWithVariants = rawProducts.map(p => {
         const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
@@ -176,11 +207,15 @@ export default function CustomerStorefront() {
         }
 
         const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
+        const pReviews = rawReviews.filter(r => r.product_id === p.id);
+        const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : null;
 
         return { 
           ...p, 
           images: mergedImages,
-          variants: mergedVariants 
+          variants: mergedVariants,
+          avgRating,
+          reviewCount: pReviews.length
         };
       });
 
@@ -190,6 +225,65 @@ export default function CustomerStorefront() {
       console.error('Fetch error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserReviews = async (userId) => {
+    const { data } = await supabase.from('product_reviews').select('*').eq('user_id', userId);
+    if (data) {
+      const map = {};
+      data.forEach(rev => {
+        map[rev.product_id] = rev;
+      });
+      setUserReviewsMap(map);
+    }
+  };
+
+  const fetchProductReviews = async (productId) => {
+    const { data } = await supabase.from('product_reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
+    if (data) setProductReviews(data);
+  };
+
+  const handleAddOrUpdateReview = async (e) => {
+    e.preventDefault();
+    if (!session) { navigate('/login'); return; }
+    if (!reviewModalProduct) return;
+
+    const existingReview = userReviewsMap[reviewModalProduct.id];
+
+    if (existingReview) {
+      const { error } = await supabase
+        .from('product_reviews')
+        .update({ rating: Number(newReviewForm.rating), review_text: newReviewForm.review_text })
+        .eq('id', existingReview.id);
+
+      if (!error) {
+        alert("Review updated successfully!");
+        setNewReviewForm({ rating: 5, review_text: '' });
+        setReviewModalProduct(null);
+        fetchUserReviews(session.user.id);
+        fetchStoreData();
+      } else {
+        alert("Error updating review: " + error.message);
+      }
+    } else {
+      const { error } = await supabase.from('product_reviews').insert([{
+        product_id: reviewModalProduct.id,
+        user_id: session.user.id,
+        user_email: session.user.email,
+        rating: Number(newReviewForm.rating),
+        review_text: newReviewForm.review_text
+      }]);
+
+      if (!error) {
+        alert("Review submitted successfully!");
+        setNewReviewForm({ rating: 5, review_text: '' });
+        setReviewModalProduct(null);
+        fetchUserReviews(session.user.id);
+        fetchStoreData();
+      } else {
+        alert("Error posting review: " + error.message);
+      }
     }
   };
 
@@ -240,11 +334,62 @@ export default function CustomerStorefront() {
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*, products(name, image_url, images, gallery))')
+      .select('*, order_items(*, products(*))')
       .eq('customer_email', email)
       .order('created_at', { ascending: false });
 
-    if (!error) setMyOrders(data || []);
+    if (!error && data) {
+      setMyOrders(data || []);
+
+      const deliveredIds = [];
+      data.forEach(order => {
+        if (order.status === 'delivered' && order.order_items) {
+          order.order_items.forEach(item => {
+            if (item.product_id) deliveredIds.push(item.product_id);
+          });
+        }
+      });
+      setDeliveredProductIds(deliveredIds);
+    }
+  };
+
+  const handleReorder = (order) => {
+    if (!order.order_items || order.order_items.length === 0) return;
+
+    let addedCount = 0;
+    order.order_items.forEach(item => {
+      const prod = item.products;
+      if (prod && Number(prod.stock || 0) > 0) {
+        const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+        const itemImage = pImages[0] || '';
+
+        setCart(prev => {
+          const cartItemId = prod.id;
+          const existing = prev.find(ci => ci.cartItemId === cartItemId);
+          if (existing) {
+            return prev.map(ci => ci.cartItemId === cartItemId ? { ...ci, quantity: ci.quantity + item.quantity } : ci);
+          }
+          return [...prev, {
+            cartItemId,
+            product: prod,
+            variant: null,
+            title: prod.name,
+            price: Number(item.price),
+            quantity: item.quantity,
+            stock: Number(prod.stock || 10),
+            image: itemImage
+          }];
+        });
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      alert("Items from past order successfully added to your cart!");
+      setIsCartOpen(true);
+    } else {
+      alert("Sorry, items in this order are currently out of stock.");
+    }
   };
 
   const handleCancelOrder = async (orderId) => {
@@ -483,6 +628,14 @@ export default function CustomerStorefront() {
     setDiscountAmount(0);
   };
 
+  const shareOnWhatsApp = (product) => {
+    const productUrl = window.location.href;
+    const message = encodeURIComponent(
+      `Hey! Check out *${product.name}* available on ValueGo for just ₹${product.price} (10-minute delivery)! 🛒✨\n\nView here: ${productUrl}`
+    );
+    window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
   const cartTotal = Math.max(0, cartSubtotal - discountAmount) + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -582,12 +735,10 @@ export default function CustomerStorefront() {
       <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-40 border-b border-stone-200/60 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
-          {/* Logo Component */}
           <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <ValueGoLogo />
           </div>
 
-          {/* Search Bar - Center Focus */}
           <div className="flex-1 max-w-xl mx-4 hidden md:block">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition" size={18} />
@@ -601,7 +752,6 @@ export default function CustomerStorefront() {
             </div>
           </div>
 
-          {/* Right Actions: Profile & Cart */}
           <div className="flex items-center gap-2.5">
             {session ? (
               <button 
@@ -693,22 +843,25 @@ export default function CustomerStorefront() {
                             <span>{new Date(order.created_at).toLocaleDateString()}</span>
                             <span className="font-black text-stone-900">₹{order.total_amount}</span>
                           </div>
-                          {order.status === 'cancelled' && order.cancellation_remark && (
-                            <p className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-md border border-rose-100">
-                              Remark: {order.cancellation_remark}
-                            </p>
-                          )}
                           <div className="flex gap-2 pt-1">
                             <button 
                               onClick={() => setSelectedProfileOrder(order)}
                               className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
                             >
-                              <FileText size={12} /> View Full Details
+                              <FileText size={12} /> View Details
                             </button>
                             {order.status === 'delivered' && (
                               <button 
+                                onClick={() => handleReorder(order)}
+                                className="bg-stone-900 hover:bg-black text-white px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"
+                              >
+                                <RotateCcw size={12} /> Re-order
+                              </button>
+                            )}
+                            {order.status === 'delivered' && (
+                              <button 
                                 onClick={() => setSelectedInvoiceOrder(order)}
-                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3 py-1.5 rounded-lg font-bold transition"
+                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-2.5 py-1.5 rounded-lg font-bold transition"
                               >
                                 Invoice
                               </button>
@@ -848,10 +1001,10 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Expanded Order Details Modal inside Profile (With Product Images, Status Remarks & Cancellation) */}
+      {/* Expanded Order Details Modal inside Profile */}
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-base text-stone-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
               <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
@@ -878,22 +1031,44 @@ export default function CustomerStorefront() {
               )}
 
               <div className="space-y-1">
-                <span className="font-bold text-stone-400 uppercase text-[10px]">Ordered Items</span>
-                <div className="space-y-2 max-h-48 overflow-y-auto bg-stone-50 p-3 rounded-xl border">
+                <span className="font-bold text-stone-400 uppercase text-[10px]">Ordered Items & Reviews</span>
+                <div className="space-y-2 bg-stone-50 p-3 rounded-xl border">
                   {selectedProfileOrder.order_items?.map(item => {
                     const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
                     const itemImg = itemImages[0] || '';
+                    const hasReviewed = userReviewsMap[item.product_id];
 
                     return (
-                      <div key={item.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-stone-200/50 last:border-0">
-                        <div className="flex items-center gap-2.5">
-                          <img src={itemImg} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white shrink-0 shadow-xs" />
-                          <div>
-                            <span className="font-bold text-stone-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
-                            <span className="text-stone-500 text-[10px]">Qty: {item.quantity}</span>
+                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-stone-200/50 last:border-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <img src={itemImg} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white shrink-0 shadow-xs" />
+                            <div>
+                              <span className="font-bold text-stone-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
+                              <span className="text-stone-500 text-[10px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
+                            </div>
                           </div>
+
+                          {selectedProfileOrder.status === 'delivered' && item.products && (
+                            <button
+                              onClick={() => {
+                                setReviewModalProduct(item.products);
+                                if (hasReviewed) {
+                                  setNewReviewForm({ rating: hasReviewed.rating, review_text: hasReviewed.review_text });
+                                } else {
+                                  setNewReviewForm({ rating: 5, review_text: '' });
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center gap-1 ${
+                                hasReviewed 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' 
+                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {hasReviewed ? <><Star size={12} className="fill-amber-500 text-amber-500" /> Edit Review</> : <><Star size={12} /> Write Review</>}
+                            </button>
+                          )}
                         </div>
-                        <span className="font-black text-stone-900 shrink-0">₹{item.price * item.quantity}</span>
                       </div>
                     );
                   })}
@@ -912,7 +1087,6 @@ export default function CustomerStorefront() {
             </div>
 
             <div className="space-y-2 pt-2">
-              {/* Cancel Button - Only available if status is pending */}
               {selectedProfileOrder.status === 'pending' && (
                 <button 
                   onClick={() => handleCancelOrder(selectedProfileOrder.id)}
@@ -928,6 +1102,62 @@ export default function CustomerStorefront() {
                 Close Details
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Review Modal */}
+      {reviewModalProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-black text-sm text-stone-900">
+                {userReviewsMap[reviewModalProduct.id] ? 'Edit Your Review' : 'Write a Product Review'}
+              </h3>
+              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+            </div>
+
+            <form onSubmit={handleAddOrUpdateReview} className="space-y-3 text-xs">
+              <div className="flex items-center gap-3 bg-stone-50 p-2.5 rounded-xl border">
+                <img 
+                  src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
+                  alt="" 
+                  className="w-10 h-10 object-cover rounded-lg bg-white border" 
+                />
+                <span className="font-bold text-stone-900 truncate">{reviewModalProduct.name}</span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">Select Rating</label>
+                <select 
+                  value={newReviewForm.rating} 
+                  onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
+                  className="w-full border p-2.5 rounded-xl bg-stone-50 font-bold outline-none"
+                >
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                  <option value="3">⭐⭐⭐ (3/5)</option>
+                  <option value="2">⭐⭐ (2/5)</option>
+                  <option value="1">⭐ (1/5)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">Review Comments</label>
+                <textarea 
+                  rows="3"
+                  placeholder="Share your experience with this item..." 
+                  required
+                  value={newReviewForm.review_text}
+                  onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
+                  className="w-full border p-2.5 rounded-xl bg-stone-50 outline-none resize-none"
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition shadow-md">
+                {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -951,10 +1181,9 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Main Home Screen (Strictly Product Catalog & Shopping Experience) */}
+      {/* Main Home Screen */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Stunning Banner Slider */}
         {banners.length > 0 && (
           <div className="mb-8 relative rounded-3xl overflow-hidden shadow-2xl h-52 sm:h-72 bg-stone-900 border border-stone-200/50">
             {banners.map((banner, index) => (
@@ -976,7 +1205,6 @@ export default function CustomerStorefront() {
           </div>
         )}
 
-        {/* Admin-Managed Flash Sale Banner */}
         {activeFlashSale && activeFlashSale.is_active && timeLeft > 0 && (
           <div className="mb-8 bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 rounded-3xl p-6 text-white shadow-xl flex items-center justify-between border border-rose-400/30">
             <div className="flex items-center gap-4">
@@ -998,7 +1226,6 @@ export default function CustomerStorefront() {
           </div>
         )}
 
-        {/* Gorgeous Pill Categories */}
         <div className="flex gap-3 overflow-x-auto pb-4 mb-8 scrollbar-none items-center">
           <button
             onClick={() => setActiveCategory('All')}
@@ -1049,14 +1276,14 @@ export default function CustomerStorefront() {
                 return (
                   <div 
                     key={product.id} 
-                    onClick={() => {
+                    onClick={async () => {
                       setSelectedProductDetails(product);
                       setActiveGalleryImage(productImages[0] || '');
+                      await fetchProductReviews(product.id);
                     }}
                     className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
                   >
                     
-                    {/* Wishlist Button */}
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
                       className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur-xs text-stone-400 hover:text-rose-600'}`}
@@ -1111,11 +1338,19 @@ export default function CustomerStorefront() {
                             <p className="text-xs text-stone-400 line-through font-medium">₹{displayMrp.toFixed(2)}</p>
                           )}
                         </div>
-                        {discountPercent > 0 && (
-                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md mt-0.5 inline-block border border-emerald-100">
-                            {discountPercent}% OFF
-                          </span>
-                        )}
+                        
+                        <div className="flex items-center gap-2 mt-1">
+                          {discountPercent > 0 && (
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                              {discountPercent}% OFF
+                            </span>
+                          )}
+                          {product.avgRating && (
+                            <span className="flex items-center gap-1 text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              <Star size={10} className="fill-amber-500 text-amber-500" /> {product.avgRating}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div onClick={(e) => e.stopPropagation()}>
@@ -1144,7 +1379,6 @@ export default function CustomerStorefront() {
               })}
             </div>
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-3 mt-12">
                 <button 
@@ -1174,12 +1408,12 @@ export default function CustomerStorefront() {
         <TestimonialsSection />
       </main>
 
-      {/* Product Details Modal with Gallery & Stock Guards */}
+      {/* Product Details Modal (Read-Only Reviews Viewer & WhatsApp Share Icon) */}
       {selectedProductDetails && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-lg text-stone-900">Product Details</h3>
+              <h3 className="font-black text-lg text-stone-900">Product Details & Reviews</h3>
               <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500"><X size={18}/></button>
             </div>
 
@@ -1224,72 +1458,69 @@ export default function CustomerStorefront() {
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
+                    <div className="flex justify-between items-start">
+                      <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
+                      {selectedProductDetails.avgRating && (
+                        <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
+                          <Star size={14} className="fill-amber-500 text-amber-500" />
+                          <span>{selectedProductDetails.avgRating} ({selectedProductDetails.reviewCount} reviews)</span>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
                       <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
                     </p>
                     <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
                   </div>
 
-                  {selectedProductDetails.variants && selectedProductDetails.variants.length > 0 && (
-                    <div>
-                      <label className="block text-xs font-bold text-stone-700 mb-1">Select Variant / Weight</label>
-                      <select 
-                        className="w-full border p-3 rounded-xl text-xs bg-stone-50 font-bold outline-none"
-                        value={currentVariantKey || selectedProductDetails.variants[0]?.id || selectedProductDetails.variants[0]?.label || selectedProductDetails.variants[0]?.unit_label || ''}
-                        onChange={(e) => setSelectedVariants({...selectedVariants, [selectedProductDetails.id]: e.target.value})}
-                      >
-                        {selectedProductDetails.variants.map((v, vIdx) => (
-                          <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
-                            {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)} (Stock: {v.stock})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Frequently Bought Together Suggestions */}
-                  <div className="pt-3 border-t">
-                    <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider mb-2.5">Frequently Bought Together</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {products
-                        .filter(p => p.category_id === selectedProductDetails.category_id && p.id !== selectedProductDetails.id)
-                        .slice(0, 3)
-                        .map(suggestion => {
-                          const suggImages = suggestion.images || suggestion.gallery || [suggestion.image_url].filter(Boolean);
-                          return (
-                            <div 
-                              key={suggestion.id} 
-                              onClick={() => {
-                                setSelectedProductDetails(suggestion);
-                                setActiveGalleryImage(suggImages[0] || '');
-                              }}
-                              className="bg-stone-50 hover:bg-stone-100 p-2.5 rounded-2xl border text-center cursor-pointer transition shadow-2xs group"
-                            >
-                              <img src={suggImages[0]} alt="" className="w-12 h-12 object-cover mx-auto mb-1.5 rounded-xl border group-hover:scale-105 transition" />
-                              <p className="text-[11px] font-bold text-stone-800 truncate">{suggestion.name}</p>
-                              <p className="text-[10px] font-black text-emerald-700 mt-0.5">₹{Number(suggestion.price || 0).toFixed(2)}</p>
+                  <div className="pt-4 border-t space-y-3">
+                    <h4 className="font-black text-stone-900 text-xs uppercase tracking-wider">Customer Ratings & Reviews</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {productReviews.length === 0 ? (
+                        <p className="text-xs text-stone-400 italic">No reviews yet for this product.</p>
+                      ) : (
+                        productReviews.map(rev => (
+                          <div key={rev.id} className="p-3 bg-stone-50 rounded-2xl border space-y-1 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-stone-900">{rev.user_email.split('@')[0]}</span>
+                              <div className="flex items-center gap-0.5 text-amber-500">
+                                {[...Array(rev.rating)].map((_, i) => (
+                                  <Star key={i} size={12} className="fill-amber-500" />
+                                ))}
+                              </div>
                             </div>
-                          );
-                        })}
+                            <p className="text-stone-600">{rev.review_text}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t flex justify-between items-center">
+                  <div className="pt-4 border-t flex items-center justify-between gap-3">
                     <span className="text-xl font-black text-stone-900">
                       ₹{modalPrice.toFixed(2)}
                     </span>
-                    <button 
-                      onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
-                      disabled={isModalOutOfStock}
-                      className={`font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition ${
-                        isModalOutOfStock 
-                          ? 'bg-stone-100 text-stone-400 cursor-not-allowed' 
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
-                    >
-                      {isModalOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => shareOnWhatsApp(selectedProductDetails)}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 p-3 rounded-2xl transition shadow-2xs flex items-center justify-center"
+                        title="Share on WhatsApp"
+                      >
+                        <MessageCircle size={20} />
+                      </button>
+                      <button 
+                        onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
+                        disabled={isModalOutOfStock}
+                        className={`font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition ${
+                          isModalOutOfStock 
+                            ? 'bg-stone-100 text-stone-400 cursor-not-allowed' 
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        }`}
+                      >
+                        {isModalOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                      </button>
+                    </div>
                   </div>
                 </>
               );

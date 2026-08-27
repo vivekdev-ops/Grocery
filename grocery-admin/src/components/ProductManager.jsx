@@ -1,7 +1,7 @@
 // src/components/ProductManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter, Star, MessageSquare } from 'lucide-react';
 import ExcelProductUpload from './ExcelProductUpload';
 
 export default function ProductManager() {
@@ -32,6 +32,10 @@ export default function ProductManager() {
   const [variants, setVariants] = useState([]); 
   const [submitting, setSubmitting] = useState(false);
 
+  // Reviews Modal State
+  const [selectedProductForReviews, setSelectedProductForReviews] = useState(null);
+  const [productReviewsList, setProductReviewsList] = useState([]);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -39,21 +43,19 @@ export default function ProductManager() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, varRes, shopRes] = await Promise.all([
+      const [prodRes, catRes, varRes, shopRes, revRes] = await Promise.all([
         supabase.from('products').select('*').order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_variants').select('*'),
-        supabase.from('shopkeeper_profiles').select('*')
+        supabase.from('shopkeeper_profiles').select('*'),
+        supabase.from('product_reviews').select('*')
       ]);
 
       const rawProducts = prodRes.data || [];
       const rawCategories = catRes.data || [];
       const rawVariants = varRes.data || [];
       const shopkeepersList = shopRes.data || [];
-
-      // DEBUG LOGS TO INSPECT PROFILES AND IDS IN CONSOLE
-      console.log("Admin Panel - Fetched Shopkeepers List:", shopkeepersList);
-      console.log("Admin Panel - All Products shopkeeper_ids:", rawProducts.map(p => ({ name: p.name, shopkeeper_id: p.shopkeeper_id })));
+      const rawReviews = revRes.data || [];
 
       setShopkeepers(shopkeepersList);
 
@@ -63,7 +65,11 @@ export default function ProductManager() {
         const mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
         const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
         
-        // Robust ID matching (converting both to strings to prevent type mismatches)
+        // Match reviews for this product
+        const pReviews = rawReviews.filter(r => r.product_id === p.id);
+        const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : 'No ratings';
+
+        // Robust ID matching
         const ownerProfile = shopkeepersList.find(s => String(s.id).trim() === String(p.shopkeeper_id).trim());
         const categoryObj = rawCategories.find(c => c.id === p.category_id);
 
@@ -72,7 +78,10 @@ export default function ProductManager() {
           categories: categoryObj || { name: 'General' },
           shopkeeper_profiles: ownerProfile || { store_name: 'Admin / Direct', email: 'admin@hub.com' },
           images: mergedImages,
-          variants: mergedVariants
+          variants: mergedVariants,
+          avgRating,
+          reviewCount: pReviews.length,
+          reviews: pReviews
         };
       });
 
@@ -97,6 +106,21 @@ export default function ProductManager() {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) alert(error.message);
       else fetchData();
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm("Are you sure you want to delete this customer review?")) return;
+
+    const { error } = await supabase.from('product_reviews').delete().eq('id', reviewId);
+    if (!error) {
+      alert("Review deleted successfully.");
+      fetchData();
+      if (selectedProductForReviews) {
+        setProductReviewsList(prev => prev.filter(r => r.id !== reviewId));
+      }
+    } else {
+      alert("Error deleting review: " + error.message);
     }
   };
 
@@ -274,15 +298,16 @@ export default function ProductManager() {
               <th className="p-4">Images</th>
               <th className="p-4">Variants</th>
               <th className="p-4">Price / Stock</th>
+              <th className="p-4">Ratings & Reviews</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y text-xs">
             {loading ? (
-              <tr><td colSpan="6" className="p-8 text-center text-gray-500">Loading inventory...</td></tr>
+              <tr><td colSpan="7" className="p-8 text-center text-gray-500">Loading inventory...</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan="6" className="p-8 text-center text-gray-400">No products found matching this filter.</td></tr>
+              <tr><td colSpan="7" className="p-8 text-center text-gray-400">No products found matching this filter.</td></tr>
             ) : (
               filteredProducts.map(p => {
                 const imgList = p.images || p.gallery || [];
@@ -324,6 +349,22 @@ export default function ProductManager() {
                       <span className="text-gray-400 text-[10px]">Stock: {p.stock}</span>
                     </td>
                     <td className="p-4">
+                      {p.avgRating !== 'No ratings' ? (
+                        <button 
+                          onClick={() => {
+                            setSelectedProductForReviews(p);
+                            setProductReviewsList(p.reviews || []);
+                          }}
+                          className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full font-black border border-amber-200 hover:bg-amber-100 transition"
+                        >
+                          <Star size={12} className="fill-amber-500 text-amber-500" />
+                          <span>{p.avgRating} ({p.reviewCount})</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 italic">No ratings</span>
+                      )}
+                    </td>
+                    <td className="p-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
                         p.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
                         p.approval_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
@@ -345,6 +386,57 @@ export default function ProductManager() {
           </tbody>
         </table>
       </div>
+
+      {/* Reviews Modal */}
+      {selectedProductForReviews && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-black text-sm text-stone-900 flex items-center gap-2">
+                <MessageSquare size={16} className="text-emerald-600" /> 
+                Customer Reviews for {selectedProductForReviews.name}
+              </h3>
+              <button onClick={() => setSelectedProductForReviews(null)} className="p-1.5 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+            </div>
+
+            <div className="space-y-3">
+              {productReviewsList.length === 0 ? (
+                <p className="text-xs text-stone-400 italic py-6 text-center">No customer reviews submitted for this product yet.</p>
+              ) : (
+                productReviewsList.map(rev => (
+                  <div key={rev.id} className="p-3.5 bg-stone-50 rounded-2xl border space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-stone-900">{rev.user_email}</span>
+                      <div className="flex items-center gap-1 text-amber-500">
+                        {[...Array(rev.rating)].map((_, i) => (
+                          <Star key={i} size={12} className="fill-amber-500" />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-stone-600">{rev.review_text}</p>
+                    <div className="flex justify-between items-center pt-2 border-t text-[10px] text-stone-400 font-mono">
+                      <span>{new Date(rev.created_at).toLocaleString()}</span>
+                      <button 
+                        onClick={() => handleDeleteReview(rev.id)} 
+                        className="text-rose-600 font-bold hover:underline flex items-center gap-1"
+                      >
+                        <Trash2 size={11} /> Delete Review
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button 
+              onClick={() => setSelectedProductForReviews(null)}
+              className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-xs"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal for Create/Edit with Images & Variants */}
       {isModalOpen && (
