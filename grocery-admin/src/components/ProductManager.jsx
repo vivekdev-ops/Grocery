@@ -1,7 +1,7 @@
 // src/components/ProductManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter, Star, MessageSquare } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter, Star, MessageSquare, Sparkles, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import ExcelProductUpload from './ExcelProductUpload';
 
 export default function ProductManager() {
@@ -245,21 +245,24 @@ export default function ProductManager() {
   });
 
   const pendingCount = products.filter(p => p.approval_status === 'pending' || !p.approval_status).length;
+  const lowStockCount = products.filter(p => Number(p.stock || 0) <= 5).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6 font-sans">
+      
+      {/* Header & Action Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Product Inventory & Shopkeeper Moderation</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Filter products by store owner, check galleries, and approve listings.</p>
+          <h2 className="text-2xl font-black text-slate-900">Product Inventory & Shopkeeper Moderation</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Filter products by store owner, check galleries, and approve catalog listings.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Shopkeeper Filter Dropdown */}
-          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border shadow-2xs">
-            <Filter size={14} className="text-gray-400" />
+          <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-2 rounded-2xl border border-emerald-200">
+            <Filter size={14} className="text-emerald-700" />
             <select 
-              className="text-xs font-bold text-gray-700 bg-transparent outline-none cursor-pointer"
+              className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
               value={selectedShopkeeperFilter}
               onChange={e => setSelectedShopkeeperFilter(e.target.value)}
             >
@@ -270,30 +273,67 @@ export default function ProductManager() {
             </select>
           </div>
 
-          <div className="flex gap-2 bg-white p-1 rounded-xl border shadow-2xs">
-            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'inventory' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+          <div className="flex gap-2 bg-emerald-50/50 p-1 rounded-2xl border border-emerald-200">
+            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === 'inventory' ? 'bg-emerald-700 text-white shadow-md' : 'text-slate-600 hover:bg-emerald-100/60'}`}>
               All Inventory ({products.length})
             </button>
-            <button onClick={() => setActiveTab('approvals')} className={`px-4 py-2 rounded-lg text-xs font-bold transition relative ${activeTab === 'approvals' ? 'bg-amber-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-              Pending Approvals {pendingCount > 0 && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1.5">{pendingCount}</span>}
+            <button onClick={() => setActiveTab('approvals')} className={`px-4 py-2 rounded-xl text-xs font-bold transition relative ${activeTab === 'approvals' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-600 hover:bg-emerald-100/60'}`}>
+              Pending Approvals {pendingCount > 0 && <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1.5">{pendingCount}</span>}
             </button>
           </div>
 
           <button 
             onClick={openAddModal}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/20 active:scale-95"
           >
             <Plus size={16} /> Add Product
           </button>
         </div>
       </div>
 
+      {/* AI Product Intelligence Bar */}
+      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-emerald-800/80 pb-3">
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+            <Sparkles size={18} />
+          </div>
+          <div>
+            <h3 className="font-black text-sm uppercase tracking-wider text-white">AI Catalog & Stock Diagnostics</h3>
+            <p className="text-[11px] text-emerald-300/80">Real-time inventory health and moderation queue status.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
+              <ShieldCheck size={14} className="text-emerald-400" /> Catalog Capacity
+            </div>
+            <p className="text-emerald-100/90">Total active catalog contains <strong className="text-white">{products.length}</strong> items across all vendor storefronts.</p>
+          </div>
+
+          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-amber-400">
+              <AlertTriangle size={14} className="text-amber-400" /> Low Stock Alerts
+            </div>
+            <p className="text-emerald-100/90"><strong className="text-white">{lowStockCount}</strong> products are running low on stock (≤5 units remaining) and require restocking.</p>
+          </div>
+
+          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
+              <CheckCircle2 size={14} className="text-emerald-400" /> Moderation Queue
+            </div>
+            <p className="text-emerald-100/90"><strong className="text-white">{pendingCount}</strong> store listings are currently awaiting admin review and approval.</p>
+          </div>
+        </div>
+      </div>
+
       <ExcelProductUpload onUploadSuccess={fetchData} />
 
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+      {/* Inventory Table */}
+      <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b text-xs uppercase text-gray-500 font-semibold">
+            <tr className="bg-emerald-50/50 border-b border-emerald-100 text-xs uppercase text-slate-500 font-semibold">
               <th className="p-4">Product & Store</th>
               <th className="p-4">Images</th>
               <th className="p-4">Variants</th>
@@ -303,50 +343,50 @@ export default function ProductManager() {
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y text-xs">
+          <tbody className="divide-y divide-emerald-50 text-xs">
             {loading ? (
-              <tr><td colSpan="7" className="p-8 text-center text-gray-500">Loading inventory...</td></tr>
+              <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-medium">Loading inventory...</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-gray-400">No products found matching this filter.</td></tr>
+              <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic">No products found matching this filter.</td></tr>
             ) : (
               filteredProducts.map(p => {
                 const imgList = p.images || p.gallery || [];
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50">
+                  <tr key={p.id} className="hover:bg-emerald-50/30 transition">
                     <td className="p-4 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0 border">
+                      <div className="w-10 h-10 bg-emerald-50 rounded-xl overflow-hidden shrink-0 border border-emerald-200">
                         {p.image_url || imgList.length > 0 ? (
                           <img src={p.image_url || imgList[0]} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          <Package size={18} className="text-gray-400 m-2"/>
+                          <Package size={18} className="text-slate-400 m-2"/>
                         )}
                       </div>
                       <div>
-                        <span className="font-bold text-gray-900 block">{p.name}</span>
+                        <span className="font-bold text-slate-900 block">{p.name}</span>
                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5 border border-emerald-200">
                           <Store size={10} /> {p.shopkeeper_profiles?.store_name || 'Admin Store'}
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 text-gray-600 font-medium">
+                    <td className="p-4 text-slate-600 font-medium">
                       {imgList.length} loaded
                     </td>
                     <td className="p-4">
                       {p.variants?.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {p.variants.map((v, i) => (
-                            <span key={v.id || i} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md text-[10px] font-bold border">
+                            <span key={v.id || i} className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-emerald-200">
                               {v.unit_label || v.label}: ₹{Number(v.price || 0)}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-gray-400 italic">No variants</span>
+                        <span className="text-slate-400 italic">No variants</span>
                       )}
                     </td>
                     <td className="p-4">
-                      <span className="font-bold block">₹{Number(p.price || 0).toFixed(2)}</span>
-                      <span className="text-gray-400 text-[10px]">Stock: {p.stock}</span>
+                      <span className="font-bold block text-slate-900">₹{Number(p.price || 0).toFixed(2)}</span>
+                      <span className={`text-[10px] font-bold ${Number(p.stock || 0) <= 5 ? 'text-amber-600' : 'text-slate-400'}`}>Stock: {p.stock}</span>
                     </td>
                     <td className="p-4">
                       {p.avgRating !== 'No ratings' ? (
@@ -361,23 +401,23 @@ export default function ProductManager() {
                           <span>{p.avgRating} ({p.reviewCount})</span>
                         </button>
                       ) : (
-                        <span className="text-gray-400 italic">No ratings</span>
+                        <span className="text-slate-400 italic">No ratings</span>
                       )}
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
-                        p.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
-                        p.approval_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                        p.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
+                        p.approval_status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                       }`}>
                         {p.approval_status || 'pending'}
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-2">
                       {(!p.approval_status || p.approval_status === 'pending') && (
-                        <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-green-600 text-white px-3 py-1 rounded-lg font-bold shadow-2xs">Approve</button>
+                        <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-emerald-700 text-white px-3 py-1 rounded-xl font-bold shadow-2xs hover:bg-emerald-800 transition">Approve</button>
                       )}
                       <button onClick={() => openEditModal(p)} className="text-blue-600 hover:text-blue-800 p-1.5" title="Edit"><Edit size={16}/></button>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1.5" title="Delete"><Trash2 size={16}/></button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="text-rose-500 hover:text-rose-700 p-1.5" title="Delete"><Trash2 size={16}/></button>
                     </td>
                   </tr>
                 );
@@ -389,32 +429,32 @@ export default function ProductManager() {
 
       {/* Reviews Modal */}
       {selectedProductForReviews && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-sm text-stone-900 flex items-center gap-2">
-                <MessageSquare size={16} className="text-emerald-600" /> 
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                <MessageSquare size={16} className="text-emerald-700" /> 
                 Customer Reviews for {selectedProductForReviews.name}
               </h3>
-              <button onClick={() => setSelectedProductForReviews(null)} className="p-1.5 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+              <button onClick={() => setSelectedProductForReviews(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
             </div>
 
             <div className="space-y-3">
               {productReviewsList.length === 0 ? (
-                <p className="text-xs text-stone-400 italic py-6 text-center">No customer reviews submitted for this product yet.</p>
+                <p className="text-xs text-slate-400 italic py-6 text-center">No customer reviews submitted for this product yet.</p>
               ) : (
                 productReviewsList.map(rev => (
-                  <div key={rev.id} className="p-3.5 bg-stone-50 rounded-2xl border space-y-2 text-xs">
+                  <div key={rev.id} className="p-3.5 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-stone-900">{rev.user_email}</span>
+                      <span className="font-bold text-slate-900">{rev.user_email}</span>
                       <div className="flex items-center gap-1 text-amber-500">
                         {[...Array(rev.rating)].map((_, i) => (
                           <Star key={i} size={12} className="fill-amber-500" />
                         ))}
                       </div>
                     </div>
-                    <p className="text-stone-600">{rev.review_text}</p>
-                    <div className="flex justify-between items-center pt-2 border-t text-[10px] text-stone-400 font-mono">
+                    <p className="text-slate-600">{rev.review_text}</p>
+                    <div className="flex justify-between items-center pt-2 border-t border-emerald-100 text-[10px] text-slate-400 font-mono">
                       <span>{new Date(rev.created_at).toLocaleString()}</span>
                       <button 
                         onClick={() => handleDeleteReview(rev.id)} 
@@ -430,7 +470,7 @@ export default function ProductManager() {
 
             <button 
               onClick={() => setSelectedProductForReviews(null)}
-              className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-xs"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase"
             >
               Close
             </button>
@@ -440,41 +480,41 @@ export default function ProductManager() {
 
       {/* Modal for Create/Edit with Images & Variants */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-lg text-gray-900">{editingProduct ? 'Edit Product & Gallery' : 'Add Product with Gallery & Variants'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100 text-gray-500"><X size={18}/></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-emerald-100 space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-base text-slate-900">{editingProduct ? 'Edit Product & Gallery' : 'Add Product with Gallery & Variants'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18}/></button>
             </div>
 
             <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Product Name</label>
+                <label className="block font-bold text-slate-700 mb-1">Product Name</label>
                 <input 
                   type="text" required placeholder="Aashirvaad Atta / Fresh Milk" 
-                  className="w-full border p-3 rounded-xl outline-none focus:border-green-600 text-sm"
+                  className="w-full border border-emerald-200 p-3 rounded-2xl outline-none focus:border-emerald-600 text-sm bg-emerald-50/20 font-medium"
                   value={form.name} onChange={e => setForm({...form, name: e.target.value})} 
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Base Price (₹)</label>
-                  <input type="number" step="0.01" required placeholder="45.00" className="w-full border p-3 rounded-xl text-sm" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+                  <label className="block font-bold text-slate-700 mb-1">Base Price (₹)</label>
+                  <input type="number" step="0.01" required placeholder="45.00" className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-medium" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">MRP (₹)</label>
-                  <input type="number" step="0.01" placeholder="50.00" className="w-full border p-3 rounded-xl text-sm" value={form.mrp} onChange={e => setForm({...form, mrp: e.target.value})} />
+                  <label className="block font-bold text-slate-700 mb-1">MRP (₹)</label>
+                  <input type="number" step="0.01" placeholder="50.00" className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-medium" value={form.mrp} onChange={e => setForm({...form, mrp: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Base Stock</label>
-                  <input type="number" required placeholder="100" className="w-full border p-3 rounded-xl text-sm" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} />
+                  <label className="block font-bold text-slate-700 mb-1">Base Stock</label>
+                  <input type="number" required placeholder="100" className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-medium" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Category</label>
-                <select className="w-full border p-3 rounded-xl text-sm bg-white font-medium" value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
+                <label className="block font-bold text-slate-700 mb-1">Category</label>
+                <select className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-bold text-slate-800 cursor-pointer" value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
                   <option value="">Select Category</option>
                   {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
@@ -482,22 +522,22 @@ export default function ProductManager() {
 
               {/* MULTIPLE IMAGE UPLOAD SECTION */}
               <div className="pt-2">
-                <label className="block font-bold text-gray-700 mb-1">Browse & Upload Multiple Images</label>
-                <div className="border-2 border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50">
+                <label className="block font-bold text-slate-700 mb-1">Browse & Upload Multiple Images</label>
+                <div className="border-2 border-dashed border-emerald-200 p-4 rounded-2xl text-center bg-emerald-50/30">
                   <input 
                     type="file" multiple accept="image/*" 
                     onChange={e => setImageFiles(Array.from(e.target.files))}
-                    className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer"
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-100 file:text-emerald-800 hover:file:bg-emerald-200 cursor-pointer"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Select multiple files from your device to form the product gallery.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Select multiple files from your device to form the product gallery.</p>
                 </div>
 
                 {existingImages.length > 0 && (
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {existingImages.map((url, i) => (
-                      <div key={i} className="w-16 h-16 rounded-xl border relative overflow-hidden bg-gray-100 shadow-2xs">
+                      <div key={i} className="w-16 h-16 rounded-2xl border border-emerald-200 relative overflow-hidden bg-white shadow-2xs">
                         <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow">
+                        <button type="button" onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-0.5 shadow">
                           <X size={12}/>
                         </button>
                       </div>
@@ -507,49 +547,49 @@ export default function ProductManager() {
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Description</label>
-                <textarea rows="3" placeholder="Product details..." className="w-full border p-3 rounded-xl text-sm" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+                <label className="block font-bold text-slate-700 mb-1">Description</label>
+                <textarea rows="3" placeholder="Product details..." className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-medium" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
               </div>
 
               {/* VARIANTS SECTION */}
-              <div className="pt-4 border-t space-y-3">
+              <div className="pt-4 border-t border-emerald-100 space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <Layers size={16} className="text-green-600" />
-                    <span className="font-bold text-gray-900 text-sm">Product Variants (e.g. 500g, 1kg, 5L)</span>
+                    <Layers size={16} className="text-emerald-700" />
+                    <span className="font-bold text-slate-900 text-sm">Product Variants (e.g. 500g, 1kg, 5L)</span>
                   </div>
-                  <button type="button" onClick={addVariantRow} className="bg-green-50 hover:bg-green-100 text-green-700 font-bold px-3 py-1.5 rounded-lg text-xs">
+                  <button type="button" onClick={addVariantRow} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1.5 rounded-xl text-xs transition">
                     + Add Variant Tier
                   </button>
                 </div>
 
                 {variants.length === 0 ? (
-                  <p className="text-gray-400 italic text-center py-2 bg-gray-50 rounded-xl border">No pack variants added.</p>
+                  <p className="text-slate-400 italic text-center py-3 bg-emerald-50/30 rounded-2xl border border-emerald-100">No pack variants added.</p>
                 ) : (
                   <div className="space-y-2">
                     {variants.map((v, index) => (
-                      <div key={index} className="flex gap-2 items-center bg-gray-50 p-3 rounded-xl border">
+                      <div key={index} className="flex gap-2 items-center bg-emerald-50/30 p-3 rounded-2xl border border-emerald-100">
                         <input 
                           type="text" placeholder="Unit Label (e.g. 1 kg)" required 
-                          className="flex-1 border p-2 rounded-lg text-xs bg-white"
+                          className="flex-1 border border-emerald-200 p-2 rounded-xl text-xs bg-white font-medium"
                           value={v.unit_label || v.label} onChange={e => updateVariantRow(index, 'unit_label', e.target.value)}
                         />
                         <input 
                           type="number" step="0.01" placeholder="Price (₹)" required 
-                          className="w-24 border p-2 rounded-lg text-xs bg-white"
+                          className="w-24 border border-emerald-200 p-2 rounded-xl text-xs bg-white font-medium"
                           value={v.price} onChange={e => updateVariantRow(index, 'price', e.target.value)}
                         />
                         <input 
                           type="number" step="0.01" placeholder="MRP (₹)" 
-                          className="w-24 border p-2 rounded-lg text-xs bg-white"
+                          className="w-24 border border-emerald-200 p-2 rounded-xl text-xs bg-white font-medium"
                           value={v.mrp} onChange={e => updateVariantRow(index, 'mrp', e.target.value)}
                         />
                         <input 
                           type="number" placeholder="Stock" required 
-                          className="w-20 border p-2 rounded-lg text-xs bg-white"
+                          className="w-20 border border-emerald-200 p-2 rounded-xl text-xs bg-white font-medium"
                           value={v.stock} onChange={e => updateVariantRow(index, 'stock', e.target.value)}
                         />
-                        <button type="button" onClick={() => removeVariantRow(index)} className="text-red-500 hover:text-red-700 p-1.5"><Trash2 size={16}/></button>
+                        <button type="button" onClick={() => removeVariantRow(index)} className="text-rose-500 hover:text-rose-700 p-1.5"><Trash2 size={16}/></button>
                       </div>
                     ))}
                   </div>
@@ -558,7 +598,7 @@ export default function ProductManager() {
 
               <button 
                 type="submit" disabled={submitting}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition text-sm shadow-md flex items-center justify-center gap-2 mt-4"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-xs uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-4"
               >
                 <Plus size={16} /> {submitting ? 'Uploading & Saving...' : (editingProduct ? 'Update Product & Gallery' : 'Publish Product')}
               </button>

@@ -1,7 +1,7 @@
 // src/components/CategoryManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { FolderTree, Plus, Trash2, Edit, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { FolderTree, Plus, Trash2, Edit, X, Upload, Image as ImageIcon, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function CategoryManager() {
   const [categories, setCategories] = useState([]);
@@ -124,57 +124,88 @@ export default function CategoryManager() {
     }
   };
 
+  const categoriesWithIcons = categories.filter(c => c.image_url && c.image_url.trim() !== '').length;
+
   return (
     <div className="space-y-6 font-sans">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
         <div>
-          <h2 className="text-2xl font-black text-stone-900 flex items-center gap-2">
-            <FolderTree size={24} className="text-emerald-600" /> Category Management
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <FolderTree size={24} className="text-emerald-700" /> Category Management
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">Create, update, or remove store categories and icons for customer navigation.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Create, update, or remove store categories and bucket icons for customer storefront navigation.</p>
         </div>
         <button 
           onClick={openAddModal}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm active:scale-95"
+          className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/25 active:scale-95 shrink-0"
         >
           <Plus size={16} /> Add Category
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+      {/* AI Category Intelligence Diagnostics Bar */}
+      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-emerald-800/80 pb-3">
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+            <Sparkles size={18} />
+          </div>
+          <div>
+            <h3 className="font-black text-sm uppercase tracking-wider text-white">AI Category Navigation Diagnostics</h3>
+            <p className="text-[11px] text-emerald-300/80">Automated structural health of your store taxonomy.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
+              <CheckCircle2 size={14} className="text-emerald-400" /> Total Active Taxonomies
+            </div>
+            <p className="text-emerald-100/90">Your storefront features <strong className="text-white">{categories.length}</strong> main shopping categories optimized for mobile discovery.</p>
+          </div>
+
+          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
+              <Sparkles size={14} className="text-emerald-400" /> Bucket Icon Coverage
+            </div>
+            <p className="text-emerald-100/90"><strong className="text-white">{categoriesWithIcons}</strong> out of <strong className="text-white">{categories.length}</strong> categories have custom icons uploaded from the bucket storage.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-stone-50 border-b border-stone-200 text-xs uppercase text-stone-500 font-semibold">
+            <tr className="bg-emerald-50/50 border-b border-emerald-100 text-xs uppercase text-slate-500 font-semibold">
               <th className="p-4">Icon</th>
               <th className="p-4">Category Name</th>
               <th className="p-4">Category ID</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100 text-xs">
+          <tbody className="divide-y divide-emerald-50 text-xs">
             {loading ? (
-              <tr><td colSpan="4" className="p-8 text-center text-stone-500 font-medium">Loading categories...</td></tr>
+              <tr><td colSpan="4" className="p-8 text-center text-slate-500 font-medium">Loading categories...</td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="4" className="p-8 text-center text-stone-400 italic">No categories created yet.</td></tr>
+              <tr><td colSpan="4" className="p-8 text-center text-slate-400 italic">No categories created yet.</td></tr>
             ) : (
               categories.map(cat => (
-                <tr key={cat.id} className="hover:bg-stone-50/80 transition">
+                <tr key={cat.id} className="hover:bg-emerald-50/40 transition">
                   <td className="p-4">
-                    <div className="w-10 h-10 rounded-xl bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 overflow-hidden flex items-center justify-center">
                       {cat.image_url ? (
                         <img src={cat.image_url} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <ImageIcon size={16} className="text-stone-400" />
+                        <ImageIcon size={18} className="text-slate-400" />
                       )}
                     </div>
                   </td>
-                  <td className="p-4 font-bold text-stone-900 text-sm">{cat.name}</td>
-                  <td className="p-4 font-mono text-stone-400 text-[11px]">{cat.id}</td>
+                  <td className="p-4 font-bold text-slate-900 text-sm">{cat.name}</td>
+                  <td className="p-4 font-mono text-slate-400 text-[11px]">{cat.id}</td>
                   <td className="p-4 text-right space-x-2">
-                    <button onClick={() => openEditModal(cat)} className="bg-stone-100 hover:bg-stone-200 text-stone-700 p-2 rounded-xl transition inline-flex items-center gap-1" title="Edit">
+                    <button onClick={() => openEditModal(cat)} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-emerald-200" title="Edit">
                       <Edit size={14} />
                     </button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2 rounded-xl transition inline-flex items-center gap-1" title="Delete">
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-rose-200" title="Delete">
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -186,48 +217,48 @@ export default function CategoryManager() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-stone-100 pb-3">
-              <h3 className="font-black text-lg text-stone-900">{editingCategory ? 'Edit Category' : 'Add New Category'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-stone-100 text-stone-500"><X size={18} /></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-lg text-slate-900">{editingCategory ? 'Edit Category' : 'Add New Category'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleSaveCategory} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Category Name</label>
+                <label className="block font-bold text-slate-700 mb-1">Category Name</label>
                 <input 
                   type="text" required 
                   placeholder="e.g. Dairy, Snacks, Vegetables" 
-                  className="w-full border border-stone-300 p-3 rounded-xl text-sm outline-none focus:border-emerald-600 font-medium bg-stone-50"
+                  className="w-full border border-emerald-200 p-3 rounded-2xl text-sm outline-none focus:border-emerald-600 font-medium bg-emerald-50/20 text-slate-900"
                   value={categoryName} 
                   onChange={e => setCategoryName(e.target.value)} 
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Category Icon / Image</label>
+                <label className="block font-bold text-slate-700 mb-1">Category Icon / Image</label>
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 overflow-hidden flex items-center justify-center shrink-0">
                     {categoryImageUrl ? (
                       <img src={categoryImageUrl} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                      <ImageIcon size={20} className="text-stone-400" />
+                      <ImageIcon size={20} className="text-slate-400" />
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="cursor-pointer bg-stone-900 hover:bg-stone-800 text-white px-4 py-2.5 rounded-xl font-bold transition inline-flex items-center gap-1.5 text-xs shadow-sm">
+                    <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-2xl font-bold transition inline-flex items-center gap-1.5 text-xs shadow-sm">
                       <Upload size={14} /> {uploading ? 'Uploading...' : 'Browse Local File'}
                       <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                     </label>
-                    <p className="text-[10px] text-stone-400">Recommended: Square PNG or JPG (max 2MB)</p>
+                    <p className="text-[10px] text-slate-400">Recommended: Square PNG or JPG (max 2MB)</p>
                   </div>
                 </div>
               </div>
 
               <button 
                 type="submit" disabled={submitting || uploading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition text-sm shadow-md flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-sm uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
               </button>
