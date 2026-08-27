@@ -1,7 +1,7 @@
 // src/components/Orders.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Search, CheckCircle, Clock, Truck, FileText, MapPin, ExternalLink, Navigation, UserCheck } from 'lucide-react';
+import { Package, Search, CheckCircle, Clock, Truck, FileText, MapPin, ExternalLink, Navigation, UserCheck, ShieldAlert, Ban } from 'lucide-react';
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -19,7 +19,7 @@ export default function Orders() {
     setLoading(true);
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*, products(name, image_url))')
+      .select('*, order_items(*, products(name, image_url, images, gallery))')
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -41,15 +41,33 @@ export default function Orders() {
     }
   };
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = async (orderId, newStatus, currentStatus) => {
+    if (currentStatus === 'cancelled' || currentStatus === 'delivered') {
+      alert("This order is locked and its status cannot be modified.");
+      return;
+    }
+
+    let remark = null;
+    if (newStatus === 'cancelled') {
+      const reason = prompt("Enter cancellation remark (e.g., 'Cancelled by admin due to stock unavailability'):", "Cancelled by admin");
+      if (reason === null) return; // User pressed cancel on prompt
+      remark = reason.trim() || "Cancelled by admin";
+    }
+
+    const updatePayload = { status: newStatus };
+    if (remark) {
+      updatePayload.cancellation_remark = remark;
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus })
+      .update(updatePayload)
       .eq('id', orderId);
 
     if (error) {
       alert("Failed to update status: " + error.message);
     } else {
+      alert("Order status updated successfully!");
       fetchOrders();
     }
   };
@@ -87,7 +105,7 @@ export default function Orders() {
         
         {/* Status Filters */}
         <div className="flex gap-2 bg-white p-1 rounded-xl border shadow-2xs overflow-x-auto">
-          {['all', 'pending', 'processing', 'shipped', 'delivered'].map(status => (
+          {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
@@ -122,132 +140,151 @@ export default function Orders() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredOrders.map(order => (
-            <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-xs space-y-4">
-              
-              {/* Header Info & Assign Delivery Boy Controls */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center pb-4 border-b border-stone-100 gap-3">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-black text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
-                      order.status === 'processing' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-stone-400 mt-1">Placed on {new Date(order.created_at).toLocaleString()}</p>
-                </div>
+          {filteredOrders.map(order => {
+            const isLocked = order.status === 'cancelled' || order.status === 'delivered';
 
-                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                  {/* Assign Delivery Boy Dropdown from staff_profiles */}
-                  <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-xl">
-                    <UserCheck size={14} className="text-emerald-600" />
+            return (
+              <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-xs space-y-4">
+                
+                {/* Header Info & Assign Delivery Boy Controls */}
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center pb-4 border-b border-stone-100 gap-3">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-black text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                        order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                        order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                        order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-400 mt-1">Placed on {new Date(order.created_at).toLocaleString()}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                    {/* Assign Delivery Boy Dropdown from staff_profiles */}
+                    <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-xl">
+                      <UserCheck size={14} className="text-emerald-600" />
+                      <select 
+                        value={order.delivery_agent_id || ''}
+                        onChange={(e) => assignAgent(order.id, e.target.value)}
+                        className="text-xs font-bold bg-transparent outline-none cursor-pointer"
+                      >
+                        <option value="">Assign Delivery Boy...</option>
+                        {deliveryBoys.map(staff => (
+                          <option key={staff.id} value={staff.id}>
+                            {staff.name || staff.full_name || staff.email || `Staff ${staff.id.slice(0, 6)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status Switcher Dropdown (Locked if delivered or cancelled) */}
                     <select 
-                      value={order.delivery_agent_id || ''}
-                      onChange={(e) => assignAgent(order.id, e.target.value)}
-                      className="text-xs font-bold bg-transparent outline-none cursor-pointer"
+                      disabled={isLocked}
+                      value={order.status}
+                      onChange={(e) => updateOrderStatus(order.id, e.target.value, order.status)}
+                      className={`border rounded-xl px-3 py-1.5 text-xs font-bold outline-none ${
+                        isLocked ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-800'
+                      }`}
                     >
-                      <option value="">Assign Delivery Boy...</option>
-                      {deliveryBoys.map(staff => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.name || staff.full_name || staff.email || `Staff ${staff.id.slice(0, 6)}`}
-                        </option>
-                      ))}
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
-
-                  {/* Status Switcher Dropdown */}
-                  <select 
-                    value={order.status}
-                    onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                    className="border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold bg-stone-50 outline-none"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Customer & OTP Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                <div>
-                  <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Customer Email</span>
-                  <span className="font-bold text-stone-900">{order.customer_email}</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Contact Phone</span>
-                  <span className="font-bold text-stone-900">{order.phone || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Verification OTP</span>
-                  <span className="font-mono font-black text-emerald-700 bg-white px-2.5 py-1 rounded-lg border inline-block tracking-widest">{order.otp || '----'}</span>
-                </div>
-              </div>
-
-              {/* Delivery Address & GPS Navigation Section */}
-              <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-100 space-y-3">
-                <div>
-                  <span className="text-stone-400 font-bold text-xs uppercase tracking-wider block mb-0.5">Delivery Address</span>
-                  <p className="text-xs text-stone-800 font-medium">{order.delivery_address || 'Not specified'}</p>
                 </div>
 
-                {order.latitude && order.longitude ? (
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block flex items-center gap-1">
-                        <Navigation size={12} /> Customer GPS Location Captured
-                      </span>
-                      <span className="text-xs font-mono text-emerald-700">{order.latitude}, {order.longitude}</span>
-                    </div>
-                    <a 
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                    >
-                      📍 Open Google Maps <ExternalLink size={12} />
-                    </a>
+                {order.status === 'cancelled' && order.cancellation_remark && (
+                  <div className="bg-rose-50 p-3 rounded-2xl border border-rose-200 flex items-center gap-2 text-rose-700 text-xs font-bold">
+                    <ShieldAlert size={15} /> Cancellation Remark: {order.cancellation_remark}
                   </div>
-                ) : (
-                  <p className="text-xs text-stone-400 italic">No GPS coordinates attached to this order.</p>
                 )}
-              </div>
 
-              {/* Order Items Table */}
-              <div className="space-y-2">
-                <p className="text-xs font-black text-stone-400 uppercase tracking-wider">Ordered Items ({order.order_items?.length || 0})</p>
-                <div className="divide-y border rounded-2xl overflow-hidden bg-stone-50/50">
-                  {order.order_items?.map(item => (
-                    <div key={item.id} className="p-3 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-3">
-                        {item.products?.image_url && (
-                          <img src={item.products.image_url} alt="" className="w-9 h-9 object-cover rounded-xl border bg-white" />
-                        )}
-                        <div>
-                          <span className="font-bold text-stone-900 block">{item.products?.name || 'Product'}</span>
-                          <span className="text-stone-500">Qty: {item.quantity} × ₹{item.price.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <span className="font-black text-stone-900">₹{(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
+                {/* Customer & OTP Details */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                  <div>
+                    <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Customer Email</span>
+                    <span className="font-bold text-stone-900">{order.customer_email}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Contact Phone</span>
+                    <span className="font-bold text-stone-900">{order.phone || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 font-bold block uppercase tracking-wider mb-0.5">Verification OTP</span>
+                    <span className="font-mono font-black text-emerald-700 bg-white px-2.5 py-1 rounded-lg border inline-block tracking-widest">{order.otp || '----'}</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Total Amount Footer */}
-              <div className="pt-3 border-t flex justify-between items-center text-sm font-bold">
-                <span className="text-stone-600">Total Order Amount:</span>
-                <span className="text-lg font-black text-stone-900">₹{order.total_amount.toFixed(2)}</span>
-              </div>
+                {/* Delivery Address & GPS Navigation Section */}
+                <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-100 space-y-3">
+                  <div>
+                    <span className="text-stone-400 font-bold text-xs uppercase tracking-wider block mb-0.5">Delivery Address</span>
+                    <p className="text-xs text-stone-800 font-medium">{order.delivery_address || 'Not specified'}</p>
+                  </div>
 
-            </div>
-          ))}
+                  {order.latitude && order.longitude ? (
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block flex items-center gap-1">
+                          <Navigation size={12} /> Customer GPS Location Captured
+                        </span>
+                        <span className="text-xs font-mono text-emerald-700">{order.latitude}, {order.longitude}</span>
+                      </div>
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                      >
+                        📍 Open Google Maps <ExternalLink size={12} />
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-stone-400 italic">No GPS coordinates attached to this order.</p>
+                  )}
+                </div>
+
+                {/* Order Items Table */}
+                <div className="space-y-2">
+                  <p className="text-xs font-black text-stone-400 uppercase tracking-wider">Ordered Items ({order.order_items?.length || 0})</p>
+                  <div className="divide-y border rounded-2xl overflow-hidden bg-stone-50/50">
+                    {order.order_items?.map(item => {
+                      const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
+                      const itemImg = itemImages[0] || '';
+
+                      return (
+                        <div key={item.id} className="p-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            {itemImg && (
+                              <img src={itemImg} alt="" className="w-10 h-10 object-cover rounded-xl border bg-white shadow-2xs" />
+                            )}
+                            <div>
+                              <span className="font-bold text-stone-900 block">{item.products?.name || 'Product'}</span>
+                              <span className="text-stone-500">Qty: {item.quantity} × ₹{Number(item.price || 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <span className="font-black text-stone-900">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Total Amount Footer */}
+                <div className="pt-3 border-t flex justify-between items-center text-sm font-bold">
+                  <span className="text-stone-600">Total Order Amount:</span>
+                  <span className="text-lg font-black text-stone-900">₹{Number(order.total_amount || 0).toFixed(2)}</span>
+                </div>
+
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, CheckCircle, Search, ShieldCheck, X, User, MapPin, Timer, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Zap, Flame, Navigation, MessageSquarePlus, Ban } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import TestimonialsSection from './TestimonialsSection';
 import Footer from './Footer';
-import CustomerFeedbackModal from './CustomerFeedbackModal'; // <-- Imported Feedback Modal
+import CustomerFeedbackModal from './CustomerFeedbackModal';
+import ValueGoLogo from './ValueGoLogo';
 import { calculateDistanceKm } from '../utils/distance';
 
 export default function CustomerStorefront() {
@@ -27,13 +28,16 @@ export default function CustomerStorefront() {
   const [activeFlashSale, setActiveFlashSale] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
 
-  // User & View State
+  // User & Profile Drawer State
   const [session, setSession] = useState(null);
-  const [viewTab, setViewTab] = useState('shop');
   const [myOrders, setMyOrders] = useState([]);
   const [wishlistIds, setWishlistIds] = useState([]);
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Profile Collapsible Accordion & Detail States
+  const [openSection, setOpenSection] = useState(null);
+  const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
 
   // Feedback Modal State
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -236,11 +240,32 @@ export default function CustomerStorefront() {
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*, products(name, image_url))')
+      .select('*, order_items(*, products(name, image_url, images, gallery))')
       .eq('customer_email', email)
       .order('created_at', { ascending: false });
 
     if (!error) setMyOrders(data || []);
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status: 'cancelled',
+        cancellation_remark: 'Cancelled by customer'
+      })
+      .eq('id', orderId);
+
+    if (!error) {
+      alert("Order cancelled successfully.");
+      setSelectedProfileOrder(null);
+      if (session) fetchMyOrders(session.user.email);
+      fetchStoreData();
+    } else {
+      alert("Failed to cancel order: " + error.message);
+    }
   };
 
   const fetchSavedAddresses = async (userId) => {
@@ -373,6 +398,9 @@ export default function CustomerStorefront() {
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
     const itemPrice = Number(variant ? variant.price : product.price || 0);
     const itemStock = stockCheck;
+    
+    const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+    const itemImage = productImages[0] || '';
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
@@ -383,7 +411,7 @@ export default function CustomerStorefront() {
             : item
         );
       }
-      return [...prev, { cartItemId, product, variant, title: itemTitle, price: itemPrice, quantity: 1, stock: itemStock }];
+      return [...prev, { cartItemId, product, variant, title: itemTitle, price: itemPrice, quantity: 1, stock: itemStock, image: itemImage }];
     });
   };
 
@@ -554,18 +582,12 @@ export default function CustomerStorefront() {
       <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-40 border-b border-stone-200/60 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setViewTab('shop')}>
-            <div className="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-600/30 group-hover:scale-105 transition transform">
-              <span className="text-white font-black text-xl tracking-tighter">HS</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg sm:text-xl font-black tracking-tight text-stone-900 leading-tight">Harraiya Super Market</span>
-              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full w-max flex items-center gap-1 mt-0.5 border border-emerald-200/60 shadow-2xs">
-                <Zap size={10} className="fill-emerald-600 text-emerald-600" /> 10 MINS SUPERFAST DELIVERY
-              </span>
-            </div>
+          {/* Logo Component */}
+          <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <ValueGoLogo />
           </div>
 
+          {/* Search Bar - Center Focus */}
           <div className="flex-1 max-w-xl mx-4 hidden md:block">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition" size={18} />
@@ -579,39 +601,36 @@ export default function CustomerStorefront() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Feedback / Complaint Button */}
-            <button 
-              onClick={() => setIsFeedbackOpen(true)}
-              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-1.5 transition shadow-2xs border border-emerald-200"
-            >
-              <MessageSquarePlus size={16} /> Feedback
-            </button>
-
+          {/* Right Actions: Profile & Cart */}
+          <div className="flex items-center gap-2.5">
             {session ? (
               <button 
                 onClick={() => setIsProfileOpen(true)}
-                className="bg-white hover:bg-stone-50 text-stone-800 px-4 py-2.5 rounded-2xl shadow-xs transition duration-200 flex items-center gap-2.5 font-bold text-sm border border-stone-200/80 active:scale-95"
+                className="w-11 h-11 bg-white hover:bg-stone-50 text-stone-800 rounded-2xl shadow-xs transition duration-200 flex items-center justify-center border border-stone-200/80 active:scale-95"
+                title="My Profile"
               >
-                <div className="w-7 h-7 bg-emerald-600 text-white rounded-full flex items-center justify-center font-black text-xs shadow-xs">
-                  {session.user.email[0].toUpperCase()}
-                </div>
-                <span className="hidden sm:inline">Account</span>
+                <User size={20} className="text-stone-700" />
               </button>
             ) : (
-              <Link to="/login" className="bg-white hover:bg-stone-50 text-stone-800 px-5 py-2.5 rounded-2xl text-sm font-bold shadow-xs transition duration-200 border border-stone-200/80 active:scale-95">
+              <Link to="/login" className="bg-white hover:bg-stone-50 text-stone-800 px-4 py-2.5 rounded-2xl text-sm font-bold shadow-xs transition duration-200 border border-stone-200/80 active:scale-95">
                 Login
               </Link>
             )}
 
             <button 
               onClick={() => setIsCartOpen(true)}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-2.5 rounded-2xl font-black flex items-center gap-2.5 shadow-xl shadow-emerald-600/30 transition duration-200 transform active:scale-95"
+              className="w-11 h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-600/30 transition duration-200 transform active:scale-95 relative"
+              title="Cart"
             >
-              <ShoppingCart size={18} />
-              <span>{totalItemsCount > 0 ? `${totalItemsCount} items` : 'Cart'}</span>
+              <ShoppingCart size={20} />
+              {totalItemsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                  {totalItemsCount}
+                </span>
+              )}
             </button>
           </div>
+
         </div>
       </header>
 
@@ -629,7 +648,7 @@ export default function CustomerStorefront() {
         </div>
       </div>
 
-      {/* Profile & Structured Address Drawer */}
+      {/* Profile & Collapsible Accordion Drawer */}
       {isProfileOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-end z-50 transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
@@ -638,126 +657,183 @@ export default function CustomerStorefront() {
               <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-stone-200/80 rounded-full text-stone-600 hover:bg-stone-300 transition"><X size={18} /></button>
             </div>
 
-            <div className="p-6 flex-1 overflow-y-auto space-y-6">
+            <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 p-4 rounded-2xl shadow-xs">
-                <p className="text-xs text-emerald-800 uppercase font-extrabold tracking-wider">Signed in as</p>
+                <p className="text-[10px] text-emerald-800 uppercase font-extrabold tracking-wider">Signed in as</p>
                 <p className="font-bold text-stone-900 mt-0.5 truncate text-sm">{session?.user?.email}</p>
               </div>
 
-              <div className="space-y-2">
+              {/* Collapsible Accordion: Recent Orders */}
+              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
                 <button 
-                  onClick={() => { setIsProfileOpen(false); setViewTab('orders'); }}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-2xs"
+                  onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
+                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
                 >
-                  <span className="flex items-center gap-3"><Package size={18} className="text-emerald-600" /> My Orders & Live Tracking</span>
-                  <ChevronRight size={16} className="text-stone-400" />
+                  <span className="flex items-center gap-2.5">
+                    <Package size={16} className="text-emerald-600" /> My Orders ({myOrders.length})
+                  </span>
+                  {openSection === 'orders' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
-                <button 
-                  onClick={() => { setIsProfileOpen(false); setViewTab('wishlist'); }}
-                  className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-stone-50 border border-stone-200/80 transition font-bold text-stone-700 text-sm shadow-2xs"
-                >
-                  <span className="flex items-center gap-3"><Heart size={18} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})</span>
-                  <ChevronRight size={16} className="text-stone-400" />
-                </button>
-              </div>
 
-              {/* Saved Addresses Section with Distance Badges */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black text-stone-400 uppercase tracking-wider">Saved Addresses ({savedAddresses.length})</h4>
-                  <button onClick={() => setShowAddAddressBox(!showAddAddressBox)} className="text-xs text-emerald-600 font-bold hover:underline">
-                    {showAddAddressBox ? 'Cancel' : '+ Add Address'}
-                  </button>
-                </div>
-
-                {showAddAddressBox && (
-                  <form onSubmit={handleAddAddress} className="bg-stone-50 p-4 rounded-2xl border space-y-3 shadow-inner text-xs">
-                    <div>
-                      <label className="block font-bold text-stone-700 mb-1">Address Label</label>
-                      <input type="text" placeholder="Home, Work" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
-                    </div>
-
-                    <button 
-                      type="button" 
-                      onClick={detectCustomerLocation}
-                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition"
-                    >
-                      <Navigation size={14} /> Detect My GPS Location
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">House No.</label>
-                        <input type="text" placeholder="House/Flat No." required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">Ward No. & Name</label>
-                        <input type="text" placeholder="Ward No / Colony" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">City</label>
-                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.city} onChange={e => setNewAddressForm({...newAddressForm, city: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">District</label>
-                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.district} onChange={e => setNewAddressForm({...newAddressForm, district: e.target.value})} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">State</label>
-                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.state} onChange={e => setNewAddressForm({...newAddressForm, state: e.target.value})} />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-stone-600 mb-1">Pin Code</label>
-                        <input type="text" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.pincode} onChange={e => setNewAddressForm({...newAddressForm, pincode: e.target.value})} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-medium text-stone-600 mb-1">Phone Number</label>
-                      <input type="tel" placeholder="9876543210" required className="w-full border p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                    </div>
-
-                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition shadow-md">Save Address</button>
-                  </form>
-                )}
-
-                {savedAddresses.length === 0 && !showAddAddressBox ? (
-                  <p className="text-sm text-stone-500 italic p-4 bg-stone-50 rounded-2xl border text-center">No saved addresses yet.</p>
-                ) : (
-                  savedAddresses.map(addr => {
-                    const dist = (addr.latitude && addr.longitude) 
-                      ? calculateDistanceKm(storeLocation.latitude, storeLocation.longitude, addr.latitude, addr.longitude) 
-                      : null;
-
-                    return (
-                      <div key={addr.id} className="p-3.5 bg-stone-50/80 rounded-2xl border text-sm text-stone-700 flex items-start justify-between gap-3 shadow-2xs">
-                        <div className="flex items-start gap-3 flex-1">
-                          <MapPin size={18} className="text-emerald-600 shrink-0 mt-0.5" />
-                          <div className="w-full">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-stone-900">{addr.title}</span>
-                              {dist !== null && (
-                                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">
-                                  📍 {dist} KM away
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-stone-600 mt-0.5 block">{addr.address}</span>
-                            <span className="text-[11px] text-stone-400 block mt-1 font-mono">Phone: {addr.phone}</span>
+                {openSection === 'orders' && (
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-stone-100">
+                    {myOrders.length === 0 ? (
+                      <p className="text-stone-400 italic py-2 text-center">No orders found.</p>
+                    ) : (
+                      myOrders.map(order => (
+                        <div key={order.id} className="p-3 bg-stone-50 rounded-xl border space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-mono font-bold text-stone-900">#{order.id.slice(0, 8)}</span>
+                            <span className={`px-2 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                              order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                              order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                            }`}>{order.status}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-stone-600">
+                            <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                            <span className="font-black text-stone-900">₹{order.total_amount}</span>
+                          </div>
+                          {order.status === 'cancelled' && order.cancellation_remark && (
+                            <p className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-md border border-rose-100">
+                              Remark: {order.cancellation_remark}
+                            </p>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            <button 
+                              onClick={() => setSelectedProfileOrder(order)}
+                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
+                            >
+                              <FileText size={12} /> View Full Details
+                            </button>
+                            {order.status === 'delivered' && (
+                              <button 
+                                onClick={() => setSelectedInvoiceOrder(order)}
+                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3 py-1.5 rounded-lg font-bold transition"
+                              >
+                                Invoice
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1.5 hover:bg-rose-50 rounded-lg transition"><Trash2 size={14}/></button>
-                      </div>
-                    );
-                  })
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
+
+              {/* Collapsible Accordion: Wishlist */}
+              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
+                <button 
+                  onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
+                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Heart size={16} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})
+                  </span>
+                  {openSection === 'wishlist' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+
+                {openSection === 'wishlist' && (
+                  <div className="p-4 pt-0 space-y-2 bg-white border-t border-stone-100">
+                    {wishlistProducts.length === 0 ? (
+                      <p className="text-stone-400 italic py-2 text-center">Your wishlist is empty.</p>
+                    ) : (
+                      wishlistProducts.map(p => {
+                        const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
+                        const hasVariants = p.variants && p.variants.length > 0;
+                        const isWishlistOutOfStock = hasVariants 
+                          ? p.variants.every(v => Number(v.stock || 0) <= 0)
+                          : Number(p.stock || 0) <= 0;
+
+                        return (
+                          <div key={p.id} className="p-2.5 bg-stone-50 rounded-xl border flex items-center justify-between gap-3 relative overflow-hidden">
+                            <div className="flex items-center gap-2.5 relative">
+                              <img src={pImages[0] || ''} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white" />
+                              <div>
+                                <span className="font-bold text-stone-900 block line-clamp-1">{p.name}</span>
+                                <span className="font-black text-emerald-700">₹{p.price}</span>
+                              </div>
+                            </div>
+
+                            {isWishlistOutOfStock ? (
+                              <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
+                                Sold Out
+                              </span>
+                            ) : (
+                              <button 
+                                onClick={() => addToCart(p)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold shrink-0 transition"
+                              >
+                                Add
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Collapsible Accordion: Saved Addresses */}
+              <div className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden">
+                <button 
+                  onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
+                  className="w-full p-4 flex items-center justify-between font-bold text-stone-800 hover:bg-stone-100 transition"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <MapPin size={16} className="text-emerald-600" /> Saved Addresses ({savedAddresses.length})
+                  </span>
+                  {openSection === 'addresses' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+
+                {openSection === 'addresses' && (
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-stone-100">
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="font-bold text-stone-400 uppercase text-[10px]">Your Locations</span>
+                      <button onClick={() => setShowAddAddressBox(!showAddAddressBox)} className="text-emerald-600 font-bold hover:underline">
+                        {showAddAddressBox ? 'Cancel' : '+ Add New'}
+                      </button>
+                    </div>
+
+                    {showAddAddressBox && (
+                      <form onSubmit={handleAddAddress} className="bg-stone-50 p-3 rounded-xl border space-y-2">
+                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
+                        <button type="button" onClick={detectCustomerLocation} className="w-full bg-emerald-50 text-emerald-700 py-1.5 rounded-lg font-bold flex items-center justify-center gap-1 border border-emerald-200">
+                          <Navigation size={12} /> Detect GPS
+                        </button>
+                        <input type="text" placeholder="House No." required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
+                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
+                        <input type="tel" placeholder="Phone Number" required className="w-full border p-2 rounded-lg bg-white" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
+                        <button type="submit" className="w-full bg-emerald-600 text-white py-2 rounded-lg font-bold">Save Address</button>
+                      </form>
+                    )}
+
+                    {savedAddresses.map(addr => (
+                      <div key={addr.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-start">
+                        <div>
+                          <span className="font-bold text-stone-900 block">{addr.title}</span>
+                          <span className="text-stone-600 block mt-0.5">{addr.address}</span>
+                          <span className="text-stone-400 font-mono text-[10px] block mt-1">Phone: {addr.phone}</span>
+                        </div>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700"><Trash2 size={13}/></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Feedback Button inside Profile */}
+              <button 
+                onClick={() => setIsFeedbackOpen(true)}
+                className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 p-4 rounded-2xl font-bold flex items-center justify-between border border-emerald-200 transition shadow-2xs"
+              >
+                <span className="flex items-center gap-2.5">
+                  <MessageSquarePlus size={16} className="text-emerald-600" /> Send Feedback / Suggestions
+                </span>
+                <ChevronRight size={16} />
+              </button>
+
             </div>
 
             <div className="p-6 border-t bg-stone-50">
@@ -766,6 +842,90 @@ export default function CustomerStorefront() {
                 className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-sm shadow-2xs"
               >
                 <LogOut size={16} /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Order Details Modal inside Profile (With Product Images, Status Remarks & Cancellation) */}
+      {selectedProfileOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-black text-base text-stone-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-stone-100 rounded-full hover:bg-stone-200"><X size={16}/></button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-stone-50 p-3 rounded-xl border flex justify-between items-center">
+                <span className="text-stone-500 font-bold">Status:</span>
+                <span className="font-extrabold uppercase text-emerald-700">{selectedProfileOrder.status}</span>
+              </div>
+
+              {selectedProfileOrder.status === 'cancelled' && selectedProfileOrder.cancellation_remark && (
+                <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 flex justify-between items-center text-rose-700">
+                  <span className="font-bold">Remark:</span>
+                  <span className="font-extrabold">{selectedProfileOrder.cancellation_remark}</span>
+                </div>
+              )}
+
+              {selectedProfileOrder.otp && selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
+                <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex justify-between items-center">
+                  <span className="text-emerald-800 font-bold">Delivery OTP:</span>
+                  <span className="font-mono font-black text-emerald-700 text-sm">{selectedProfileOrder.otp}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <span className="font-bold text-stone-400 uppercase text-[10px]">Ordered Items</span>
+                <div className="space-y-2 max-h-48 overflow-y-auto bg-stone-50 p-3 rounded-xl border">
+                  {selectedProfileOrder.order_items?.map(item => {
+                    const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
+                    const itemImg = itemImages[0] || '';
+
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-stone-200/50 last:border-0">
+                        <div className="flex items-center gap-2.5">
+                          <img src={itemImg} alt="" className="w-10 h-10 object-cover rounded-lg border bg-white shrink-0 shadow-xs" />
+                          <div>
+                            <span className="font-bold text-stone-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
+                            <span className="text-stone-500 text-[10px]">Qty: {item.quantity}</span>
+                          </div>
+                        </div>
+                        <span className="font-black text-stone-900 shrink-0">₹{item.price * item.quantity}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-stone-50 p-3 rounded-xl border space-y-1">
+                <p className="text-stone-400 font-bold uppercase text-[10px]">Delivery Address</p>
+                <p className="text-stone-800 font-medium">{selectedProfileOrder.delivery_address}</p>
+              </div>
+
+              <div className="pt-2 border-t flex justify-between items-center font-black text-sm">
+                <span>Total Amount Paid:</span>
+                <span>₹{selectedProfileOrder.total_amount}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {/* Cancel Button - Only available if status is pending */}
+              {selectedProfileOrder.status === 'pending' && (
+                <button 
+                  onClick={() => handleCancelOrder(selectedProfileOrder.id)}
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition"
+                >
+                  <Ban size={15} /> Cancel Order
+                </button>
+              )}
+              <button 
+                onClick={() => setSelectedProfileOrder(null)}
+                className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold text-xs"
+              >
+                Close Details
               </button>
             </div>
           </div>
@@ -782,153 +942,139 @@ export default function CustomerStorefront() {
             <h2 className="text-2xl font-black text-stone-900 mb-2">Order Placed Successfully!</h2>
             <p className="text-stone-600 text-sm mb-6">Your quick delivery order <span className="font-mono font-bold text-stone-900">#{orderSuccess}</span> has been confirmed.</p>
             <button 
-              onClick={() => { setOrderSuccess(null); setViewTab('orders'); }}
+              onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-bold transition duration-200 shadow-lg shadow-emerald-600/30 active:scale-95 flex items-center justify-center gap-2"
             >
-              Track My Order <ArrowRight size={16} />
+              View My Orders <ArrowRight size={16} />
             </button>
           </div>
         </div>
       )}
 
-      {viewTab === 'orders' ? (
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-stone-900">My Orders & Live Tracking</h2>
-            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-white px-4 py-2.5 rounded-xl border border-stone-200 shadow-2xs">Back to Shop</button>
-          </div>
-
-          {!session ? (
-            <div className="bg-white p-12 rounded-3xl border text-center shadow-sm">
-              <p className="text-stone-600 mb-4 font-medium">Please log in to view your orders.</p>
-              <Link to="/login" className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-md inline-block">Login Now</Link>
-            </div>
-          ) : myOrders.length === 0 ? (
-            <div className="bg-white p-12 rounded-3xl border text-center text-stone-500 shadow-sm space-y-3">
-              <Package className="mx-auto text-stone-300 mb-2" size={48} />
-              <p className="font-bold text-stone-800">You haven't placed any orders yet.</p>
-              <button onClick={() => setViewTab('shop')} className="text-emerald-600 font-bold hover:underline block mx-auto">Start Shopping Now</button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {myOrders.map(order => (
-                <div key={order.id} className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs transition duration-300 hover:shadow-md space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-stone-100 gap-2">
-                    <div>
-                      <span className="font-mono font-bold text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
-                      <p className="text-xs text-stone-400 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {order.status === 'delivered' && (
-                        <button 
-                          onClick={() => setSelectedInvoiceOrder(order)}
-                          className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition duration-200 active:scale-95 flex items-center gap-1.5 shadow-2xs"
-                        >
-                          <FileText size={14} /> Download Invoice
-                        </button>
-                      )}
-                      <span className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider ${
-                        order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                        order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
-                        order.status === 'processing' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {order.status !== 'delivered' && order.status !== 'cancelled' && order.otp && (
-                    <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">Delivery Verification OTP</span>
-                        <span className="text-xs text-emerald-600 font-medium">Provide this 4-digit code to the delivery partner upon arrival.</span>
-                      </div>
-                      <span className="font-mono font-black text-xl text-emerald-700 bg-white px-4 py-1.5 rounded-xl border border-emerald-300 shadow-2xs tracking-widest">
-                        {order.otp}
-                      </span>
+      {/* Main Home Screen (Strictly Product Catalog & Shopping Experience) */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        {/* Stunning Banner Slider */}
+        {banners.length > 0 && (
+          <div className="mb-8 relative rounded-3xl overflow-hidden shadow-2xl h-52 sm:h-72 bg-stone-900 border border-stone-200/50">
+            {banners.map((banner, index) => (
+              <div 
+                key={banner.id} 
+                className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+              >
+                <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover transform scale-105 transition duration-1000" />
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/30 to-transparent flex items-end p-6 sm:p-8">
+                  {banner.title && (
+                    <div className="space-y-1.5">
+                      <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md">Special Offer</span>
+                      <h2 className="text-white font-black text-2xl sm:text-3xl drop-shadow-md tracking-tight">{banner.title}</h2>
                     </div>
                   )}
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-black text-stone-400 uppercase tracking-wider">Items Ordered ({order.order_items?.length || 0})</p>
-                    <div className="space-y-2 bg-stone-50 p-4 rounded-2xl border border-stone-200/60">
-                      {order.order_items?.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-sm py-1.5 border-b border-stone-200/50 last:border-0">
-                          <div className="flex items-center gap-3">
-                            {item.products?.image_url && (
-                              <img src={item.products.image_url} alt="" className="w-11 h-11 object-cover rounded-xl border bg-white shadow-2xs" />
-                            )}
-                            <div>
-                              <span className="font-bold text-stone-900 block">{item.products?.name || 'Product'}</span>
-                              <span className="text-xs text-stone-500">Qty: {item.quantity} × ₹{Number(item.price || 0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                          <span className="font-black text-stone-900">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm pt-2 bg-stone-50/50 p-4 rounded-2xl border border-stone-100">
-                    <div>
-                      <p className="text-stone-400 font-bold text-xs uppercase tracking-wider">Delivery Address</p>
-                      <p className="text-stone-800 mt-1 font-medium">{order.delivery_address || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <p className="text-stone-400 font-bold text-xs uppercase tracking-wider">Contact Phone</p>
-                      <p className="text-stone-800 mt-1 font-medium">{order.phone || 'Not specified'}</p>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4 flex justify-between items-center font-bold">
-                    <span className="text-stone-600">Total Amount Paid:</span>
-                    <span className="text-xl font-black text-stone-900">₹{Number(order.total_amount || 0).toFixed(2)}</span>
-                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </main>
-      ) : viewTab === 'wishlist' ? (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-black text-stone-900">My Wishlist</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Quickly access items you saved for later.</p>
-            </div>
-            <button onClick={() => setViewTab('shop')} className="text-xs font-bold text-emerald-600 hover:underline bg-white px-4 py-2.5 rounded-xl border border-stone-200">Back to Shop</button>
+              </div>
+            ))}
           </div>
+        )}
 
-          {wishlistProducts.length === 0 ? (
-            <div className="bg-white p-16 rounded-3xl border text-center text-stone-400 shadow-sm space-y-3">
-              <Heart className="mx-auto text-stone-300 mb-2" size={56} />
-              <p className="font-bold text-stone-700 text-base">Your wishlist is empty.</p>
-              <button onClick={() => setViewTab('shop')} className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-md inline-block">Explore Store</button>
+        {/* Admin-Managed Flash Sale Banner */}
+        {activeFlashSale && activeFlashSale.is_active && timeLeft > 0 && (
+          <div className="mb-8 bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 rounded-3xl p-6 text-white shadow-xl flex items-center justify-between border border-rose-400/30">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3.5 rounded-2xl backdrop-blur-md shadow-inner">
+                <Flame size={28} className="text-white animate-bounce" />
+              </div>
+              <div>
+                <span className="bg-black/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">Limited Time</span>
+                <h3 className="font-black text-xl sm:text-2xl mt-1 tracking-tight">{activeFlashSale.title}</h3>
+                <p className="text-xs text-rose-100 font-medium mt-0.5">{activeFlashSale.subtitle}</p>
+              </div>
             </div>
-          ) : (
+            <div className="text-right bg-black/20 px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
+              <p className="text-[10px] font-black uppercase tracking-wider text-rose-200">Sale Ends In</p>
+              <div className="font-mono font-black text-2xl sm:text-3xl tracking-wider text-white mt-0.5">
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gorgeous Pill Categories */}
+        <div className="flex gap-3 overflow-x-auto pb-4 mb-8 scrollbar-none items-center">
+          <button
+            onClick={() => setActiveCategory('All')}
+            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === 'All' ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
+          >
+            All Items
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === cat.id ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="text-center py-24 text-stone-500 font-bold text-sm">Loading fresh catalog...</div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border shadow-xs space-y-2">
+            <Package className="mx-auto text-stone-300 mb-2" size={48} />
+            <h3 className="text-lg font-bold text-stone-800">No products found</h3>
+            <p className="text-stone-500 text-sm">Try searching for something else or pick another category.</p>
+          </div>
+        ) : (
+          <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-              {wishlistProducts.map(product => {
+              {currentProducts.map(product => {
                 const currentVariantKey = selectedVariants[product.id];
                 const activeVariant = product.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
+                
                 const displayPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
-                const isOutOfStock = Number(activeVariant ? activeVariant.stock : product.stock || 0) <= 0;
+                const displayMrp = Number(activeVariant ? (activeVariant.mrp || activeVariant.price) : (product.mrp || product.price || 0));
+                const displayStock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
+                const isOutOfStock = displayStock <= 0;
+
+                const discountPercent = displayMrp > displayPrice ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100) : 0;
+                const isWishlisted = wishlistIds.includes(product.id);
+
+                const cartItemId = activeVariant ? `${product.id}-${activeVariant.id || activeVariant.label || activeVariant.unit_label}` : product.id;
+                const cartItem = cart.find(item => item.cartItemId === cartItemId);
+                const qtyInCart = cartItem ? cartItem.quantity : 0;
 
                 const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
 
                 return (
-                 <div key={product.id} className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs flex flex-col justify-between relative group hover:shadow-xl transition duration-300">
+                  <div 
+                    key={product.id} 
+                    onClick={() => {
+                      setSelectedProductDetails(product);
+                      setActiveGalleryImage(productImages[0] || '');
+                    }}
+                    className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
+                  >
+                    
+                    {/* Wishlist Button */}
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
-                      className={`absolute top-4 right-4 z-10 p-2 bg-white/90 backdrop-blur-xs rounded-full shadow-md text-rose-600 hover:scale-110 transition`}
-                      title="Remove from wishlist"
+                      className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur-xs text-stone-400 hover:text-rose-600'}`}
+                      title="Wishlist"
                     >
-                      <Heart size={16} fill="currentColor" />
+                      <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
                     </button>
 
                     <div>
-                      <div className="h-40 bg-stone-50 rounded-2xl relative overflow-hidden mb-3 flex items-center justify-center border border-stone-100">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-800 w-max shadow-2xs border border-emerald-200/50">
+                          <Timer size={10} className="text-emerald-600"/> 10 MINS
+                        </div>
+                      </div>
+
+                      <div className="h-40 bg-stone-50/80 rounded-2xl relative overflow-hidden mb-3.5 flex items-center justify-center border border-stone-100">
                         {productImages.length > 0 ? (
-                          <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                          <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         ) : (
                           <Package size={36} className="text-stone-300" />
                         )}
@@ -938,250 +1084,97 @@ export default function CustomerStorefront() {
                           </div>
                         )}
                       </div>
+
                       <h3 className="font-bold text-stone-900 text-sm line-clamp-2 leading-snug">{product.name}</h3>
-                      <p className="text-sm font-black text-stone-900 mt-2">₹{displayPrice.toFixed(2)}</p>
+                      
+                      {product.variants && product.variants.length > 0 && (
+                        <select 
+                          className="mt-2.5 w-full border border-stone-200 rounded-xl p-2 text-xs bg-stone-50 font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                          value={currentVariantKey || product.variants[0]?.id || product.variants[0]?.label || product.variants[0]?.unit_label || ''}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setSelectedVariants({...selectedVariants, [product.id]: e.target.value})}
+                        >
+                          {product.variants.map((v, vIdx) => (
+                            <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
+                              {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
 
-                    <button 
-                      onClick={() => addToCart(product)}
-                      disabled={isOutOfStock}
-                      className={`mt-4 w-full py-2.5 rounded-2xl text-xs font-bold shadow-md transition active:scale-95 ${
-                        isOutOfStock ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
-                    >
-                      {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                    </button>
+                    <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-black text-stone-900">₹{displayPrice.toFixed(2)}</p>
+                          {displayMrp > displayPrice && (
+                            <p className="text-xs text-stone-400 line-through font-medium">₹{displayMrp.toFixed(2)}</p>
+                          )}
+                        </div>
+                        {discountPercent > 0 && (
+                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md mt-0.5 inline-block border border-emerald-100">
+                            {discountPercent}% OFF
+                          </span>
+                        )}
+                      </div>
+
+                      <div onClick={(e) => e.stopPropagation()}>
+                        {isOutOfStock ? (
+                          <button disabled className="bg-stone-100 text-stone-400 font-bold px-3.5 py-2 rounded-xl text-xs cursor-not-allowed">
+                            Sold
+                          </button>
+                        ) : qtyInCart === 0 ? (
+                          <button 
+                            onClick={() => addToCart(product)}
+                            className="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200 font-black px-4 py-2 rounded-xl text-xs transition duration-200 transform active:scale-95 shadow-2xs uppercase tracking-wide"
+                          >
+                            ADD
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl p-1 shadow-md">
+                            <button onClick={() => updateQuantity(cartItemId, -1)} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Minus size={12} /></button>
+                            <span className="font-black text-xs w-5 text-center">{qtyInCart}</span>
+                            <button onClick={() => addToCart(product)} disabled={qtyInCart >= displayStock} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Plus size={12} /></button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-          )}
-        </main>
-      ) : (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          
-          {/* Stunning Banner Slider */}
-          {banners.length > 0 && (
-            <div className="mb-8 relative rounded-3xl overflow-hidden shadow-2xl h-52 sm:h-72 bg-stone-900 border border-stone-200/50">
-              {banners.map((banner, index) => (
-                <div 
-                  key={banner.id} 
-                  className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-3 mt-12">
+                <button 
+                  onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
+                  disabled={currentPage === 1}
+                  className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
                 >
-                  <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover transform scale-105 transition duration-1000" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/30 to-transparent flex items-end p-6 sm:p-8">
-                    {banner.title && (
-                      <div className="space-y-1.5">
-                        <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-md">Special Offer</span>
-                        <h2 className="text-white font-black text-2xl sm:text-3xl drop-shadow-md tracking-tight">{banner.title}</h2>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  Previous
+                </button>
 
-          {/* Admin-Managed Flash Sale Banner */}
-          {activeFlashSale && activeFlashSale.is_active && timeLeft > 0 && (
-            <div className="mb-8 bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 rounded-3xl p-6 text-white shadow-xl flex items-center justify-between border border-rose-400/30">
-              <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-3.5 rounded-2xl backdrop-blur-md shadow-inner">
-                  <Flame size={28} className="text-white animate-bounce" />
-                </div>
-                <div>
-                  <span className="bg-black/20 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">Limited Time</span>
-                  <h3 className="font-black text-xl sm:text-2xl mt-1 tracking-tight">{activeFlashSale.title}</h3>
-                  <p className="text-xs text-rose-100 font-medium mt-0.5">{activeFlashSale.subtitle}</p>
-                </div>
+                <span className="text-xs font-bold text-stone-600 px-3 font-mono">
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button 
+                  onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
+                  disabled={currentPage === totalPages}
+                  className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
+                >
+                  Next
+                </button>
               </div>
-              <div className="text-right bg-black/20 px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
-                <p className="text-[10px] font-black uppercase tracking-wider text-rose-200">Sale Ends In</p>
-                <div className="font-mono font-black text-2xl sm:text-3xl tracking-wider text-white mt-0.5">
-                  {formatTime(timeLeft)}
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </>
+        )}
 
-          {/* Gorgeous Pill Categories */}
-          <div className="flex gap-3 overflow-x-auto pb-4 mb-8 scrollbar-none items-center">
-            <button
-              onClick={() => setActiveCategory('All')}
-              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === 'All' ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
-            >
-              All Items
-            </button>
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition duration-200 transform active:scale-95 shadow-2xs ${activeCategory === cat.id ? 'bg-gradient-to-r from-stone-900 to-stone-800 text-white shadow-lg' : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'}`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
+        <TestimonialsSection />
+      </main>
 
-          {loading ? (
-            <div className="text-center py-24 text-stone-500 font-bold text-sm">Loading fresh catalog...</div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-3xl border shadow-xs space-y-2">
-              <Package className="mx-auto text-stone-300 mb-2" size={48} />
-              <h3 className="text-lg font-bold text-stone-800">No products found</h3>
-              <p className="text-stone-500 text-sm">Try searching for something else or pick another category.</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                {currentProducts.map(product => {
-                  const currentVariantKey = selectedVariants[product.id];
-                  const activeVariant = product.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
-                  
-                  const displayPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
-                  const displayMrp = Number(activeVariant ? (activeVariant.mrp || activeVariant.price) : (product.mrp || product.price || 0));
-                  const displayStock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
-                  const isOutOfStock = displayStock <= 0;
-
-                  const discountPercent = displayMrp > displayPrice ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100) : 0;
-                  const isWishlisted = wishlistIds.includes(product.id);
-
-                  const cartItemId = activeVariant ? `${product.id}-${activeVariant.id || activeVariant.label || activeVariant.unit_label}` : product.id;
-                  const cartItem = cart.find(item => item.cartItemId === cartItemId);
-                  const qtyInCart = cartItem ? cartItem.quantity : 0;
-
-                  const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-
-                  return (
-                    <div 
-                      key={product.id} 
-                      onClick={() => {
-                        setSelectedProductDetails(product);
-                        setActiveGalleryImage(productImages[0] || '');
-                      }}
-                      className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl flex flex-col justify-between relative group cursor-pointer"
-                    >
-                      
-                      {/* Wishlist Button */}
-                      <button 
-                        onClick={(e) => toggleWishlist(product.id, e)}
-                        className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-md transition duration-200 ${isWishlisted ? 'bg-rose-50 text-rose-600 scale-110' : 'bg-white/90 backdrop-blur-xs text-stone-400 hover:text-rose-600'}`}
-                        title="Wishlist"
-                      >
-                        <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
-                      </button>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2.5">
-                          <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-800 w-max shadow-2xs border border-emerald-200/50">
-                            <Timer size={10} className="text-emerald-600"/> 10 MINS
-                          </div>
-                        </div>
-
-                        <div className="h-40 bg-stone-50/80 rounded-2xl relative overflow-hidden mb-3.5 flex items-center justify-center border border-stone-100">
-                          {productImages.length > 0 ? (
-                            <img src={productImages[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                          ) : (
-                            <Package size={36} className="text-stone-300" />
-                          )}
-                          {isOutOfStock && (
-                            <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
-                              <span className="bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">Sold Out</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <h3 className="font-bold text-stone-900 text-sm line-clamp-2 leading-snug">{product.name}</h3>
-                        
-                        {product.variants && product.variants.length > 0 && (
-                          <select 
-                            className="mt-2.5 w-full border border-stone-200 rounded-xl p-2 text-xs bg-stone-50 font-bold text-stone-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                            value={currentVariantKey || product.variants[0]?.id || product.variants[0]?.label || product.variants[0]?.unit_label || ''}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setSelectedVariants({...selectedVariants, [product.id]: e.target.value})}
-                          >
-                            {product.variants.map((v, vIdx) => (
-                              <option key={v.id || vIdx} value={v.id || v.label || v.unit_label}>
-                                {v.unit_label || v.label} - ₹{Number(v.price || 0).toFixed(2)}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-black text-stone-900">₹{displayPrice.toFixed(2)}</p>
-                            {displayMrp > displayPrice && (
-                              <p className="text-xs text-stone-400 line-through font-medium">₹{displayMrp.toFixed(2)}</p>
-                            )}
-                          </div>
-                          {discountPercent > 0 && (
-                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md mt-0.5 inline-block border border-emerald-100">
-                              {discountPercent}% OFF
-                            </span>
-                          )}
-                        </div>
-
-                        <div onClick={(e) => e.stopPropagation()}>
-                          {isOutOfStock ? (
-                            <button disabled className="bg-stone-100 text-stone-400 font-bold px-3.5 py-2 rounded-xl text-xs cursor-not-allowed">
-                              Sold
-                            </button>
-                          ) : qtyInCart === 0 ? (
-                            <button 
-                              onClick={() => addToCart(product)}
-                              className="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200 font-black px-4 py-2 rounded-xl text-xs transition duration-200 transform active:scale-95 shadow-2xs uppercase tracking-wide"
-                            >
-                              ADD
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl p-1 shadow-md">
-                              <button onClick={() => updateQuantity(cartItemId, -1)} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Minus size={12} /></button>
-                              <span className="font-black text-xs w-5 text-center">{qtyInCart}</span>
-                              <button onClick={() => addToCart(product)} disabled={qtyInCart >= displayStock} className="p-1 hover:bg-emerald-700 transition rounded-lg"><Plus size={12} /></button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-3 mt-12">
-                  <button 
-                    onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
-                    disabled={currentPage === 1}
-                    className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
-                  >
-                    Previous
-                  </button>
-
-                  <span className="text-xs font-bold text-stone-600 px-3 font-mono">
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button 
-                    onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 400, behavior: 'smooth' }); }}
-                    disabled={currentPage === totalPages}
-                    className="px-5 py-2.5 rounded-xl bg-white border border-stone-200 text-xs font-bold disabled:opacity-40 hover:bg-stone-50 transition shadow-xs"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          <TestimonialsSection />
-        </main>
-      )}
-
-      {/* Product Details Modal with Gallery & Frequently Bought Together */}
+      {/* Product Details Modal with Gallery & Stock Guards */}
       {selectedProductDetails && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1194,16 +1187,24 @@ export default function CustomerStorefront() {
               const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
               const currentVariantKey = selectedVariants[selectedProductDetails.id];
               const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
+              
               const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
+              const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
+              const isModalOutOfStock = modalStock <= 0;
 
               return (
                 <>
                   <div className="space-y-3">
-                    <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner">
+                    <div className="h-64 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center border shadow-inner relative">
                       {activeGalleryImage ? (
                         <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <Package size={48} className="text-stone-300" />
+                      )}
+                      {isModalOutOfStock && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+                          <span className="bg-rose-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow">Sold Out</span>
+                        </div>
                       )}
                     </div>
 
@@ -1225,7 +1226,7 @@ export default function CustomerStorefront() {
                   <div className="space-y-2">
                     <h2 className="text-xl font-black text-stone-900">{selectedProductDetails.name}</h2>
                     <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
-                      <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'Harraiya Super Market'}
+                      <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
                     </p>
                     <p className="text-sm text-stone-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
                   </div>
@@ -1280,9 +1281,14 @@ export default function CustomerStorefront() {
                     </span>
                     <button 
                       onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition"
+                      disabled={isModalOutOfStock}
+                      className={`font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition ${
+                        isModalOutOfStock 
+                          ? 'bg-stone-100 text-stone-400 cursor-not-allowed' 
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                     >
-                      Add to Cart
+                      {isModalOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                     </button>
                   </div>
                 </>
@@ -1323,12 +1329,15 @@ export default function CustomerStorefront() {
               <div className="space-y-3">
                 {cart.map(item => (
                   <div key={item.cartItemId} className="flex items-center justify-between gap-3 bg-stone-50/80 p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
-                    <div className="flex-1 min-w-0">
-                      <span className="font-bold text-sm text-stone-900 block truncate">{item.title}</span>
-                      <span className="text-xs text-stone-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <img src={item.image || ''} alt="" className="w-12 h-12 object-cover rounded-xl border bg-white shrink-0 shadow-xs" />
+                      <div className="min-w-0">
+                        <span className="font-bold text-sm text-stone-900 block truncate">{item.title}</span>
+                        <span className="text-xs text-stone-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
+                      </div>
                     </div>
-                    <span className="text-sm font-black text-stone-900">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
-                    <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200 shadow-2xs">
+                    <span className="text-sm font-black text-stone-900 shrink-0">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-stone-200 shadow-2xs shrink-0">
                       <button onClick={() => updateQuantity(item.cartItemId, -1)} className="p-1 hover:bg-stone-100 rounded-lg transition"><Minus size={14}/></button>
                       <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
                       <button onClick={() => updateQuantity(item.cartItemId, 1)} className="p-1 hover:bg-stone-100 rounded-lg transition"><Plus size={14}/></button>
@@ -1360,7 +1369,7 @@ export default function CustomerStorefront() {
                     </div>
                   ) : (
                     <p className="text-xs text-amber-800 bg-amber-50 p-4 rounded-2xl border border-amber-200 font-medium">
-                      No saved addresses. Please open your **Account** menu above to add a delivery address.
+                      No saved addresses. Please open your **Profile** menu above to add a delivery address.
                     </p>
                   )}
 
@@ -1444,7 +1453,7 @@ export default function CustomerStorefront() {
         onClose={() => setSelectedInvoiceOrder(null)} 
       />
 
-      {/* Feedback & Suggestion Modal */}
+      {/* Feedback Modal */}
       <CustomerFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
       <Footer />
