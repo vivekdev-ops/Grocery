@@ -1,5 +1,5 @@
 // src/components/store/ProductGrid.jsx
-import { Sparkles, Clock, Star, Heart, Plus, Minus, Package, LayoutGrid } from 'lucide-react';
+import { Sparkles, Clock, Star, Heart, Plus, Minus, Package, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ProductGrid({
   banners,
@@ -24,6 +24,27 @@ export default function ProductGrid({
   updateQuantity,
   onSelectProduct
 }) {
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      let start = Math.max(1, currentPage - 2);
+      let end = Math.min(totalPages, start + maxVisible - 1);
+      
+      if (end - start < maxVisible - 1) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+    }
+    return pages;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-8 font-sans">
       
@@ -43,7 +64,6 @@ export default function ProductGrid({
             </div>
           ))}
 
-          {/* Dots Indicator */}
           {banners.length > 1 && (
             <div className="absolute bottom-3 right-4 z-20 flex gap-1.5">
               {banners.map((_, i) => (
@@ -78,17 +98,17 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* 3. Category Horizontal Scroll Tabs */}
+      {/* 3. Category Horizontal Scroll Tabs (Enhanced padding & flex wrap/scroll) */}
       <div className="space-y-3">
         <h3 className="font-black text-xs uppercase tracking-wider text-slate-500 px-1">Shop by Category</h3>
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-3 pt-1 px-1 scrollbar-none">
           
           <button
             onClick={() => setActiveCategory('All')}
-            className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs shrink-0 ${
+            className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-sm shrink-0 ${
               activeCategory === 'All' 
                 ? 'bg-emerald-700 text-white shadow-md' 
-                : 'bg-white text-slate-700 border border-emerald-200/80 hover:border-emerald-300'
+                : 'bg-white text-slate-700 border border-emerald-200 hover:border-emerald-300'
             }`}
           >
             <LayoutGrid size={16} className={activeCategory === 'All' ? 'text-white' : 'text-emerald-700'} />
@@ -101,18 +121,21 @@ export default function ProductGrid({
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs shrink-0 ${
+                className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-sm shrink-0 ${
                   isSelected 
                     ? 'bg-emerald-700 text-white shadow-md' 
-                    : 'bg-white text-slate-700 border border-emerald-200/80 hover:border-emerald-300'
+                    : 'bg-white text-slate-700 border border-emerald-200 hover:border-emerald-300'
                 }`}
               >
                 {cat.image_url && cat.image_url.trim() !== '' ? (
                   <img 
                     src={cat.image_url} 
                     alt={cat.name} 
-                    className="w-4 h-4 object-contain rounded-xs shrink-0" 
-                    onError={(e) => { e.target.style.display = 'none'; }} 
+                    className="w-5 h-5 object-cover rounded-full shrink-0 border border-emerald-100" 
+                    onError={(e) => { 
+                      e.target.onerror = null; 
+                      e.target.style.display = 'none'; 
+                    }} 
                   />
                 ) : (
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -166,7 +189,6 @@ export default function ProductGrid({
                   onClick={() => onSelectProduct(product)}
                   className="bg-white border border-emerald-100 rounded-3xl p-3.5 flex flex-col justify-between hover:border-emerald-300 transition duration-300 shadow-sm hover:shadow-md cursor-pointer group relative overflow-hidden"
                 >
-                  {/* Top Wishlist & Rating Badges */}
                   <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10 pointer-events-none">
                     <button 
                       onClick={(e) => toggleWishlist(product.id, e)}
@@ -185,7 +207,6 @@ export default function ProductGrid({
                     )}
                   </div>
 
-                  {/* Product Image */}
                   <div className="relative w-full h-36 bg-emerald-50/40 rounded-2xl overflow-hidden border border-emerald-100/60 mb-3 flex items-center justify-center shrink-0">
                     {pImage ? (
                       <img src={pImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
@@ -199,16 +220,12 @@ export default function ProductGrid({
                     )}
                   </div>
 
-                  {/* Product Metadata & Controls */}
                   <div className="flex-1 flex flex-col justify-between space-y-2.5">
-                    
-                    {/* Title & Category */}
                     <div>
                       <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block">{product.categories?.name || 'Quick Delivery'}</span>
                       <h4 className="font-black text-xs sm:text-sm text-slate-900 line-clamp-1 group-hover:text-emerald-700 transition mt-0.5">{product.name}</h4>
                     </div>
 
-                    {/* Variant Selector (Clean standalone block with top spacing so it never overlaps) */}
                     {product.variants && product.variants.length > 0 && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <select
@@ -225,7 +242,6 @@ export default function ProductGrid({
                       </div>
                     )}
 
-                    {/* Price and Add Button Row */}
                     <div className="flex items-center justify-between pt-1 border-t border-emerald-50">
                       <span className="font-black text-sm text-slate-900">₹{currentPrice.toFixed(2)}</span>
 
@@ -258,20 +274,36 @@ export default function ProductGrid({
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 pt-6">
-            {[...Array(totalPages)].map((_, i) => (
+          <div className="flex justify-center items-center gap-1.5 pt-6 flex-wrap">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 h-9 rounded-xl font-bold text-xs bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+
+            {getPageNumbers().map(pageNum => (
               <button
-                key={i}
-                onClick={() => setCurrentPage(i + 1)}
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
                 className={`w-9 h-9 rounded-xl font-black text-xs transition ${
-                  currentPage === i + 1 
+                  currentPage === pageNum 
                     ? 'bg-emerald-700 text-white shadow-md' 
                     : 'bg-white text-slate-600 border border-emerald-200 hover:text-slate-900'
                 }`}
               >
-                {i + 1}
+                {pageNum}
               </button>
             ))}
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 h-9 rounded-xl font-bold text-xs bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              Next <ChevronRight size={14} />
+            </button>
           </div>
         )}
       </div>
