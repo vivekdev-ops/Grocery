@@ -78,15 +78,14 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* 3. Category Horizontal Scroll Tabs (Using image_url from CategoryManager) */}
+      {/* 3. Category Horizontal Scroll Tabs */}
       <div className="space-y-3">
         <h3 className="font-black text-xs uppercase tracking-wider text-slate-500 px-1">Shop by Category</h3>
         <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-none">
           
-          {/* All Products Pill */}
           <button
             onClick={() => setActiveCategory('All')}
-            className={`px-5 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs ${
+            className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs shrink-0 ${
               activeCategory === 'All' 
                 ? 'bg-emerald-700 text-white shadow-md' 
                 : 'bg-white text-slate-700 border border-emerald-200/80 hover:border-emerald-300'
@@ -96,15 +95,13 @@ export default function ProductGrid({
             All Products
           </button>
 
-          {/* Dynamic Admin-Managed Categories */}
           {categories.map(cat => {
             const isSelected = activeCategory === cat.id;
-
             return (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-5 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs ${
+                className={`px-4 py-2.5 rounded-2xl font-black text-xs whitespace-nowrap transition flex items-center gap-2 shadow-2xs shrink-0 ${
                   isSelected 
                     ? 'bg-emerald-700 text-white shadow-md' 
                     : 'bg-white text-slate-700 border border-emerald-200/80 hover:border-emerald-300'
@@ -114,13 +111,13 @@ export default function ProductGrid({
                   <img 
                     src={cat.image_url} 
                     alt={cat.name} 
-                    className="w-4 h-4 object-cover rounded-md" 
+                    className="w-4 h-4 object-contain rounded-xs shrink-0" 
                     onError={(e) => { e.target.style.display = 'none'; }} 
                   />
                 ) : (
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 )}
-                {cat.name}
+                <span>{cat.name}</span>
               </button>
             );
           })}
@@ -189,7 +186,7 @@ export default function ProductGrid({
                   </div>
 
                   {/* Product Image */}
-                  <div className="relative w-full h-36 bg-emerald-50/40 rounded-2xl overflow-hidden border border-emerald-100/60 mb-3 flex items-center justify-center">
+                  <div className="relative w-full h-36 bg-emerald-50/40 rounded-2xl overflow-hidden border border-emerald-100/60 mb-3 flex items-center justify-center shrink-0">
                     {pImage ? (
                       <img src={pImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                     ) : (
@@ -202,20 +199,22 @@ export default function ProductGrid({
                     )}
                   </div>
 
-                  {/* Product Metadata */}
-                  <div className="space-y-1.5 flex-1 flex flex-col justify-between">
+                  {/* Product Metadata & Controls */}
+                  <div className="flex-1 flex flex-col justify-between space-y-2.5">
+                    
+                    {/* Title & Category */}
                     <div>
                       <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block">{product.categories?.name || 'Quick Delivery'}</span>
-                      <h4 className="font-black text-xs sm:text-sm text-slate-900 line-clamp-1 group-hover:text-emerald-700 transition">{product.name}</h4>
+                      <h4 className="font-black text-xs sm:text-sm text-slate-900 line-clamp-1 group-hover:text-emerald-700 transition mt-0.5">{product.name}</h4>
                     </div>
 
-                    {/* Variant Selector if available */}
+                    {/* Variant Selector (Clean standalone block with top spacing so it never overlaps) */}
                     {product.variants && product.variants.length > 0 && (
-                      <div onClick={(e) => e.stopPropagation()} className="pt-1">
+                      <div onClick={(e) => e.stopPropagation()}>
                         <select
                           value={currentVariantKey || ''}
                           onChange={(e) => setSelectedVariants(prev => ({ ...prev, [product.id]: e.target.value }))}
-                          className="w-full bg-emerald-50/30 border border-emerald-200 text-slate-700 text-[11px] font-bold rounded-xl py-1 px-2 outline-none cursor-pointer"
+                          className="w-full bg-emerald-50/50 border border-emerald-200 text-slate-800 text-[11px] font-bold rounded-xl py-1.5 px-2 outline-none cursor-pointer truncate"
                         >
                           {product.variants.map((v, i) => (
                             <option key={i} value={v.id || v.label || v.unit_label}>
@@ -226,10 +225,10 @@ export default function ProductGrid({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-2">
+                    {/* Price and Add Button Row */}
+                    <div className="flex items-center justify-between pt-1 border-t border-emerald-50">
                       <span className="font-black text-sm text-slate-900">₹{currentPrice.toFixed(2)}</span>
 
-                      {/* Add Button or Stepper */}
                       <div onClick={(e) => e.stopPropagation()}>
                         {isOutOfStock ? (
                           <span className="text-[10px] font-bold text-slate-400 uppercase px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200">Sold Out</span>
@@ -249,6 +248,7 @@ export default function ProductGrid({
                         )}
                       </div>
                     </div>
+
                   </div>
                 </div>
               );
