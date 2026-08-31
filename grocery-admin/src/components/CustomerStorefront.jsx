@@ -431,24 +431,25 @@ export default function CustomerStorefront() {
     }
   };
 
-  const detectCustomerLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setNewAddressForm(prev => ({
-            ...prev,
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude
-          }));
-          alert("GPS location captured successfully!");
-        },
-        (err) => {
-          alert("Unable to retrieve location: " + err.message);
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      alert("Geolocation is not supported by your browser.");
+  // Automatically fetch GPS location when the add address box is toggled open
+  const handleToggleAddAddressBox = (isOpen) => {
+    setShowAddAddressBox(isOpen);
+    if (isOpen) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setNewAddressForm(prev => ({
+              ...prev,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            }));
+          },
+          (err) => {
+            console.warn("Automatic location fetch failed or denied: " + err.message);
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }
     }
   };
 
@@ -603,27 +604,67 @@ export default function CustomerStorefront() {
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
-    const { data, error } = await supabase
-      .from('coupons')
-      .select('*')
-      .eq('code', couponInput.trim().toUpperCase())
-      .eq('is_active', true)
-      .single();
+    
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponInput.trim().toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle();
 
-    if (error || !data) {
-      alert("Invalid or expired coupon code.");
-      return;
+      if (error || !data) {
+        alert("Invalid or inactive coupon code.");
+        return;
+      }
+
+      if (data.expiry_date) {
+        const expiry = new Date(data.expiry_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (expiry < today) {
+          alert("This coupon has expired.");
+          return;
+        }
+      }
+
+      if (data.usage_limit_type === 'one_time') {
+        const userEmail = session?.user?.email || session?.user?.user_metadata?.email;
+        if (!userEmail) {
+          alert("Please log in to use this one-time coupon.");
+          return;
+        }
+
+        const { data: pastOrders, error: orderError } = await supabase
+          .from('orders')
+          .select('id, coupon_code, customer_email')
+          .eq('customer_email', userEmail)
+          .eq('coupon_code', data.code);
+
+        if (orderError) {
+          alert(`Could not verify usage history: ${orderError.message}`);
+          return;
+        }
+
+        if (pastOrders && pastOrders.length > 0) {
+          alert("You have already used this one-time coupon on a previous order.");
+          return;
+        }
+      }
+
+      if (cartSubtotal < (data.min_order_value || 0)) {
+        alert(`Minimum order value of ₹${data.min_order_value} required for this coupon.`);
+        return;
+      }
+
+      let discount = data.discount_type === 'percentage' ? (cartSubtotal * data.discount_value) / 100 : data.discount_value;
+      setDiscountAmount(Math.min(discount, cartSubtotal));
+      setAppliedCoupon(data);
+      setCouponInput('');
+      alert("Coupon applied successfully!");
+    } catch (err) {
+      alert(`Failed to apply coupon: ${err.message || err}`);
     }
-
-    if (cartSubtotal < (data.min_order_value || 0)) {
-      alert(`Minimum order value of ₹${data.min_order_value} required for this coupon.`);
-      return;
-    }
-
-    let discount = data.discount_type === 'percentage' ? (cartSubtotal * data.discount_value) / 100 : data.discount_value;
-    setDiscountAmount(Math.min(discount, cartSubtotal));
-    setAppliedCoupon(data);
-    setCouponInput('');
   };
 
   const removeCoupon = () => {
@@ -680,6 +721,7 @@ export default function CustomerStorefront() {
           delivery_address: addressForm.address,
           phone: addressForm.phone,
           otp: generatedOtp,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
           latitude: selectedAddrObj?.latitude || null,
           longitude: selectedAddrObj?.longitude || null
         }])
@@ -878,7 +920,7 @@ export default function CustomerStorefront() {
                   <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => setShowAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline">
+                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline">
                         {showAddAddressBox ? 'Cancel' : '+ Add Address'}
                       </button>
                     </div>
@@ -886,9 +928,12 @@ export default function CustomerStorefront() {
                     {showAddAddressBox && (
                       <form onSubmit={handleAddAddress} className="bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-200 space-y-2.5">
                         <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
-                        <button type="button" onClick={detectCustomerLocation} className="w-full bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 border border-emerald-300">
-                          <Navigation size={13} /> Detect GPS Location
-                        </button>
+                        
+                        <div className="p-2.5 bg-emerald-50 text-emerald-800 rounded-xl font-bold flex items-center gap-1.5 border border-emerald-200 text-[11px]">
+                          <Navigation size={13} className="shrink-0" />
+                          <span>{newAddressForm.latitude ? 'GPS Location automatically detected!' : 'Detecting GPS location...'}</span>
+                        </div>
+
                         <input type="text" placeholder="House No." required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
                         <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
                         <input type="tel" placeholder="Phone Number" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
@@ -1303,14 +1348,15 @@ export default function CustomerStorefront() {
         selectedAddressId={selectedAddressId}
         handleSelectAddress={handleSelectAddress}
         showAddAddressBox={showAddAddressBox}
-        setShowAddAddressBox={setShowAddAddressBox}
+        setShowAddAddressBox={handleToggleAddAddressBox}
         newAddressForm={newAddressForm}
         setNewAddressForm={setNewAddressForm}
-        detectCustomerLocation={detectCustomerLocation}
+        detectCustomerLocation={() => {}}
         handleAddAddress={handleAddAddress}
         handleDeleteAddress={handleDeleteAddress}
         updateQuantity={updateQuantity}
         appliedCoupon={appliedCoupon}
+        setAppliedCoupon={setAppliedCoupon}
         couponInput={couponInput}
         setCouponInput={setCouponInput}
         handleApplyCoupon={handleApplyCoupon}
@@ -1329,7 +1375,7 @@ export default function CustomerStorefront() {
       <InvoiceModal 
         order={selectedInvoiceOrder} 
         isOpen={Boolean(selectedInvoiceOrder)} 
-        onClose={() => setSelectedInvoiceOrder(null)} 
+        onClose={() => setSelectedInvoiceOrder(log => null)} 
       />
 
       {/* Feedback Modal */}

@@ -1,7 +1,7 @@
 // src/components/ProductManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter, Star, MessageSquare, Sparkles, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, X, Layers, Store, Filter, Star, MessageSquare, Sparkles, AlertTriangle, CheckCircle2, ShieldCheck, TrendingUp, AlertOctagon, FileSpreadsheet, ChevronDown, ChevronUp } from 'lucide-react';
 import ExcelProductUpload from './ExcelProductUpload';
 
 export default function ProductManager() {
@@ -9,7 +9,7 @@ export default function ProductManager() {
   const [categories, setCategories] = useState([]);
   const [shopkeepers, setShopkeepers] = useState([]);
   const [selectedShopkeeperFilter, setSelectedShopkeeperFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' or 'approvals'
+  const [activeTab, setActiveTab] = useState('inventory'); // 'inventory', 'approvals', 'lowStock', 'topSelling'
   const [loading, setLoading] = useState(true);
 
   // Modal State (Create & Edit)
@@ -36,6 +36,12 @@ export default function ProductManager() {
   const [selectedProductForReviews, setSelectedProductForReviews] = useState(null);
   const [productReviewsList, setProductReviewsList] = useState([]);
 
+  // Top Selling Analytics Data Map
+  const [productOrderCounts, setProductOrderCounts] = useState({});
+
+  // Expandable Excel Upload Section State
+  const [isExcelUploadExpanded, setIsExcelUploadExpanded] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -43,12 +49,13 @@ export default function ProductManager() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, varRes, shopRes, revRes] = await Promise.all([
+      const [prodRes, catRes, varRes, shopRes, revRes, orderItemsRes] = await Promise.all([
         supabase.from('products').select('*').order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_variants').select('*'),
         supabase.from('shopkeeper_profiles').select('*'),
-        supabase.from('product_reviews').select('*')
+        supabase.from('product_reviews').select('*'),
+        supabase.from('order_items').select('product_id, quantity')
       ]);
 
       const rawProducts = prodRes.data || [];
@@ -56,8 +63,17 @@ export default function ProductManager() {
       const rawVariants = varRes.data || [];
       const shopkeepersList = shopRes.data || [];
       const rawReviews = revRes.data || [];
+      const rawOrderItems = orderItemsRes.data || [];
 
       setShopkeepers(shopkeepersList);
+
+      const countsMap = {};
+      rawOrderItems.forEach(item => {
+        if (item.product_id) {
+          countsMap[item.product_id] = (countsMap[item.product_id] || 0) + Number(item.quantity || 1);
+        }
+      });
+      setProductOrderCounts(countsMap);
 
       const combined = rawProducts.map(p => {
         const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
@@ -65,11 +81,9 @@ export default function ProductManager() {
         const mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
         const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
         
-        // Match reviews for this product
         const pReviews = rawReviews.filter(r => r.product_id === p.id);
         const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : 'No ratings';
 
-        // Robust ID matching
         const ownerProfile = shopkeepersList.find(s => String(s.id).trim() === String(p.shopkeeper_id).trim());
         const categoryObj = rawCategories.find(c => c.id === p.category_id);
 
@@ -81,7 +95,8 @@ export default function ProductManager() {
           variants: mergedVariants,
           avgRating,
           reviewCount: pReviews.length,
-          reviews: pReviews
+          reviews: pReviews,
+          totalSold: countsMap[p.id] || 0
         };
       });
 
@@ -239,9 +254,22 @@ export default function ProductManager() {
   };
 
   const filteredProducts = products.filter(p => {
-    const matchesTab = activeTab === 'inventory' ? true : (p.approval_status === 'pending' || !p.approval_status);
+    let matchesTab = true;
+    if (activeTab === 'approvals') {
+      matchesTab = (p.approval_status === 'pending' || !p.approval_status);
+    } else if (activeTab === 'lowStock') {
+      matchesTab = Number(p.stock || 0) <= 5;
+    } else if (activeTab === 'topSelling') {
+      matchesTab = Number(p.totalSold || 0) > 0;
+    }
+
     const matchesShopkeeper = selectedShopkeeperFilter === 'all' || String(p.shopkeeper_id).trim() === String(selectedShopkeeperFilter).trim();
     return matchesTab && matchesShopkeeper;
+  }).sort((a, b) => {
+    if (activeTab === 'topSelling') {
+      return (b.totalSold || 0) - (a.totalSold || 0);
+    }
+    return 0;
   });
 
   const pendingCount = products.filter(p => p.approval_status === 'pending' || !p.approval_status).length;
@@ -254,7 +282,7 @@ export default function ProductManager() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
         <div>
           <h2 className="text-2xl font-black text-slate-900">Product Inventory & Shopkeeper Moderation</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Filter products by store owner, check galleries, and approve catalog listings.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Filter products by store owner, check low stock alerts, top sellers, and catalog listings.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -273,26 +301,34 @@ export default function ProductManager() {
             </select>
           </div>
 
-          <div className="flex gap-2 bg-emerald-50/50 p-1 rounded-2xl border border-emerald-200">
-            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === 'inventory' ? 'bg-emerald-700 text-white shadow-md' : 'text-slate-600 hover:bg-emerald-100/60'}`}>
-              All Inventory ({products.length})
-            </button>
-            <button onClick={() => setActiveTab('approvals')} className={`px-4 py-2 rounded-xl text-xs font-bold transition relative ${activeTab === 'approvals' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-600 hover:bg-emerald-100/60'}`}>
-              Pending Approvals {pendingCount > 0 && <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1.5">{pendingCount}</span>}
-            </button>
-          </div>
+          {/* Bulk Upload Expandable Toggle Button */}
+          <button 
+            onClick={() => setIsExcelUploadExpanded(!isExcelUploadExpanded)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition cursor-pointer border border-slate-200"
+          >
+            <FileSpreadsheet size={16} className="text-emerald-700" /> 
+            Bulk Excel Upload 
+            {isExcelUploadExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
 
           <button 
             onClick={openAddModal}
-            className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/20 active:scale-95"
+            className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/20 active:scale-95 cursor-pointer"
           >
             <Plus size={16} /> Add Product
           </button>
         </div>
       </div>
 
-      {/* AI Product Intelligence Bar */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-4">
+      {/* Expandable Excel Upload Section */}
+      {isExcelUploadExpanded && (
+        <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-md animate-fadeIn">
+          <ExcelProductUpload onUploadSuccess={fetchData} />
+        </div>
+      )}
+
+      {/* AI Product Intelligence Bar & Section Navigation Tabs */}
+      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-5">
         <div className="flex items-center gap-2.5 border-b border-emerald-800/80 pb-3">
           <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
             <Sparkles size={18} />
@@ -315,19 +351,56 @@ export default function ProductManager() {
             <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-amber-400">
               <AlertTriangle size={14} className="text-amber-400" /> Low Stock Alerts
             </div>
-            <p className="text-emerald-100/90"><strong className="text-white">{lowStockCount}</strong> products are running low on stock (≤5 units remaining) and require restocking.</p>
+            <p className="text-emerald-100/90"><strong className="text-white">{lowStockCount}</strong> products are running low on stock (≤5 units remaining).</p>
           </div>
 
           <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
             <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
               <CheckCircle2 size={14} className="text-emerald-400" /> Moderation Queue
             </div>
-            <p className="text-emerald-100/90"><strong className="text-white">{pendingCount}</strong> store listings are currently awaiting admin review and approval.</p>
+            <p className="text-emerald-100/90"><strong className="text-white">{pendingCount}</strong> store listings are currently awaiting admin review.</p>
           </div>
         </div>
-      </div>
 
-      <ExcelProductUpload onUploadSuccess={fetchData} />
+        {/* Section Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-800/80">
+          <button 
+            onClick={() => setActiveTab('inventory')} 
+            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'inventory' ? 'bg-emerald-500 text-slate-950 shadow-md' : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+            }`}
+          >
+            <Package size={14} /> All Inventory ({products.length})
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('approvals')} 
+            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'approvals' ? 'bg-amber-500 text-slate-950 shadow-md' : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+            }`}
+          >
+            <AlertOctagon size={14} /> Pending Approvals {pendingCount > 0 && <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingCount}</span>}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('lowStock')} 
+            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'lowStock' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+            }`}
+          >
+            <AlertTriangle size={14} /> Low Stock Section {lowStockCount > 0 && <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full">{lowStockCount}</span>}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('topSelling')} 
+            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'topSelling' ? 'bg-emerald-400 text-slate-950 shadow-md' : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+            }`}
+          >
+            <TrendingUp size={14} /> Most Orders / Top Selling
+          </button>
+        </div>
+      </div>
 
       {/* Inventory Table */}
       <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
@@ -337,7 +410,7 @@ export default function ProductManager() {
               <th className="p-4">Product & Store</th>
               <th className="p-4">Images</th>
               <th className="p-4">Variants</th>
-              <th className="p-4">Price / Stock</th>
+              <th className="p-4">{activeTab === 'topSelling' ? 'Units Sold' : 'Price / Stock'}</th>
               <th className="p-4">Ratings & Reviews</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Actions</th>
@@ -347,7 +420,7 @@ export default function ProductManager() {
             {loading ? (
               <tr><td colSpan="7" className="p-8 text-center text-slate-500 font-medium">Loading inventory...</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic">No products found matching this filter.</td></tr>
+              <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic">No products found in this section.</td></tr>
             ) : (
               filteredProducts.map(p => {
                 const imgList = p.images || p.gallery || [];
@@ -385,8 +458,16 @@ export default function ProductManager() {
                       )}
                     </td>
                     <td className="p-4">
-                      <span className="font-bold block text-slate-900">₹{Number(p.price || 0).toFixed(2)}</span>
-                      <span className={`text-[10px] font-bold ${Number(p.stock || 0) <= 5 ? 'text-amber-600' : 'text-slate-400'}`}>Stock: {p.stock}</span>
+                      {activeTab === 'topSelling' ? (
+                        <span className="font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                          🔥 {p.totalSold} Units Sold
+                        </span>
+                      ) : (
+                        <>
+                          <span className="font-bold block text-slate-900">₹{Number(p.price || 0).toFixed(2)}</span>
+                          <span className={`text-[10px] font-bold ${Number(p.stock || 0) <= 5 ? 'text-amber-600' : 'text-slate-400'}`}>Stock: {p.stock}</span>
+                        </>
+                      )}
                     </td>
                     <td className="p-4">
                       {p.avgRating !== 'No ratings' ? (
@@ -395,7 +476,7 @@ export default function ProductManager() {
                             setSelectedProductForReviews(p);
                             setProductReviewsList(p.reviews || []);
                           }}
-                          className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full font-black border border-amber-200 hover:bg-amber-100 transition"
+                          className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full font-black border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
                         >
                           <Star size={12} className="fill-amber-500 text-amber-500" />
                           <span>{p.avgRating} ({p.reviewCount})</span>
@@ -414,10 +495,10 @@ export default function ProductManager() {
                     </td>
                     <td className="p-4 text-right space-x-2">
                       {(!p.approval_status || p.approval_status === 'pending') && (
-                        <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-emerald-700 text-white px-3 py-1 rounded-xl font-bold shadow-2xs hover:bg-emerald-800 transition">Approve</button>
+                        <button onClick={() => handleUpdateApproval(p.id, 'approved')} className="bg-emerald-700 text-white px-3 py-1 rounded-xl font-bold shadow-2xs hover:bg-emerald-800 transition cursor-pointer">Approve</button>
                       )}
-                      <button onClick={() => openEditModal(p)} className="text-blue-600 hover:text-blue-800 p-1.5" title="Edit"><Edit size={16}/></button>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="text-rose-500 hover:text-rose-700 p-1.5" title="Delete"><Trash2 size={16}/></button>
+                      <button onClick={() => openEditModal(p)} className="text-blue-600 hover:text-blue-800 p-1.5 cursor-pointer" title="Edit"><Edit size={16}/></button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer" title="Delete"><Trash2 size={16}/></button>
                     </td>
                   </tr>
                 );
@@ -436,7 +517,7 @@ export default function ProductManager() {
                 <MessageSquare size={16} className="text-emerald-700" /> 
                 Customer Reviews for {selectedProductForReviews.name}
               </h3>
-              <button onClick={() => setSelectedProductForReviews(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
+              <button onClick={() => setSelectedProductForReviews(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
             </div>
 
             <div className="space-y-3">
@@ -458,7 +539,7 @@ export default function ProductManager() {
                       <span>{new Date(rev.created_at).toLocaleString()}</span>
                       <button 
                         onClick={() => handleDeleteReview(rev.id)} 
-                        className="text-rose-600 font-bold hover:underline flex items-center gap-1"
+                        className="text-rose-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 size={11} /> Delete Review
                       </button>
@@ -470,7 +551,7 @@ export default function ProductManager() {
 
             <button 
               onClick={() => setSelectedProductForReviews(null)}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
             >
               Close
             </button>
@@ -484,7 +565,7 @@ export default function ProductManager() {
           <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-emerald-100 space-y-6 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-base text-slate-900">{editingProduct ? 'Edit Product & Gallery' : 'Add Product with Gallery & Variants'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18}/></button>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer"><X size={18}/></button>
             </div>
 
             <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
@@ -537,7 +618,7 @@ export default function ProductManager() {
                     {existingImages.map((url, i) => (
                       <div key={i} className="w-16 h-16 rounded-2xl border border-emerald-200 relative overflow-hidden bg-white shadow-2xs">
                         <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-0.5 shadow">
+                        <button type="button" onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-0.5 shadow cursor-pointer">
                           <X size={12}/>
                         </button>
                       </div>
@@ -558,7 +639,7 @@ export default function ProductManager() {
                     <Layers size={16} className="text-emerald-700" />
                     <span className="font-bold text-slate-900 text-sm">Product Variants (e.g. 500g, 1kg, 5L)</span>
                   </div>
-                  <button type="button" onClick={addVariantRow} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1.5 rounded-xl text-xs transition">
+                  <button type="button" onClick={addVariantRow} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer">
                     + Add Variant Tier
                   </button>
                 </div>
@@ -589,7 +670,7 @@ export default function ProductManager() {
                           className="w-20 border border-emerald-200 p-2 rounded-xl text-xs bg-white font-medium"
                           value={v.stock} onChange={e => updateVariantRow(index, 'stock', e.target.value)}
                         />
-                        <button type="button" onClick={() => removeVariantRow(index)} className="text-rose-500 hover:text-rose-700 p-1.5"><Trash2 size={16}/></button>
+                        <button type="button" onClick={() => removeVariantRow(index)} className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer"><Trash2 size={16}/></button>
                       </div>
                     ))}
                   </div>
@@ -598,7 +679,7 @@ export default function ProductManager() {
 
               <button 
                 type="submit" disabled={submitting}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-xs uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-4"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-xs uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
               >
                 <Plus size={16} /> {submitting ? 'Uploading & Saving...' : (editingProduct ? 'Update Product & Gallery' : 'Publish Product')}
               </button>

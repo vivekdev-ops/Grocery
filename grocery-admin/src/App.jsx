@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, Settings } from 'lucide-react';
 
 import HomeSelector from './components/HomeSelector';
 import CustomerStorefront from './components/CustomerStorefront';
@@ -24,7 +24,7 @@ import ShopkeeperDetailsAdmin from './components/ShopkeeperDetailsAdmin';
 import CategoryManager from './components/CategoryManager';
 import FlashSaleManager from './components/FlashSaleManager';
 import StoreLocationManager from './components/StoreLocationManager';
-import FeedbackAdmin from './components/FeedbackAdmin'; // <-- Imported Customer Feedback Admin View
+import FeedbackAdmin from './components/FeedbackAdmin';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
 
@@ -32,6 +32,14 @@ function AdminLayout() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('analytics');
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState({
+    'Overview': true,
+    'Operations': true,
+    'Management': true,
+    'Store Setup': true,
+    'Marketing & Support': true
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -65,41 +73,145 @@ function AdminLayout() {
       case 'banners': return <BannerManager />;
       case 'flashSales': return <FlashSaleManager />;
       case 'testimonials': return <TestimonialManager />;
-      case 'feedback': return <FeedbackAdmin />; // <-- Render Feedback Admin View
+      case 'feedback': return <FeedbackAdmin />;
       default: return <Analytics />;
     }
   };
 
+  const menuGroups = [
+    {
+      title: 'Overview',
+      items: [
+        { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard }
+      ]
+    },
+    {
+      title: 'Operations',
+      items: [
+        { id: 'orders', label: 'Orders', icon: ShoppingCart },
+        { id: 'inventory', label: 'Inventory', icon: Package },
+        { id: 'categories', label: 'Categories', icon: FolderTree }
+      ]
+    },
+    {
+      title: 'Management',
+      items: [
+        { id: 'staff', label: 'Staff & Shopkeepers', icon: Users },
+        { id: 'shopkeeperDetails', label: 'Shopkeeper Details', icon: Store },
+        { id: 'customers', label: 'Customers', icon: Users }
+      ]
+    },
+    {
+      title: 'Store Setup',
+      items: [
+        { id: 'deliveryFees', label: 'Delivery Fees', icon: Truck },
+        { id: 'storeLocation', label: 'Store Location', icon: MapPin }
+      ]
+    },
+    {
+      title: 'Marketing & Support',
+      items: [
+        { id: 'coupons', label: 'Coupons', icon: Tag },
+        { id: 'banners', label: 'Banners', icon: Image },
+        { id: 'flashSales', label: 'Flash Sales', icon: Flame },
+        { id: 'testimonials', label: 'Testimonials', icon: MessageSquareQuote },
+        { id: 'feedback', label: 'Feedback & Complaints', icon: MessageSquare }
+      ]
+    }
+  ];
+
+  const toggleGroup = (title) => {
+    setCollapsedGroups(prev => ({ ...prev, [title]: !prev[title] }));
+  };
+
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans">
-      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b border-stone-200">
-          <h1 className="text-xl font-black text-brand-700">Harraiya Super Market</h1>
-          <p className="text-xs text-stone-500 truncate mt-1">{session.user.email}</p>
+    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans text-xs">
+      <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-stone-200 flex flex-col shadow-xs transition-all duration-300 relative z-10`}>
+        
+        {/* Sidebar Header & Collapse Toggle */}
+        <div className="p-3.5 border-b border-stone-200 flex items-center justify-between">
+          {!isCollapsed && (
+            <div className="min-w-0 pr-2">
+              <h1 className="text-sm font-black text-brand-700 truncate">Harraiya Market</h1>
+              <p className="text-[10px] text-stone-400 truncate">{session.user.email}</p>
+            </div>
+          )}
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)} 
+            className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-500 transition-colors mx-auto cursor-pointer"
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <button onClick={() => setActiveView('analytics')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'analytics' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><LayoutDashboard size={18} />Dashboard</button>
-          <button onClick={() => setActiveView('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'inventory' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Package size={18} />Inventory</button>
-          <button onClick={() => setActiveView('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'categories' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><FolderTree size={18} />Categories</button>
-          <button onClick={() => setActiveView('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'orders' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><ShoppingCart size={18} />Orders</button>
-          <button onClick={() => setActiveView('staff')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'staff' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Users size={18} />Staff & Shopkeepers</button>
-          <button onClick={() => setActiveView('shopkeeperDetails')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'shopkeeperDetails' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Store size={18} />Shopkeeper Details</button>
-          <button onClick={() => setActiveView('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'customers' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Users size={18} />Customers</button>
-          <button onClick={() => setActiveView('deliveryFees')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'deliveryFees' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Truck size={18} />Delivery Fees</button>
-          <button onClick={() => setActiveView('storeLocation')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'storeLocation' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MapPin size={18} />Store Location</button>
-          <button onClick={() => setActiveView('coupons')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'coupons' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Tag size={18} />Coupons</button>
-          <button onClick={() => setActiveView('banners')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'banners' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Image size={18} />Banners</button>
-          <button onClick={() => setActiveView('flashSales')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'flashSales' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><Flame size={18} />Flash Sales</button>
-          <button onClick={() => setActiveView('testimonials')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'testimonials' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MessageSquareQuote size={18} />Testimonials</button>
-          <button onClick={() => setActiveView('feedback')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeView === 'feedback' ? 'bg-brand-50 text-brand-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}><MessageSquare size={18} />Feedback & Complaints</button>
+
+        {/* Grouped Navigation Links */}
+        <nav className="flex-1 p-2 space-y-3 overflow-y-auto scrollbar-none">
+          {menuGroups.map((group) => {
+            const isGroupCollapsed = collapsedGroups[group.title] ?? true;
+
+            return (
+              <div key={group.title} className="space-y-1">
+                {!isCollapsed && (
+                  <button 
+                    onClick={() => toggleGroup(group.title)}
+                    className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-black uppercase tracking-wider text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
+                  >
+                    <span>{group.title}</span>
+                    {isGroupCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                )}
+
+                {(!isGroupCollapsed || isCollapsed) && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeView === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveView(item.id)}
+                          title={isCollapsed ? item.label : ''}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-medium transition-colors cursor-pointer ${
+                            isActive ? 'bg-brand-50 text-brand-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
+                          } ${isCollapsed ? 'justify-center' : ''}`}
+                        >
+                          <Icon size={16} className="shrink-0" />
+                          {!isCollapsed && <span className="truncate">{item.label}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
-        <div className="p-4 border-t border-stone-200 space-y-2">
-          <button onClick={() => navigate('/select')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition-colors"><Store size={18} />Switch App</button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition-colors"><LogOut size={18} />Sign Out</button>
+
+        {/* Footer Actions */}
+        <div className="p-2.5 border-t border-stone-200 space-y-1">
+          <button 
+            onClick={() => navigate('/select')} 
+            title={isCollapsed ? "Switch App" : ""}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition-colors cursor-pointer ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <Store size={16} className="shrink-0" />
+            {!isCollapsed && <span className="truncate">Switch App</span>}
+          </button>
+          <button 
+            onClick={() => supabase.auth.signOut()} 
+            title={isCollapsed ? "Sign Out" : ""}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition-colors cursor-pointer ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <LogOut size={16} className="shrink-0" />
+            {!isCollapsed && <span className="truncate">Sign Out</span>}
+          </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto">
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto bg-[#F9FAFB]">
+        <div className="p-5 max-w-7xl mx-auto">
           {renderContent()}
         </div>
       </main>
