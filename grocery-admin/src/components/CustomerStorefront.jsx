@@ -2,7 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, Star, RotateCcw, MessageCircle, CheckCircle } from 'lucide-react';
+import { 
+  Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, 
+  FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, 
+  Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck 
+} from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
@@ -34,6 +38,7 @@ export default function CustomerStorefront() {
   // User & Profile Drawer State
   const [session, setSession] = useState(null);
   const [myOrders, setMyOrders] = useState([]);
+  const [myComplaintsMap, setMyComplaintsMap] = useState({});
   const [wishlistIds, setWishlistIds] = useState([]);
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -47,6 +52,14 @@ export default function CustomerStorefront() {
   // Order Section Review Modal State
   const [reviewModalProduct, setReviewModalProduct] = useState(null);
   const [newReviewForm, setNewReviewForm] = useState({ rating: 5, review_text: '' });
+
+  // Order & Item Help Support Modal State
+  const [orderHelpTarget, setOrderHelpTarget] = useState(null);
+  const [helpForm, setHelpForm] = useState({
+    issueType: 'Damaged / Defective Item',
+    message: ''
+  });
+  const [submittingHelp, setSubmittingHelp] = useState(false);
 
   // Feedback Modal State
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -101,6 +114,7 @@ export default function CustomerStorefront() {
       setSession(session);
       if (session) {
         fetchMyOrders(session.user.email);
+        fetchMyComplaints(session.user.id);
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
         fetchUserReviews(session.user.id);
@@ -111,6 +125,7 @@ export default function CustomerStorefront() {
       setSession(session);
       if (session) {
         fetchMyOrders(session.user.email);
+        fetchMyComplaints(session.user.id);
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
         fetchUserReviews(session.user.id);
@@ -126,25 +141,21 @@ export default function CustomerStorefront() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Realtime review synchronization
   useEffect(() => {
-    const reviewsChannel = supabase
-      .channel('public:product_reviews')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_reviews' }, () => {
-        fetchStoreData();
-        if (selectedProductDetails) {
-          fetchProductReviews(selectedProductDetails.id);
-        }
+    const channel = supabase
+      .channel('public:customer_feedbacks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_feedbacks' }, () => {
         if (session) {
+          fetchMyComplaints(session.user.id);
           fetchUserReviews(session.user.id);
         }
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(reviewsChannel);
+      supabase.removeChannel(channel);
     };
-  }, [selectedProductDetails, session]);
+  }, [session]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -242,6 +253,25 @@ export default function CustomerStorefront() {
     }
   };
 
+  const fetchMyComplaints = async (userId) => {
+    const { data } = await supabase
+      .from('customer_feedbacks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('category', 'order_support');
+
+    if (data) {
+      const map = {};
+      data.forEach(ticket => {
+        const match = ticket.comments?.match(/Order ID: ([a-zA-Z0-9-]+)/);
+        if (match && match[1]) {
+          map[match[1]] = ticket;
+        }
+      });
+      setMyComplaintsMap(map);
+    }
+  };
+
   const fetchProductReviews = async (productId) => {
     const { data } = await supabase.from('product_reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
     if (data) setProductReviews(data);
@@ -287,6 +317,41 @@ export default function CustomerStorefront() {
       } else {
         alert("Error posting review: " + error.message);
       }
+    }
+  };
+
+  const handleSubmitOrderHelp = async (e) => {
+    e.preventDefault();
+    if (!session) { navigate('/login'); return; }
+    if (!orderHelpTarget) return;
+
+    setSubmittingHelp(true);
+    try {
+      const isItemLevel = Boolean(orderHelpTarget.item);
+      const subjectText = isItemLevel 
+        ? `Issue with ${orderHelpTarget.item.name} in Order #${orderHelpTarget.order.id.slice(0, 8)}`
+        : `Issue with Order #${orderHelpTarget.order.id.slice(0, 8)}`;
+
+      const { error } = await supabase.from('customer_feedbacks').insert([{
+        user_id: session.user.id,
+        user_email: session.user.email,
+        category: 'order_support',
+        subject: subjectText,
+        comments: `[${helpForm.issueType}] ${helpForm.message} (Order ID: ${orderHelpTarget.order.id}${isItemLevel ? `, Product: ${orderHelpTarget.item.name} [ID: ${orderHelpTarget.item.id}]` : ''})`,
+        status: 'open',
+        rating: 5
+      }]);
+
+      if (error) throw error;
+
+      alert("Your support request has been recorded. Our team will review and resolve it promptly!");
+      setOrderHelpTarget(null);
+      setHelpForm({ issueType: 'Damaged / Defective Item', message: '' });
+      fetchMyComplaints(session.user.id);
+    } catch (err) {
+      alert("Failed to submit request: " + err.message);
+    } finally {
+      setSubmittingHelp(false);
     }
   };
 
@@ -431,7 +496,6 @@ export default function CustomerStorefront() {
     }
   };
 
-  // Automatically fetch GPS location when the add address box is toggled open
   const handleToggleAddAddressBox = (isOpen) => {
     setShowAddAddressBox(isOpen);
     if (isOpen) {
@@ -792,7 +856,7 @@ export default function CustomerStorefront() {
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
             <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
               <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5"><User size={20} className="text-emerald-700" /> My Account & Dashboard</h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition"><X size={16} /></button>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
@@ -805,7 +869,7 @@ export default function CustomerStorefront() {
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     <Package size={16} className="text-emerald-700" /> My Orders ({myOrders.length})
@@ -818,45 +882,61 @@ export default function CustomerStorefront() {
                     {myOrders.length === 0 ? (
                       <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
                     ) : (
-                      myOrders.map(order => (
-                        <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
-                            <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
-                              order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                              order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                            }`}>{order.status}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-slate-500">
-                            <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                            <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
-                          </div>
-                          <div className="flex gap-2 pt-1">
-                            <button 
-                              onClick={() => setSelectedProfileOrder(order)}
-                              className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200"
-                            >
-                              <FileText size={13} /> Details
-                            </button>
-                            {order.status === 'delivered' && (
-                              <button 
-                                onClick={() => handleReorder(order)}
-                                className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs"
-                              >
-                                <RotateCcw size={13} /> Reorder
-                              </button>
+                      myOrders.map(order => {
+                        const complaintTicket = myComplaintsMap[order.id];
+
+                        return (
+                          <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
+                              <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                                order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                                order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                              }`}>{order.status}</span>
+                            </div>
+                            
+                            {complaintTicket && (
+                              <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border ${
+                                complaintTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}>
+                                <span className="flex items-center gap-1">
+                                  <LifeBuoy size={12} /> Complaint Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong>
+                                </span>
+                                <span className="font-mono text-[9px]">Ticket Active</span>
+                              </div>
                             )}
-                            {order.status === 'delivered' && (
+
+                            <div className="flex justify-between items-center text-slate-500">
+                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                              <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
+                            </div>
+                            <div className="flex gap-2 pt-1 flex-wrap">
                               <button 
-                                onClick={() => setSelectedInvoiceOrder(order)}
-                                className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200"
+                                onClick={() => setSelectedProfileOrder(order)}
+                                className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200 cursor-pointer"
                               >
-                                Bill
+                                <FileText size={13} /> Details
                               </button>
-                            )}
+                              {order.status === 'delivered' && (
+                                <button 
+                                  onClick={() => handleReorder(order)}
+                                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs cursor-pointer"
+                                >
+                                  <RotateCcw size={13} /> Reorder
+                                </button>
+                              )}
+                              {order.status === 'delivered' && (
+                                <button 
+                                  onClick={() => setSelectedInvoiceOrder(order)}
+                                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200 cursor-pointer"
+                                >
+                                  Bill
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -866,7 +946,7 @@ export default function CustomerStorefront() {
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     <Heart size={16} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})
@@ -892,7 +972,7 @@ export default function CustomerStorefront() {
                             </div>
                             <button 
                               onClick={() => addToCart(p)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition"
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition cursor-pointer"
                             >
                               Add
                             </button>
@@ -908,7 +988,7 @@ export default function CustomerStorefront() {
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     <MapPin size={16} className="text-emerald-700" /> Saved Addresses ({savedAddresses.length})
@@ -920,7 +1000,7 @@ export default function CustomerStorefront() {
                   <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline">
+                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline cursor-pointer">
                         {showAddAddressBox ? 'Cancel' : '+ Add Address'}
                       </button>
                     </div>
@@ -937,7 +1017,7 @@ export default function CustomerStorefront() {
                         <input type="text" placeholder="House No." required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
                         <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
                         <input type="tel" placeholder="Phone Number" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                        <button type="submit" className="w-full bg-emerald-700 text-white py-2.5 rounded-xl font-black">Save Address</button>
+                        <button type="submit" className="w-full bg-emerald-700 text-white py-2.5 rounded-xl font-black cursor-pointer">Save Address</button>
                       </form>
                     )}
 
@@ -948,7 +1028,7 @@ export default function CustomerStorefront() {
                           <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
                           <span className="text-slate-400 font-mono text-[10px] block mt-1">Phone: {addr.phone}</span>
                         </div>
-                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={14}/></button>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 size={14}/></button>
                       </div>
                     ))}
                   </div>
@@ -958,7 +1038,7 @@ export default function CustomerStorefront() {
               {/* Feedback */}
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
-                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition"
+                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
               >
                 <span className="flex items-center gap-2.5">
                   <MessageSquarePlus size={16} className="text-emerald-700" /> Send Feedback & Suggestions
@@ -971,7 +1051,7 @@ export default function CustomerStorefront() {
             <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer"
               >
                 <LogOut size={16} /> Logout Account
               </button>
@@ -982,11 +1062,11 @@ export default function CustomerStorefront() {
 
       {/* Expanded Order Details Modal */}
       {selectedProfileOrder && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
-              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -998,7 +1078,24 @@ export default function CustomerStorefront() {
                 }`}>{selectedProfileOrder.status}</span>
               </div>
 
-              {/* Cancellation Remark Box */}
+              {myComplaintsMap[selectedProfileOrder.id] && (
+                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-teal-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                      <LifeBuoy size={14} className="text-teal-700" /> Support Ticket Status
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                      myComplaintsMap[selectedProfileOrder.id].status === 'resolved' ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                    }`}>
+                      {myComplaintsMap[selectedProfileOrder.id].status || 'open'}
+                    </span>
+                  </div>
+                  <p className="text-slate-700 font-medium leading-snug">
+                    {myComplaintsMap[selectedProfileOrder.id].comments}
+                  </p>
+                </div>
+              )}
+
               {selectedProfileOrder.status === 'cancelled' && (
                 <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1">
                   <span className="text-rose-900 font-black uppercase text-[10px] tracking-wider block">Cancellation Reason</span>
@@ -1015,6 +1112,18 @@ export default function CustomerStorefront() {
                 </div>
               )}
 
+              {selectedProfileOrder.status === 'delivered' && !myComplaintsMap[selectedProfileOrder.id] && (
+                <button
+                  onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: null })}
+                  className="w-full bg-teal-50 hover:bg-teal-100 text-teal-800 p-3 rounded-2xl border border-teal-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
+                >
+                  <span className="flex items-center gap-2">
+                    <LifeBuoy size={16} className="text-teal-700" /> Need Help with this Whole Order?
+                  </span>
+                  <ChevronRight size={14} />
+                </button>
+              )}
+
               <div className="space-y-1">
                 <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Items</span>
                 <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100">
@@ -1026,32 +1135,42 @@ export default function CustomerStorefront() {
                     return (
                       <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
-                            <div>
-                              <span className="font-black text-slate-900 block line-clamp-1">{item.products?.name || 'Item'}</span>
+                            <div className="min-w-0">
+                              <span className="font-black text-slate-900 block truncate">{item.products?.name || 'Item'}</span>
                               <span className="text-slate-500 font-medium text-[11px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
                             </div>
                           </div>
 
                           {selectedProfileOrder.status === 'delivered' && item.products && (
-                            <button
-                              onClick={() => {
-                                setReviewModalProduct(item.products);
-                                if (hasReviewed) {
-                                  setNewReviewForm({ rating: hasReviewed.rating, review_text: hasReviewed.review_text });
-                                } else {
-                                  setNewReviewForm({ rating: 5, review_text: '' });
-                                }
-                              }}
-                              className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 ${
-                                hasReviewed 
-                                  ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                              }`}
-                            >
-                              {hasReviewed ? <><Star size={12} className="fill-amber-500 text-amber-500" /> Edit Review</> : <><Star size={12} /> Rate Item</>}
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: item.products })}
+                                className="px-2.5 py-1.5 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition flex items-center gap-1 cursor-pointer"
+                                title="Report issue with this specific item"
+                              >
+                                <LifeBuoy size={11} /> Item Help
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setReviewModalProduct(item.products);
+                                  if (hasReviewed) {
+                                    setNewReviewForm({ rating: hasReviewed.rating, review_text: hasReviewed.review_text });
+                                  } else {
+                                    setNewReviewForm({ rating: 5, review_text: '' });
+                                  }
+                                }}
+                                className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
+                                  hasReviewed 
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
+                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {hasReviewed ? <><Star size={11} className="fill-amber-500 text-amber-500" /> Review</> : <><Star size={11} /> Rate</>}
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1075,18 +1194,79 @@ export default function CustomerStorefront() {
               {selectedProfileOrder.status === 'pending' && (
                 <button 
                   onClick={() => handleCancelOrder(selectedProfileOrder.id)}
-                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition"
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <Ban size={15} /> Cancel Order
                 </button>
               )}
               <button 
                 onClick={() => setSelectedProfileOrder(null)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
               >
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Order & Item Help Modal */}
+      {orderHelpTarget && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                <LifeBuoy size={16} className="text-teal-700" />
+                {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
+              </h3>
+              <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+            </div>
+
+            <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
+              <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
+                <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">Target Reference</span>
+                <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
+                {orderHelpTarget.item && (
+                  <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Issue Category</label>
+                <select 
+                  value={helpForm.issueType} 
+                  onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                >
+                  <option value="Damaged / Defective Item">Damaged / Defective Item</option>
+                  <option value="Missing Item from Package">Missing Item from Package</option>
+                  <option value="Expired / Freshness Issue">Expired / Freshness Issue</option>
+                  <option value="Wrong Item Delivered">Wrong Item Delivered</option>
+                  <option value="Billing / Payment Dispute">Billing / Payment Dispute</option>
+                  <option value="Other Issue">Other Issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Describe the Issue</label>
+                <textarea 
+                  rows="3"
+                  placeholder="Explain the issue in detail so our support team can assist..." 
+                  required
+                  value={helpForm.message}
+                  onChange={e => setHelpForm({...helpForm, message: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={submittingHelp}
+                className="w-full bg-teal-700 hover:bg-teal-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-700/20 disabled:opacity-50 cursor-pointer"
+              >
+                {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -1099,7 +1279,7 @@ export default function CustomerStorefront() {
               <h3 className="font-black text-sm text-slate-900">
                 {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
               </h3>
-              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100"><X size={16}/></button>
+              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
             </div>
 
             <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
@@ -1139,7 +1319,7 @@ export default function CustomerStorefront() {
                 />
               </div>
 
-              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20">
+              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20 cursor-pointer">
                 {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
               </button>
             </form>
@@ -1160,7 +1340,7 @@ export default function CustomerStorefront() {
             </div>
             <button 
               onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
-              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2"
+              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               Track Order Status <ArrowRight size={16} />
             </button>
@@ -1204,7 +1384,7 @@ export default function CustomerStorefront() {
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-base text-slate-900">Product Details</h3>
-              <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18}/></button>
+              <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer"><X size={18}/></button>
             </div>
 
             {(() => {
@@ -1238,7 +1418,7 @@ export default function CustomerStorefront() {
                           <button 
                             key={i} 
                             onClick={() => setActiveGalleryImage(imgUrl)}
-                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-emerald-50/30 ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-emerald-100 opacity-70 hover:opacity-100'}`}
+                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-emerald-50/30 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-emerald-100 opacity-70 hover:opacity-100'}`}
                           >
                             <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                           </button>
@@ -1294,7 +1474,7 @@ export default function CustomerStorefront() {
                       <button 
                         type="button"
                         onClick={() => shareOnWhatsApp(selectedProductDetails)}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 p-3 rounded-2xl transition flex items-center justify-center"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 p-3 rounded-2xl transition flex items-center justify-center cursor-pointer"
                         title="Share on WhatsApp"
                       >
                         <MessageCircle size={20} />
@@ -1302,7 +1482,7 @@ export default function CustomerStorefront() {
                       <button 
                         onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
                         disabled={isModalOutOfStock}
-                        className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition ${
+                        className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition cursor-pointer ${
                           isModalOutOfStock 
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
                             : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-700/20'
@@ -1330,7 +1510,7 @@ export default function CustomerStorefront() {
           </div>
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 px-6 py-3 rounded-2xl transition duration-200 shadow-lg shadow-emerald-500/30 active:scale-95 text-slate-950"
+            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 px-6 py-3 rounded-2xl transition duration-200 shadow-lg shadow-emerald-500/30 active:scale-95 text-slate-950 cursor-pointer"
           >
             View Cart <ChevronRight size={16} />
           </button>
@@ -1375,7 +1555,7 @@ export default function CustomerStorefront() {
       <InvoiceModal 
         order={selectedInvoiceOrder} 
         isOpen={Boolean(selectedInvoiceOrder)} 
-        onClose={() => setSelectedInvoiceOrder(log => null)} 
+        onClose={() => setSelectedInvoiceOrder(null)} 
       />
 
       {/* Feedback Modal */}
