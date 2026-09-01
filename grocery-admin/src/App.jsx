@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
 
 import HomeSelector from './components/HomeSelector';
 import CustomerStorefront from './components/CustomerStorefront';
@@ -27,6 +27,8 @@ import StoreLocationManager from './components/StoreLocationManager';
 import AdminFeedbacks from './components/AdminFeedbacks';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
+import AdminReports from './components/AdminReports';
+
 
 function AdminLayout() {
   const [session, setSession] = useState(null);
@@ -88,6 +90,7 @@ function AdminLayout() {
   const renderContent = () => {
     switch (activeView) {
       case 'analytics': return <Analytics />;
+      case 'reports': return <AdminReports />;
       case 'inventory': return <ProductManager />;
       case 'categories': return <CategoryManager />;
       case 'orders': return <Orders />;
@@ -99,6 +102,7 @@ function AdminLayout() {
       case 'coupons': return <CouponManager />;
       case 'banners': return <BannerManager />;
       case 'flashSales': return <FlashSaleManager />;
+      
       case 'testimonials': return <TestimonialManager />;
       case 'feedback': return <AdminFeedbacks />;
       default: return <Analytics />;
@@ -109,7 +113,8 @@ function AdminLayout() {
     {
       title: 'Overview',
       items: [
-        { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard }
+        { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'reports', label: 'Financial Reports', icon: TrendingUp }
       ]
     },
     {
@@ -141,6 +146,7 @@ function AdminLayout() {
         { id: 'coupons', label: 'Coupons', icon: Tag },
         { id: 'banners', label: 'Banners', icon: Image },
         { id: 'flashSales', label: 'Flash Sales', icon: Flame },
+       
         { id: 'testimonials', label: 'Testimonials', icon: MessageSquareQuote },
         { id: 'feedback', label: 'Feedback & Complaints', icon: MessageSquare, badge: pendingComplaintsCount }
       ]
