@@ -1068,20 +1068,25 @@ export default function CustomerStorefront() {
                 
                 const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
                 
-                const originalPrice = Number(prod.price || 0);
+                const originalPrice = Number(prod.price || prod.mrp || 0);
                 const baseMrp = Number(prod.mrp || originalPrice);
 
                 const badgeText = String(deal.discount_tag || deal.discount_badge || deal.badge_label || '');
                 const matchPercent = badgeText.match(/(\d+)\s*%/);
                 const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
 
-                const finalPrice = extractedPercent > 0 
-                  ? Math.round(originalPrice * (1 - extractedPercent / 100)) 
-                  : originalPrice;
+                // Correct math: if 80% OFF, final price should be original * (1 - 0.80)
+                let finalPrice = originalPrice;
+                let displayMrp = baseMrp > originalPrice ? baseMrp : null;
 
-                const displayMrp = baseMrp > finalPrice ? baseMrp : (originalPrice > finalPrice ? originalPrice : null);
+                if (extractedPercent > 0) {
+                  if (!displayMrp || displayMrp <= originalPrice) {
+                    displayMrp = originalPrice;
+                  }
+                  finalPrice = Math.round(displayMrp * (1 - extractedPercent / 100));
+                }
                 
-                const productWithDealPrice = { ...prod, price: finalPrice };
+                const productWithDealPrice = { ...prod, price: finalPrice, mrp: displayMrp || originalPrice };
 
                 return (
                   <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">

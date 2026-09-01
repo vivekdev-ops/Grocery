@@ -206,7 +206,7 @@ export default function ProductGrid({
                               )}
 
                               <span className="absolute bottom-1.5 left-1.5 bg-white/90 backdrop-blur-xs px-1.5 py-0.5 rounded-md font-mono font-bold text-[9px] text-slate-700 flex items-center gap-0.5 shadow-2xs">
-                                <Clock size={10} className="text-emerald-600"/> 8 MINS
+                                <Clock size={10} className="text-emerald-600"/> INSTANT
                               </span>
                             </div>
 
