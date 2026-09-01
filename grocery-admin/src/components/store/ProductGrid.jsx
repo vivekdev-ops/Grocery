@@ -48,22 +48,7 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* Flash Sale Banner */}
-      {activeFlashSale && (
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 rounded-3xl p-5 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-amber-400/30">
-            <div className="space-y-1 text-center sm:text-left">
-              <span className="bg-black/30 text-amber-200 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-amber-300/30">Flash Sale Live</span>
-              <h3 className="text-lg sm:text-xl font-black">{activeFlashSale.title}</h3>
-              <p className="text-amber-100 text-xs">{activeFlashSale.description || 'Grab huge discounts on daily essentials before timer runs out!'}</p>
-            </div>
-            <div className="flex items-center gap-2 bg-black/40 px-5 py-3 rounded-2xl border border-amber-400/20 text-center shrink-0">
-              <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Ends in:</span>
-              <span className="font-mono font-black text-white text-base tracking-widest">{formatTime(timeLeft)}</span>
-            </div>
-          </div>
-        </div>
-      )}
+     
 
       {/* Category Pills Bar with Images */}
       <div className="max-w-7xl mx-auto px-4 overflow-x-auto scrollbar-none py-2">
@@ -114,17 +99,37 @@ export default function ProductGrid({
               const currentVariantKey = selectedVariants[product.id];
               const activeVariant = variantsList.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
               
-              const sellingPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
-              const mrpPrice = Number(activeVariant?.mrp || product.mrp || 0);
-              const hasMrp = mrpPrice > sellingPrice;
-              const discountPct = hasMrp ? Math.round(((mrpPrice - sellingPrice) / mrpPrice) * 100) : null;
+              // Base price & variant price calculations
+              const rawSellingPrice = Number(activeVariant ? activeVariant.price : product.price || 0);
+              const rawMrpPrice = Number(activeVariant?.mrp || product.mrp || 0);
+
+              // If product has an active deal badge override from fetchStoreData
+              let sellingPrice = rawSellingPrice;
+              let hasMrp = rawMrpPrice > sellingPrice;
+              let discountPct = hasMrp ? Math.round(((rawMrpPrice - sellingPrice) / rawMrpPrice) * 100) : null;
+              let mrpPrice = rawMrpPrice;
+
+              if (product.dealBadge) {
+                const matchPercent = String(product.dealBadge).match(/(\d+)\s*%/);
+                const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
+                if (extractedPercent > 0) {
+                  sellingPrice = Math.round(rawSellingPrice * (1 - extractedPercent / 100));
+                  mrpPrice = rawMrpPrice > sellingPrice ? rawMrpPrice : rawSellingPrice;
+                  hasMrp = mrpPrice > sellingPrice;
+                  discountPct = extractedPercent;
+                }
+              }
               
               const stockCount = Number(activeVariant ? activeVariant.stock : product.stock || 0);
               const isOutOfStock = stockCount <= 0;
 
-              const cartItemId = activeVariant ? `${product.id}-${activeVariant.id || activeVariant.label || activeVariant.unit_label}` : product.id;
+              const cartVariantKey = activeVariant ? (activeVariant.id || activeVariant.label || activeVariant.unit_label) : null;
+              const cartItemId = cartVariantKey ? `${product.id}-${cartVariantKey}` : product.id;
               const cartItem = cart.find(ci => ci.cartItemId === cartItemId);
               const quantityInCart = cartItem ? cartItem.quantity : 0;
+
+              // Product object with overridden price for cart insertion
+              const productWithDealPrice = { ...product, price: sellingPrice };
 
               return (
                 <div 
@@ -135,7 +140,7 @@ export default function ProductGrid({
                   {/* Discount Badge */}
                   {discountPct && (
                     <span className="absolute top-3 left-3 z-10 bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md uppercase tracking-wider">
-                      {discountPct}% OFF
+                      {product.dealBadge ? product.dealBadge : `${discountPct}% OFF`}
                     </span>
                   )}
 
@@ -205,7 +210,7 @@ export default function ProductGrid({
                         <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200">Sold Out</span>
                       ) : quantityInCart === 0 ? (
                         <button 
-                          onClick={() => addToCart(product)}
+                          onClick={() => addToCart(productWithDealPrice)}
                           className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-md shadow-emerald-700/20 active:scale-95 cursor-pointer"
                         >
                           Add

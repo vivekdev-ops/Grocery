@@ -12,7 +12,7 @@ export default function CartDrawer({
   detectCustomerLocation, handleAddAddress, handleDeleteAddress, updateQuantity,
   appliedCoupon, setAppliedCoupon, couponInput, setCouponInput, handleApplyCoupon, removeCoupon,
   cartSubtotal, discountAmount, selectedAddressDistance, deliveryFee, cartTotal,
-  checkingOut, handleCheckout, navigate
+  checkingOut, handleCheckout, navigate, deliveryRules = []
 }) {
   const [availableCoupons, setAvailableCoupons] = useState([]);
 
@@ -30,7 +30,6 @@ export default function CartDrawer({
       .eq('is_active', true);
 
     if (!error && data) {
-      // Filter out expired coupons locally if needed
       const validCoupons = data.filter(c => !c.expiry_date || new Date(c.expiry_date) >= new Date());
       setAvailableCoupons(validCoupons);
     }
@@ -38,8 +37,12 @@ export default function CartDrawer({
 
   if (!isOpen) return null;
 
-  // Smart Cart Value Goals & Suggestions Logic
-  const freeDeliveryThreshold = 500; 
+  // Dynamically calculate the free delivery threshold from admin rules where fee is 0
+  const freeDeliveryRule = deliveryRules
+    .filter(r => Number(r.delivery_fee) === 0)
+    .sort((a, b) => Number(a.min_cart_value) - Number(b.min_cart_value))[0];
+
+  const freeDeliveryThreshold = freeDeliveryRule ? Number(freeDeliveryRule.min_cart_value) : 500;
   const amountNeededForFreeDelivery = Math.max(0, freeDeliveryThreshold - cartSubtotal);
   const progressPercentage = Math.min(100, (cartSubtotal / freeDeliveryThreshold) * 100);
 
@@ -64,25 +67,22 @@ export default function CartDrawer({
         {/* Scrollable Body */}
         <div className="p-5 flex-1 overflow-y-auto space-y-5 bg-[#F0FDF4]/30">
           
-          {/* Dynamic Cart Value Suggestion Bar */}
-          <div className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white p-4 rounded-3xl shadow-md space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-200">
-              <Sparkles size={14} className="text-amber-400 fill-amber-400 shrink-0" />
-              {amountNeededForFreeDelivery > 0 ? (
-                <span>Add <strong className="text-white font-black">₹{amountNeededForFreeDelivery.toFixed(2)}</strong> more for Free Delivery!</span>
-              ) : (
-                <span className="text-emerald-300 font-black uppercase tracking-wider">🎉 You unlocked Free Delivery perks!</span>
-              )}
+          {/* Dynamic Free Delivery Progress */}
+          {freeDeliveryThreshold > 0 && cart.length > 0 && (
+            <div className="bg-emerald-950/80 rounded-2xl p-3 space-y-2">
+              <p className="text-[11px] font-bold text-emerald-300">
+                {amountNeededForFreeDelivery > 0
+                  ? `Add ₹${amountNeededForFreeDelivery.toFixed(2)} more for FREE delivery!`
+                  : '🎉 You qualify for FREE delivery!'}
+              </p>
+              <div className="w-full bg-emerald-950/60 h-2 rounded-full overflow-hidden border border-emerald-700/50">
+                <div 
+                  className="bg-gradient-to-r from-emerald-400 to-amber-400 h-full transition-all duration-500 rounded-full" 
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
             </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-emerald-950/60 h-2 rounded-full overflow-hidden border border-emerald-700/50">
-              <div 
-                className="bg-gradient-to-r from-emerald-400 to-amber-400 h-full transition-all duration-500 rounded-full" 
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Cart Items List */}
           <div className="space-y-3">
@@ -111,7 +111,6 @@ export default function CartDrawer({
                 <MapPin size={16} className="text-emerald-700"/> Delivery Address
               </h4>
               
-              {/* Collapsed Default Address Selector */}
               <div className="text-slate-900">
                 <CollapsedAddressSelector 
                   addresses={savedAddresses}
@@ -124,7 +123,6 @@ export default function CartDrawer({
                 />
               </div>
 
-              {/* Add Address Form Box if toggled */}
               {showAddAddressBox && (
                 <form onSubmit={handleAddAddress} className="bg-white p-4 rounded-2xl border border-emerald-200 space-y-2.5 text-xs text-slate-800 shadow-sm animate-fadeIn">
                   <div className="flex justify-between items-center font-bold text-slate-900 mb-1">
@@ -142,7 +140,6 @@ export default function CartDrawer({
                 </form>
               )}
 
-              {/* Coupon Section & Available Suggestions */}
               <div className="pt-2 border-t border-emerald-100 space-y-3">
                 <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Promo Code</h4>
                 {appliedCoupon ? (
@@ -164,13 +161,11 @@ export default function CartDrawer({
                       <button onClick={handleApplyCoupon} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">Apply</button>
                     </div>
 
-                    {/* Available Coupons Suggestions List */}
                     {availableCoupons.length > 0 && (
                       <div className="space-y-2 pt-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Available Offers</span>
                         <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                           {availableCoupons.map(coupon => {
-                            const isEligible = cartSubtotal >= (coupon.min_order_value || 0);
                             return (
                               <div key={coupon.id} className="bg-emerald-50/50 border border-emerald-200/80 p-2.5 rounded-2xl flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
@@ -222,7 +217,6 @@ export default function CartDrawer({
               <span>₹{cartSubtotal.toFixed(2)}</span>
             </div>
 
-            {/* Discount Display Row */}
             {discountAmount > 0 && (
               <div className="flex justify-between text-emerald-700 font-bold">
                 <span>Discount ({appliedCoupon?.code}):</span>

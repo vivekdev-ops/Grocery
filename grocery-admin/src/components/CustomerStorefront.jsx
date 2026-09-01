@@ -237,16 +237,27 @@ export default function CustomerStorefront() {
   const fetchStoreData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, varRes, revRes] = await Promise.all([
+      const [prodRes, catRes, varRes, revRes, dealRes] = await Promise.all([
         supabase.from('products').select('*, categories(name), shopkeeper_profiles(store_name)').eq('approval_status', 'approved').order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_variants').select('*'),
-        supabase.from('product_reviews').select('*')
+        supabase.from('product_reviews').select('*'),
+        supabase.from('personalized_deals').select('*, products(*)').eq('is_active', true)
       ]);
 
       const rawProducts = prodRes.data || [];
       const rawVariants = varRes.data || [];
       const rawReviews = revRes.data || [];
+      const activeDeals = dealRes.data || [];
+
+      setPersonalizedDeals(activeDeals);
+
+      // Create a lookup map for deals by product ID
+      const dealMap = {};
+      activeDeals.forEach(deal => {
+        const pId = deal.product_id || deal.products?.id;
+        if (pId) dealMap[pId] = deal;
+      });
 
       const productsWithVariants = rawProducts.map(p => {
         const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
@@ -261,8 +272,23 @@ export default function CustomerStorefront() {
         const pReviews = rawReviews.filter(r => r.product_id === p.id);
         const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : null;
 
+        // Check if this product has an active deal discount badge
+        const activeDeal = dealMap[p.id];
+        let dealBadge = null;
+
+        if (activeDeal) {
+          const badgeText = String(activeDeal.discount_tag || activeDeal.discount_badge || activeDeal.badge_label || '');
+          const matchPercent = badgeText.match(/(\d+)\s*%/);
+          const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
+
+          if (extractedPercent > 0) {
+            dealBadge = badgeText;
+          }
+        }
+
         return { 
           ...p, 
+          dealBadge,         // Attached badge label for grid display
           images: mergedImages,
           variants: mergedVariants,
           avgRating,
@@ -665,19 +691,30 @@ export default function CustomerStorefront() {
   const calculateFee = (subtotal, distKm) => {
     if (!deliveryRules || deliveryRules.length === 0) return 40;
 
-    const matchedRule = deliveryRules.find(r => {
-      const minCart = r.min_cart_value || 0;
-      const maxCart = r.max_cart_value || 999999;
-      const minDst = r.min_distance_km || 0;
-      const maxDst = r.max_distance_km || 999;
+    const currentDist = Number(distKm || 0);
 
-      return subtotal >= minCart && subtotal <= maxCart && distKm >= minDst && distKm <= maxDst;
+    // Find rule checking cart subtotal and flexible distance range
+    let matchedRule = deliveryRules.find(r => {
+      const minCart = Number(r.min_cart_value || 0);
+      const maxCart = Number(r.max_cart_value || 999999);
+      const minDst = Number(r.min_distance_km || 0);
+      const maxDst = Number(r.max_distance_km || 999);
+
+      return subtotal >= minCart && subtotal <= maxCart && currentDist >= minDst && currentDist <= maxDst;
     });
 
-    if (matchedRule) return matchedRule.delivery_fee;
+    if (matchedRule) return Number(matchedRule.delivery_fee);
 
-    const cartOnlyRule = deliveryRules.find(r => subtotal >= (r.min_cart_value || 0) && subtotal <= (r.max_cart_value || 999999));
-    return cartOnlyRule ? cartOnlyRule.delivery_fee : 40;
+    // Fallback: match cart range ignoring tight distance bounds
+    const cartOnlyRule = deliveryRules.find(r => {
+      const minCart = Number(r.min_cart_value || 0);
+      const maxCart = Number(r.max_cart_value || 999999);
+      return subtotal >= minCart && subtotal <= maxCart;
+    });
+
+    if (cartOnlyRule) return Number(cartOnlyRule.delivery_fee);
+
+    return 40;
   };
 
   const handleSelectAddress = (addrObj) => {
@@ -708,7 +745,20 @@ export default function CustomerStorefront() {
 
     const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
-    const itemPrice = Number(variant ? variant.price : product.price || 0);
+    
+    // Get raw price from variant or product
+    let rawItemPrice = Number(variant ? variant.price : product.price || 0);
+
+    // Apply active deal badge discount percentage if present
+    if (product.dealBadge) {
+      const matchPercent = String(product.dealBadge).match(/(\d+)\s*%/);
+      const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
+      if (extractedPercent > 0) {
+        rawItemPrice = Math.round(rawItemPrice * (1 - extractedPercent / 100));
+      }
+    }
+
+    const itemPrice = rawItemPrice;
     const itemStock = stockCheck;
     
     const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
@@ -981,59 +1031,80 @@ export default function CustomerStorefront() {
         )}
       </div>
 
-      {/* Personalized Daily Deals Dynamic Carousel */}
-      {personalizedDeals.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 mt-6">
-          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
-                <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
-              </div>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {personalizedDeals.map(deal => {
-                const prod = deal.products;
-                if (!prod) return null;
-                const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-                const hasMrp = prod.mrp && Number(prod.mrp) > Number(prod.price);
-                const discountPercent = hasMrp ? Math.round(((Number(prod.mrp) - Number(prod.price)) / Number(prod.mrp)) * 100) : null;
-
-                return (
-                  <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
-                    <div className="space-y-2">
-                      <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
-                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
-                        <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
-                          {discountPercent ? `${discountPercent}% OFF` : deal.discount_tag}
-                        </span>
-                      </div>
-                      <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
-                      <div>
-                        <span className="font-black text-sm text-emerald-300">₹{prod.price}</span>
-                        {hasMrp && (
-                          <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{prod.mrp}</span>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => addToCart(prod)}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+{personalizedDeals.length > 0 && (
+  <div className="max-w-7xl mx-auto px-4 mt-6">
+    <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
+          <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
         </div>
-      )}
+        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {personalizedDeals.map(deal => {
+          const prod = deal.products;
+          if (!prod) return null;
+          
+          const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+          
+          const originalPrice = Number(prod.price || 0);
+          const baseMrp = Number(prod.mrp || originalPrice);
+
+          // Extract numeric discount percentage from badge label text (e.g., "20% OFF" -> 20)
+          const badgeText = String(deal.discount_tag || deal.discount_badge || deal.badge_label || '');
+          const matchPercent = badgeText.match(/(\d+)\s*%/);
+          const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
+
+          // Calculate final deal price based on the extracted percentage from the badge label
+          const finalPrice = extractedPercent > 0 
+            ? Math.round(originalPrice * (1 - extractedPercent / 100)) 
+            : originalPrice;
+
+          const displayMrp = baseMrp > finalPrice ? baseMrp : (originalPrice > finalPrice ? originalPrice : null);
+          const computedPercent = extractedPercent > 0 
+            ? extractedPercent 
+            : (displayMrp && displayMrp > finalPrice ? Math.round(((displayMrp - finalPrice) / displayMrp) * 100) : 0);
+
+          const productWithDealPrice = { ...prod, price: finalPrice };
+
+          return (
+            <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
+              <div className="space-y-2">
+                <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
+                  <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
+                  
+                  {badgeText && (
+                    <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
+                      {badgeText}
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
+                <div>
+                  <span className="font-black text-sm text-emerald-300">₹{finalPrice}</span>
+                  {displayMrp && displayMrp > finalPrice && (
+                    <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{displayMrp}</span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => addToCart(productWithDealPrice)}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
+                >
+                  + Add
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
