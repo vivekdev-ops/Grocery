@@ -75,7 +75,7 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
             >
               <MapPin size={16} className="text-emerald-700 shrink-0" />
               <div className="text-left">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">Delivery in 10 mins</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">Current Location</p>
                 <p className="text-xs font-black text-slate-800 flex items-center gap-1.5 mt-0.5">
                   <span className="truncate max-w-[160px]">{locationName}</span>
                   {isFetchingLocation ? <Loader2 size={12} className="animate-spin text-emerald-600 shrink-0" /> : <ChevronDown size={12} className="text-slate-500 shrink-0" />}

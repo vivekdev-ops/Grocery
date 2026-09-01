@@ -70,6 +70,7 @@ export default function CustomerStorefront() {
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   const [activeGalleryImage, setActiveGalleryImage] = useState('');
   const [productReviews, setProductReviews] = useState([]);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // Cart & Checkout State
   const [cart, setCart] = useState([]);
@@ -1579,6 +1580,7 @@ export default function CustomerStorefront() {
         updateQuantity={updateQuantity}
         onSelectProduct={async (product) => {
           setSelectedProductDetails(product);
+          setIsDescriptionExpanded(false);
           const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
           setActiveGalleryImage(pImages[0] || '');
           await fetchProductReviews(product.id);
@@ -1587,11 +1589,18 @@ export default function CustomerStorefront() {
 
       {/* Product Details Modal */}
       {selectedProductDetails && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
-              <h3 className="font-black text-base text-slate-900">Product Details</h3>
-              <button onClick={() => setSelectedProductDetails(null)} className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer"><X size={18}/></button>
+            
+            {/* Modal Header showing Product Name instead of 'Product Details' */}
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3 gap-3">
+              <h3 className="font-black text-base md:text-lg text-slate-900 truncate">{selectedProductDetails.name}</h3>
+              <button 
+                onClick={() => { setSelectedProductDetails(null); setIsDescriptionExpanded(false); }} 
+                className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer shrink-0"
+              >
+                <X size={18}/>
+              </button>
             </div>
 
             {(() => {
@@ -1638,7 +1647,9 @@ export default function CustomerStorefront() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
-                      <h2 className="text-xl font-black text-slate-900">{selectedProductDetails.name}</h2>
+                      <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-200">
+                        <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
+                      </span>
                       {selectedProductDetails.avgRating && (
                         <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
                           <Star size={14} className="fill-amber-500 text-amber-500" />
@@ -1646,10 +1657,32 @@ export default function CustomerStorefront() {
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full w-max flex items-center gap-1 border border-emerald-200">
-                      <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
-                    </p>
-                    <p className="text-sm text-slate-600 mt-2">{selectedProductDetails.description || 'No detailed description provided for this fresh item.'}</p>
+
+                    {/* COLLAPSED / EXPANDABLE MOBILE-FRIENDLY RICH TEXT DESCRIPTION */}
+                    {selectedProductDetails.description ? (
+                      <div className="mt-3 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 space-y-2 text-xs">
+                        <span className="font-black text-slate-700 uppercase tracking-wider block text-[10px]">Product Description</span>
+                        
+                        <div className={`text-slate-600 leading-relaxed overflow-hidden transition-all duration-300 ${
+                          !isDescriptionExpanded ? 'max-h-16 relative after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:bg-gradient-to-t after:from-emerald-50/80 after:to-transparent' : ''
+                        }`}>
+                          <div 
+                            className="[&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mb-1.5 [&>p]:mb-1.5 [&_b]:font-black [&_i]:italic text-xs break-words" 
+                            dangerouslySetInnerHTML={{ __html: selectedProductDetails.description }} 
+                          />
+                        </div>
+
+                        <button 
+                          type="button"
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          className="text-emerald-700 font-black hover:underline pt-1 flex items-center gap-1 cursor-pointer text-[11px]"
+                        >
+                          {isDescriptionExpanded ? 'Read Less ▲' : 'Read More ▼'}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic mt-2">No detailed description provided for this fresh item.</p>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-emerald-100 space-y-3">
@@ -1694,7 +1727,7 @@ export default function CustomerStorefront() {
                         <MessageCircle size={20} />
                       </button>
                       <button 
-                        onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); }}
+                        onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); setIsDescriptionExpanded(false); }}
                         disabled={isModalOutOfStock}
                         className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition cursor-pointer ${
                           isModalOutOfStock 
