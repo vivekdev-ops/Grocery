@@ -1,133 +1,139 @@
-// src/components/FlashSaleManager.jsx
+// src/components/AdminFlashSaleManager.jsx (or add into Banner/FlashSale Manager)
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Flame, Clock, Save, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Tag, Sparkles, Trash2, Plus, Percent, CheckCircle } from 'lucide-react';
 
-export default function FlashSaleManager() {
-  const [flashSale, setFlashSale] = useState({
-    title: 'Flash Sale Live!',
-    subtitle: 'Extra discounts on daily essentials & snacks.',
-    end_time: '',
-    is_active: true
-  });
+export default function PersonalizedDealsManager() {
+  const [deals, setDeals] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [discountTag, setDiscountTag] = useState('20% OFF');
+  const [targetCategory, setTargetCategory] = useState('All');
 
   useEffect(() => {
-    fetchFlashSale();
+    fetchDeals();
+    fetchProducts();
   }, []);
 
-  const fetchFlashSale = async () => {
+  const fetchDeals = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('flash_sales').select('*').limit(1).single();
-    if (data && !error) {
-      // Format datetime-local string properly
-      const formattedDate = data.end_time ? new Date(data.end_time).toISOString().slice(0, 16) : '';
-      setFlashSale({ ...data, end_time: formattedDate });
-    }
+    const { data } = await supabase.from('personalized_deals').select('*, products(*)').order('created_at', { ascending: false });
+    if (data) setDeals(data);
     setLoading(false);
   };
 
-  const handleSave = async (e) => {
+  const fetchProducts = async () => {
+    const { data } = await supabase.from('products').select('id, name, price, image_url').eq('approval_status', 'approved');
+    if (data) setProducts(data);
+  };
+
+  const handleAddDeal = async (e) => {
     e.preventDefault();
-    setSaving(true);
+    if (!selectedProductId) return;
 
-    const payload = {
-      title: flashSale.title,
-      subtitle: flashSale.subtitle,
-      end_time: new Date(flashSale.end_time).toISOString(),
-      is_active: flashSale.is_active
-    };
+    const { error } = await supabase.from('personalized_deals').insert([{
+      product_id: selectedProductId,
+      discount_tag: discountTag,
+      target_category: targetCategory,
+      is_active: true
+    }]);
 
-    let error;
-    if (flashSale.id) {
-      const res = await supabase.from('flash_sales').update(payload).eq('id', flashSale.id);
-      error = res.error;
+    if (!error) {
+      alert("Personalized deal banner added successfully!");
+      setSelectedProductId('');
+      setDiscountTag('20% OFF');
+      fetchDeals();
     } else {
-      const res = await supabase.from('flash_sales').insert([payload]);
-      error = res.error;
-    }
-
-    setSaving(false);
-    if (error) {
-      alert('Error saving flash sale: ' + error.message);
-    } else {
-      alert('Flash sale banner updated successfully!');
-      fetchFlashSale();
+      alert("Error adding deal: " + error.message);
     }
   };
 
-  if (loading) return <div className="p-8 text-stone-500 font-medium">Loading flash sale configuration...</div>;
+  const handleDeleteDeal = async (id) => {
+    if (!window.confirm("Delete this personalized deal?")) return;
+    const { error } = await supabase.from('personalized_deals').delete().eq('id', id);
+    if (!error) setDeals(prev => prev.filter(d => d.id !== id));
+  };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h2 className="text-2xl font-black text-stone-900 flex items-center gap-2">
-          <Flame className="text-rose-600" /> Flash Sale Banner Management
-        </h2>
-        <p className="text-sm text-stone-500 mt-0.5">Configure live countdown timers and promotional banners for your customers.</p>
+    <div className="space-y-6 font-sans text-xs">
+      <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+            <Sparkles className="text-amber-500" size={22} /> Personalized Daily Deals Manager
+          </h2>
+          <p className="text-xs text-stone-500 mt-0.5">Configure tailored product deals showcased dynamically on customer storefronts.</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSave} className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-5">
-        <div className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border">
-          <div>
-            <span className="font-bold text-stone-900 block text-sm">Flash Sale Status</span>
-            <span className="text-xs text-stone-500">Toggle whether the banner is visible on the storefront.</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFlashSale({ ...flashSale, is_active: !flashSale.is_active })}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${flashSale.is_active ? 'bg-emerald-600 text-white shadow-md' : 'bg-stone-200 text-stone-700'}`}
+      <form onSubmit={handleAddDeal} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-4 max-w-xl">
+        <h3 className="font-black text-sm text-slate-900">Add New Featured Deal</h3>
+        <div>
+          <label className="block font-bold text-stone-700 mb-1">Select Product</label>
+          <select 
+            value={selectedProductId}
+            onChange={e => setSelectedProductId(e.target.value)}
+            required
+            className="w-full bg-stone-50 border border-stone-200 p-3 rounded-2xl outline-none font-bold text-slate-900"
           >
-            {flashSale.is_active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-            {flashSale.is_active ? 'ACTIVE' : 'INACTIVE'}
-          </button>
+            <option value="">-- Choose Product --</option>
+            {products.map(p => (
+              <option key={p.id} value={p.id}>{p.name} (₹{p.price})</option>
+            ))}
+          </select>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">Sale Title</label>
-          <input
-            type="text"
-            required
-            className="w-full border border-stone-300 p-3.5 rounded-xl text-sm outline-none font-medium focus:ring-2 focus:ring-emerald-500 bg-stone-50/50"
-            placeholder="e.g., Flash Sale Live!"
-            value={flashSale.title}
-            onChange={e => setFlashSale({ ...flashSale, title: e.target.value })}
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block font-bold text-stone-700 mb-1">Discount Badge Label</label>
+            <input 
+              type="text" 
+              placeholder="e.g. 20% OFF or BOGO"
+              value={discountTag}
+              onChange={e => setDiscountTag(e.target.value)}
+              required
+              className="w-full bg-stone-50 border border-stone-200 p-3 rounded-2xl outline-none font-bold text-slate-900"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-stone-700 mb-1">Target Interest Group</label>
+            <select 
+              value={targetCategory}
+              onChange={e => setTargetCategory(e.target.value)}
+              className="w-full bg-stone-50 border border-stone-200 p-3 rounded-2xl outline-none font-bold text-slate-900"
+            >
+              <option value="All">All Shoppers (General)</option>
+              <option value="Groceries">Groceries & Staples</option>
+              <option value="Snacks">Snacks & Beverages</option>
+              <option value="Dairy">Dairy & Breakfast</option>
+            </select>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">Subtitle / Description</label>
-          <input
-            type="text"
-            required
-            className="w-full border border-stone-300 p-3.5 rounded-xl text-sm outline-none font-medium focus:ring-2 focus:ring-emerald-500 bg-stone-50/50"
-            placeholder="e.g., Extra discounts on daily essentials & snacks."
-            value={flashSale.subtitle}
-            onChange={e => setFlashSale({ ...flashSale, subtitle: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1.5 uppercase tracking-wider">Sale Expiry Date & Time</label>
-          <input
-            type="datetime-local"
-            required
-            className="w-full border border-stone-300 p-3.5 rounded-xl text-sm outline-none font-medium focus:ring-2 focus:ring-emerald-500 bg-stone-50/50"
-            value={flashSale.end_time}
-            onChange={e => setFlashSale({ ...flashSale, end_time: e.target.value })}
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-600/30 transition active:scale-95 flex items-center justify-center gap-2 text-sm"
-        >
-          <Save size={18} />
-          {saving ? 'Saving...' : 'Save & Publish Flash Sale'}
+        <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black uppercase tracking-wider transition shadow-md cursor-pointer">
+          Publish Deal Banner
         </button>
       </form>
+
+      <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-4">
+        <h3 className="font-black text-sm text-slate-900">Active Personalized Deals ({deals.length})</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {deals.map(deal => (
+            <div key={deal.id} className="p-4 rounded-2xl border border-stone-200 bg-stone-50/50 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img src={deal.products?.image_url} alt="" className="w-12 h-12 object-cover rounded-xl border bg-white" />
+                <div>
+                  <span className="font-bold text-slate-900 block truncate max-w-[140px]">{deal.products?.name}</span>
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">{deal.discount_tag}</span>
+                </div>
+              </div>
+              <button onClick={() => handleDeleteDeal(deal.id)} className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { supabase } from '../supabaseClient';
 import { 
   Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, 
   FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, 
-  Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck 
+  Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck,
+  Sparkles, Bot, Mic, MicOff, Search, Send
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
@@ -21,6 +22,7 @@ export default function CustomerStorefront() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
+  const [personalizedDeals, setPersonalizedDeals] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,6 +109,15 @@ export default function CustomerStorefront() {
   });
   const [addressForm, setAddressForm] = useState({ phone: '', address: '' });
 
+  // --- AI ENHANCEMENTS STATE ---
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiChatMessages, setAiChatMessages] = useState([
+    { sender: 'ai', text: 'Hello! I am your ValueGo AI Grocery Concierge. Tell me what you want to cook or what items you need, and I will instantly set up your cart!' }
+  ]);
+  const [aiInputText, setAiInputText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [predictedRefillItems, setPredictedRefillItems] = useState([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -137,9 +148,29 @@ export default function CustomerStorefront() {
     fetchDeliveryRules();
     fetchBanners();
     fetchActiveFlashSale();
+    fetchPersonalizedDeals();
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Compute Smart Repeat Order / Refill Predictor whenever myOrders updates
+  useEffect(() => {
+    if (myOrders.length > 0 && products.length > 0) {
+      const purchasedCounts = {};
+      myOrders.forEach(ord => {
+        ord.order_items?.forEach(item => {
+          if (item.product_id) {
+            purchasedCounts[item.product_id] = (purchasedCounts[item.product_id] || 0) + item.quantity;
+          }
+        });
+      });
+      const sortedFavs = [...products]
+        .filter(p => purchasedCounts[p.id])
+        .sort((a, b) => (purchasedCounts[b.id] || 0) - (purchasedCounts[a.id] || 0))
+        .slice(0, 4);
+      setPredictedRefillItems(sortedFavs);
+    }
+  }, [myOrders, products]);
 
   useEffect(() => {
     const channel = supabase
@@ -173,6 +204,11 @@ export default function CustomerStorefront() {
       const difference = new Date(data.end_time).getTime() - new Date().getTime();
       setTimeLeft(Math.max(0, Math.floor(difference / 1000)));
     }
+  };
+
+  const fetchPersonalizedDeals = async () => {
+    const { data } = await supabase.from('personalized_deals').select('*, products(*)').eq('is_active', true);
+    if (data) setPersonalizedDeals(data);
   };
 
   useEffect(() => {
@@ -275,6 +311,68 @@ export default function CustomerStorefront() {
   const fetchProductReviews = async (productId) => {
     const { data } = await supabase.from('product_reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false });
     if (data) setProductReviews(data);
+  };
+
+  // --- AI CONCIERGE & SEMANTIC PARSING LOGIC ---
+  const handleAiChatSubmit = (e) => {
+    e.preventDefault();
+    if (!aiInputText.trim()) return;
+
+    const userMsg = aiInputText.trim();
+    setAiChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
+    setAiInputText('');
+
+    setTimeout(() => {
+      const queryLower = userMsg.toLowerCase();
+      let matchedItems = [];
+
+      products.forEach(p => {
+        if (queryLower.includes(p.name.toLowerCase()) || queryLower.split(' ').some(word => word.length > 3 && p.name.toLowerCase().includes(word))) {
+          matchedItems.push(p);
+        }
+      });
+
+      if (matchedItems.length > 0) {
+        let addedNames = [];
+        matchedItems.slice(0, 2).forEach(prod => {
+          addToCart(prod);
+          addedNames.push(prod.name);
+        });
+        setAiChatMessages(prev => [
+          ...prev, 
+          { sender: 'ai', text: `I found matching items for your request! I've added **${addedNames.join(', ')}** to your cart. Ready for fast 10-minute delivery.` }
+        ]);
+      } else {
+        setAiChatMessages(prev => [
+          ...prev, 
+          { sender: 'ai', text: `I scanned our inventory for "${userMsg}", but couldn't find an exact match. Try asking for items like milk, paneer, rice, oil, or snacks!` }
+        ]);
+      }
+    }, 600);
+  };
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser. Please use Chrome or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognition.onresult = (event) => {
+      const speechToText = event.results[0][0].transcript;
+      setSearchQuery(speechToText);
+    };
+
+    recognition.start();
   };
 
   const handleAddOrUpdateReview = async (e) => {
@@ -850,6 +948,92 @@ export default function CustomerStorefront() {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
+      {/* Voice Search Button Bar */}
+      <div className="max-w-7xl mx-auto px-4 mt-3 flex items-center justify-between gap-3">
+        <button 
+          onClick={startVoiceSearch}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs transition shadow-2xs cursor-pointer border ${
+            isListening ? 'bg-rose-600 text-white border-rose-700 animate-pulse' : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
+          }`}
+        >
+          {isListening ? <MicOff size={15} /> : <Mic size={15} className="text-emerald-600" />}
+          {isListening ? 'Listening... Speak now' : 'Voice Search'}
+        </button>
+
+        {session && predictedRefillItems.length > 0 && (
+          <div className="hidden md:flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl">
+            <Sparkles size={14} className="text-amber-500 fill-amber-500 shrink-0" />
+            <span className="text-[11px] font-black text-emerald-900">AI Refill Basket Ready:</span>
+            <div className="flex gap-1.5">
+              {predictedRefillItems.map(p => (
+                <button 
+                  key={p.id}
+                  onClick={() => addToCart(p)}
+                  className="bg-white hover:bg-emerald-100 text-slate-800 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-emerald-200 transition cursor-pointer truncate max-w-[100px]"
+                  title={`Add ${p.name}`}
+                >
+                  + {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Personalized Daily Deals Dynamic Carousel */}
+      {personalizedDeals.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 mt-6">
+          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
+                <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
+              </div>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {personalizedDeals.map(deal => {
+                const prod = deal.products;
+                if (!prod) return null;
+                const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+                const hasMrp = prod.mrp && Number(prod.mrp) > Number(prod.price);
+                const discountPercent = hasMrp ? Math.round(((Number(prod.mrp) - Number(prod.price)) / Number(prod.mrp)) * 100) : null;
+
+                return (
+                  <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
+                    <div className="space-y-2">
+                      <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
+                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
+                        <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
+                          {discountPercent ? `${discountPercent}% OFF` : deal.discount_tag}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
+                      <div>
+                        <span className="font-black text-sm text-emerald-300">₹{prod.price}</span>
+                        {hasMrp && (
+                          <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{prod.mrp}</span>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => addToCart(prod)}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300">
@@ -864,6 +1048,29 @@ export default function CustomerStorefront() {
                 <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
+
+              {/* AI Repeat Order Refill Section in Profile Drawer */}
+              {predictedRefillItems.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 rounded-2xl border border-emerald-800 space-y-2 shadow-md">
+                  <div className="flex items-center gap-2 text-amber-400 font-black">
+                    <Sparkles size={16} /> AI Smart Refill Basket
+                  </div>
+                  <p className="text-[11px] text-emerald-200">Based on your past orders, you might need these staples soon:</p>
+                  <div className="space-y-1.5 pt-1">
+                    {predictedRefillItems.map(p => (
+                      <div key={p.id} className="bg-emerald-900/60 p-2 rounded-xl flex items-center justify-between border border-emerald-700/50">
+                        <span className="font-bold truncate max-w-[180px]">{p.name}</span>
+                        <button 
+                          onClick={() => addToCart(p)}
+                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Collapsible Accordion: Recent Orders */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
@@ -1393,6 +1600,8 @@ export default function CustomerStorefront() {
               const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
               
               const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
+              const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
+              const hasModalMrp = modalMrp > modalPrice;
               const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
               const isModalOutOfStock = modalStock <= 0;
 
@@ -1467,9 +1676,14 @@ export default function CustomerStorefront() {
                   </div>
 
                   <div className="pt-4 border-t border-emerald-100 flex items-center justify-between gap-3">
-                    <span className="text-xl font-black text-slate-900">
-                      ₹{modalPrice.toFixed(2)}
-                    </span>
+                    <div>
+                      <span className="text-xl font-black text-slate-900">
+                        ₹{modalPrice.toFixed(2)}
+                      </span>
+                      {hasModalMrp && (
+                        <span className="text-xs text-slate-400 line-through ml-2">₹{modalMrp.toFixed(2)}</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <button 
                         type="button"
@@ -1498,6 +1712,60 @@ export default function CustomerStorefront() {
           </div>
         </div>
       )}
+
+      {/* Floating AI Grocery Concierge Chatbot Widget */}
+      <div className="fixed bottom-24 right-6 z-40">
+        {!isAiChatOpen ? (
+          <button 
+            onClick={() => setIsAiChatOpen(true)}
+            className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
+            title="Ask AI Grocery Assistant"
+          >
+            <Bot size={22} className="animate-bounce" />
+            <span className="hidden sm:inline">AI Assistant</span>
+          </button>
+        ) : (
+          <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
+            <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm">ValueGo AI Concierge</h4>
+                  <p className="text-[10px] text-emerald-300">Ask for recipes or grocery items</p>
+                </div>
+              </div>
+              <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer"><X size={16}/></button>
+            </div>
+
+            <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
+              {aiChatMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
+                    msg.sender === 'user' ? 'bg-emerald-700 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
+              <input 
+                type="text" 
+                placeholder="e.g. Add ingredients for tea..." 
+                value={aiInputText}
+                onChange={e => setAiInputText(e.target.value)}
+                className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
+              />
+              <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm">
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* Floating Bottom Cart Bar */}
       {totalItemsCount > 0 && !isCartOpen && (
