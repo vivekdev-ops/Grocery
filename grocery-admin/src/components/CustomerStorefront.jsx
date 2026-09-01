@@ -154,7 +154,6 @@ export default function CustomerStorefront() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Compute Smart Repeat Order / Refill Predictor whenever myOrders updates
   useEffect(() => {
     if (myOrders.length > 0 && products.length > 0) {
       const purchasedCounts = {};
@@ -252,7 +251,6 @@ export default function CustomerStorefront() {
 
       setPersonalizedDeals(activeDeals);
 
-      // Create a lookup map for deals by product ID
       const dealMap = {};
       activeDeals.forEach(deal => {
         const pId = deal.product_id || deal.products?.id;
@@ -272,7 +270,6 @@ export default function CustomerStorefront() {
         const pReviews = rawReviews.filter(r => r.product_id === p.id);
         const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : null;
 
-        // Check if this product has an active deal discount badge
         const activeDeal = dealMap[p.id];
         let dealBadge = null;
 
@@ -288,7 +285,7 @@ export default function CustomerStorefront() {
 
         return { 
           ...p, 
-          dealBadge,         // Attached badge label for grid display
+          dealBadge, 
           images: mergedImages,
           variants: mergedVariants,
           avgRating,
@@ -340,7 +337,6 @@ export default function CustomerStorefront() {
     if (data) setProductReviews(data);
   };
 
-  // --- AI CONCIERGE & SEMANTIC PARSING LOGIC ---
   const handleAiChatSubmit = (e) => {
     e.preventDefault();
     if (!aiInputText.trim()) return;
@@ -693,7 +689,6 @@ export default function CustomerStorefront() {
 
     const currentDist = Number(distKm || 0);
 
-    // Find rule checking cart subtotal and flexible distance range
     let matchedRule = deliveryRules.find(r => {
       const minCart = Number(r.min_cart_value || 0);
       const maxCart = Number(r.max_cart_value || 999999);
@@ -705,7 +700,6 @@ export default function CustomerStorefront() {
 
     if (matchedRule) return Number(matchedRule.delivery_fee);
 
-    // Fallback: match cart range ignoring tight distance bounds
     const cartOnlyRule = deliveryRules.find(r => {
       const minCart = Number(r.min_cart_value || 0);
       const maxCart = Number(r.max_cart_value || 999999);
@@ -746,10 +740,8 @@ export default function CustomerStorefront() {
     const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
     
-    // Get raw price from variant or product
     let rawItemPrice = Number(variant ? variant.price : product.price || 0);
 
-    // Apply active deal badge discount percentage if present
     if (product.dealBadge) {
       const matchPercent = String(product.dealBadge).match(/(\d+)\s*%/);
       const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
@@ -976,7 +968,7 @@ export default function CustomerStorefront() {
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesCategory = activeCategory === 'All' || product.category_id === activeCategory;
+    const matchesCategory = activeCategory === 'All' || product.category_id === activeCategory || product.category === activeCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -1031,80 +1023,75 @@ export default function CustomerStorefront() {
         )}
       </div>
 
-{personalizedDeals.length > 0 && (
-  <div className="max-w-7xl mx-auto px-4 mt-6">
-    <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
-          <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
-        </div>
-        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {personalizedDeals.map(deal => {
-          const prod = deal.products;
-          if (!prod) return null;
-          
-          const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-          
-          const originalPrice = Number(prod.price || 0);
-          const baseMrp = Number(prod.mrp || originalPrice);
-
-          // Extract numeric discount percentage from badge label text (e.g., "20% OFF" -> 20)
-          const badgeText = String(deal.discount_tag || deal.discount_badge || deal.badge_label || '');
-          const matchPercent = badgeText.match(/(\d+)\s*%/);
-          const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
-
-          // Calculate final deal price based on the extracted percentage from the badge label
-          const finalPrice = extractedPercent > 0 
-            ? Math.round(originalPrice * (1 - extractedPercent / 100)) 
-            : originalPrice;
-
-          const displayMrp = baseMrp > finalPrice ? baseMrp : (originalPrice > finalPrice ? originalPrice : null);
-          const computedPercent = extractedPercent > 0 
-            ? extractedPercent 
-            : (displayMrp && displayMrp > finalPrice ? Math.round(((displayMrp - finalPrice) / displayMrp) * 100) : 0);
-
-          const productWithDealPrice = { ...prod, price: finalPrice };
-
-          return (
-            <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
-              <div className="space-y-2">
-                <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
-                  <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
-                  
-                  {badgeText && (
-                    <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
-                      {badgeText}
-                    </span>
-                  )}
-                </div>
-                <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
+      {personalizedDeals.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 mt-6">
+          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
+                <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
               </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
-                <div>
-                  <span className="font-black text-sm text-emerald-300">₹{finalPrice}</span>
-                  {displayMrp && displayMrp > finalPrice && (
-                    <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{displayMrp}</span>
-                  )}
-                </div>
-                <button 
-                  onClick={() => addToCart(productWithDealPrice)}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
-                >
-                  + Add
-                </button>
-              </div>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-)}
+
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {personalizedDeals.map(deal => {
+                const prod = deal.products;
+                if (!prod) return null;
+                
+                const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+                
+                const originalPrice = Number(prod.price || 0);
+                const baseMrp = Number(prod.mrp || originalPrice);
+
+                const badgeText = String(deal.discount_tag || deal.discount_badge || deal.badge_label || '');
+                const matchPercent = badgeText.match(/(\d+)\s*%/);
+                const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
+
+                const finalPrice = extractedPercent > 0 
+                  ? Math.round(originalPrice * (1 - extractedPercent / 100)) 
+                  : originalPrice;
+
+                const displayMrp = baseMrp > finalPrice ? baseMrp : (originalPrice > finalPrice ? originalPrice : null);
+                
+                const productWithDealPrice = { ...prod, price: finalPrice };
+
+                return (
+                  <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
+                    <div className="space-y-2">
+                      <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
+                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
+                        
+                        {badgeText && (
+                          <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
+                            {badgeText}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
+                      <div>
+                        <span className="font-black text-sm text-emerald-300">₹{finalPrice}</span>
+                        {displayMrp && displayMrp > finalPrice && (
+                          <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{displayMrp}</span>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => addToCart(productWithDealPrice)}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
@@ -1121,7 +1108,6 @@ export default function CustomerStorefront() {
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
 
-              {/* AI Repeat Order Refill Section in Profile Drawer */}
               {predictedRefillItems.length > 0 && (
                 <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 rounded-2xl border border-emerald-800 space-y-2 shadow-md">
                   <div className="flex items-center gap-2 text-amber-400 font-black">
@@ -1144,7 +1130,6 @@ export default function CustomerStorefront() {
                 </div>
               )}
 
-              {/* Collapsible Accordion: Recent Orders */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
@@ -1221,7 +1206,6 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Collapsible Accordion: Wishlist */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
@@ -1263,7 +1247,6 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Collapsible Accordion: Addresses */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
@@ -1314,7 +1297,6 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Feedback */}
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
                 className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
@@ -1339,7 +1321,6 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Expanded Order Details Modal */}
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1489,7 +1470,6 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Dedicated Order & Item Help Modal */}
       {orderHelpTarget && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
@@ -1550,7 +1530,6 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Review Modal */}
       {reviewModalProduct && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
@@ -1606,7 +1585,6 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* Success Modal */}
       {orderSuccess && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
@@ -1638,6 +1616,8 @@ export default function CustomerStorefront() {
         activeCategory={activeCategory}
         setActiveCategory={setActiveCategory}
         loading={loading}
+        products={products}
+        filteredProducts={filteredProducts}
         currentProducts={currentProducts}
         totalPages={totalPages}
         currentPage={currentPage}
@@ -1663,7 +1643,6 @@ export default function CustomerStorefront() {
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
             
-            {/* Modal Header showing Product Name instead of 'Product Details' */}
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3 gap-3">
               <h3 className="font-black text-base md:text-lg text-slate-900 truncate">{selectedProductDetails.name}</h3>
               <button 
@@ -1729,7 +1708,6 @@ export default function CustomerStorefront() {
                       )}
                     </div>
 
-                    {/* COLLAPSED / EXPANDABLE MOBILE-FRIENDLY RICH TEXT DESCRIPTION */}
                     {selectedProductDetails.description ? (
                       <div className="mt-3 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 space-y-2 text-xs">
                         <span className="font-black text-slate-700 uppercase tracking-wider block text-[10px]">Product Description</span>
