@@ -241,7 +241,7 @@ export default function CustomerStorefront() {
         supabase.from('categories').select('*').order('name'),
         supabase.from('product_variants').select('*'),
         supabase.from('product_reviews').select('*'),
-        supabase.from('personalized_deals').select('*, products(*)').eq('is_active', true)
+        supabase.from('personalized_deals').select('*').eq('is_active', true)
       ]);
 
       const rawProducts = prodRes.data || [];
@@ -251,40 +251,77 @@ export default function CustomerStorefront() {
 
       setPersonalizedDeals(activeDeals);
 
-      const dealMap = {};
+      // Create separate maps for product-level and category-level deals
+      const productDealMap = {};
+      const categoryDealMap = {};
+
       activeDeals.forEach(deal => {
-        const pId = deal.product_id || deal.products?.id;
-        if (pId) dealMap[pId] = deal;
+        if (deal.deal_type === 'category' || deal.category_id) {
+          if (deal.category_id) categoryDealMap[deal.category_id] = deal;
+        } else if (deal.product_id) {
+          productDealMap[deal.product_id] = deal;
+        }
       });
 
       const productsWithVariants = rawProducts.map(p => {
         const relationalVariants = rawVariants.filter(v => v.product_id === p.id);
         const jsonVariants = p.variants || [];
-        const mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
+        let mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
+
+        // Check for active deal (Product-level takes precedence over Category-level)
+        const activeDeal = productDealMap[p.id] || categoryDealMap[p.category_id];
+        let dealBadge = null;
+        let discountPercent = 0;
+
+        if (activeDeal) {
+          const badgeText = String(activeDeal.discount_tag || activeDeal.discount_badge || activeDeal.badge_label || '');
+          const matchPercent = badgeText.match(/(\d+)\s*%/);
+          if (matchPercent) {
+            discountPercent = parseInt(matchPercent[1], 10);
+          }
+          if (discountPercent > 0) {
+            dealBadge = badgeText;
+          }
+        }
+
+        // Compute discounted product price and original MRP
+        let originalPrice = Number(p.price || 0);
+        let originalMrp = Number(p.mrp || originalPrice);
+        let finalPrice = originalPrice;
+
+        if (discountPercent > 0) {
+          if (!p.mrp || Number(p.mrp) <= originalPrice) {
+            originalMrp = originalPrice;
+          }
+          finalPrice = Math.round(originalMrp * (1 - discountPercent / 100));
+        }
+
+        // Apply discount to variants if they exist
+        mergedVariants = mergedVariants.map(v => {
+          let vPrice = Number(v.price || 0);
+          let vMrp = Number(v.mrp || vPrice);
+          let vFinalPrice = vPrice;
+          if (discountPercent > 0) {
+            if (!v.mrp || Number(v.mrp) <= vPrice) {
+              vMrp = vPrice;
+            }
+            vFinalPrice = Math.round(vMrp * (1 - discountPercent / 100));
+          }
+          return { ...v, price: vFinalPrice, mrp: vMrp };
+        });
 
         if (mergedVariants.length > 0) {
           setSelectedVariants(prev => ({ ...prev, [p.id]: mergedVariants[0].id || mergedVariants[0].label }));
         }
 
-        const mergedImages = p.images || p.gallery || (p.image_url ? [p.image_url] : []);
+        const mergedImages = p.images || p.gallery || [p.image_url].filter(Boolean);
         const pReviews = rawReviews.filter(r => r.product_id === p.id);
         const avgRating = pReviews.length > 0 ? (pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1) : null;
 
-        const activeDeal = dealMap[p.id];
-        let dealBadge = null;
-
-        if (activeDeal) {
-          const badgeText = String(activeDeal.discount_tag || activeDeal.discount_badge || activeDeal.badge_label || '');
-          const matchPercent = badgeText.match(/(\d+)\s*%/);
-          const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
-
-          if (extractedPercent > 0) {
-            dealBadge = badgeText;
-          }
-        }
-
         return { 
           ...p, 
+          price: finalPrice,
+          mrp: originalMrp,
           dealBadge, 
           images: mergedImages,
           variants: mergedVariants,
@@ -740,17 +777,7 @@ export default function CustomerStorefront() {
     const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
     
-    let rawItemPrice = Number(variant ? variant.price : product.price || 0);
-
-    if (product.dealBadge) {
-      const matchPercent = String(product.dealBadge).match(/(\d+)\s*%/);
-      const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
-      if (extractedPercent > 0) {
-        rawItemPrice = Math.round(rawItemPrice * (1 - extractedPercent / 100));
-      }
-    }
-
-    const itemPrice = rawItemPrice;
+    const itemPrice = Number(variant ? variant.price : product.price || 0);
     const itemStock = stockCheck;
     
     const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);

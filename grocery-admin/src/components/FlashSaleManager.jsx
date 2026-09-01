@@ -28,8 +28,16 @@ export default function PersonalizedDealsManager() {
 
   const fetchDeals = async () => {
     setLoading(true);
-    const { data } = await supabase.from('personalized_deals').select('*, products(*), categories(name)').order('created_at', { ascending: false });
-    if (data) setDeals(data);
+    const { data, error } = await supabase
+      .from('personalized_deals')
+      .select('*, products(*), categories(id, name, image_url)')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching deals:', error.message);
+    } else if (data) {
+      setDeals(data);
+    }
     setLoading(false);
   };
 
@@ -69,11 +77,11 @@ export default function PersonalizedDealsManager() {
     }
 
     if (editingId) {
+      // Update single active deal
       const payload = {
         deal_type: dealType,
         product_id: dealType === 'product' ? selectedProductIds[0] : null,
-        product_ids: dealType === 'product' ? selectedProductIds : [],
-        category_ids: dealType === 'category' ? selectedCategoryIds : [],
+        category_id: dealType === 'category' ? selectedCategoryIds[0] : null,
         discount_tag: discountTag,
         target_interest_group: targetInterestGroup,
         is_active: true
@@ -88,14 +96,17 @@ export default function PersonalizedDealsManager() {
         alert("Error updating deal: " + error.message);
       }
     } else {
+      // Insert new deals (handling multiple selections by generating individual row insertions)
       if (dealType === 'product') {
         const payloads = selectedProductIds.map(pId => ({
           deal_type: 'product',
           product_id: pId,
+          category_id: null,
           discount_tag: discountTag,
           target_interest_group: targetInterestGroup,
           is_active: true
         }));
+        
         const { error } = await supabase.from('personalized_deals').insert(payloads);
         if (!error) {
           alert("Product deal banners added successfully!");
@@ -107,11 +118,13 @@ export default function PersonalizedDealsManager() {
       } else {
         const payloads = selectedCategoryIds.map(cId => ({
           deal_type: 'category',
+          product_id: null,
           category_id: cId,
           discount_tag: discountTag,
           target_interest_group: targetInterestGroup,
           is_active: true
         }));
+        
         const { error } = await supabase.from('personalized_deals').insert(payloads);
         if (!error) {
           alert("Category deal banners added successfully!");
@@ -128,8 +141,8 @@ export default function PersonalizedDealsManager() {
     setEditingId(deal.id);
     const type = deal.deal_type || (deal.category_id ? 'category' : 'product');
     setDealType(type);
-    setSelectedProductIds(deal.product_id ? [deal.product_id] : (deal.product_ids || []));
-    setSelectedCategoryIds(deal.category_id ? [deal.category_id] : (deal.category_ids || []));
+    setSelectedProductIds(deal.product_id ? [deal.product_id] : []);
+    setSelectedCategoryIds(deal.category_id ? [deal.category_id] : []);
     setDiscountTag(deal.discount_tag || '20% OFF');
     setTargetInterestGroup(deal.target_interest_group || 'All');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -151,6 +164,8 @@ export default function PersonalizedDealsManager() {
     if (!error) {
       if (editingId === id) handleCancelEdit();
       setDeals(prev => prev.filter(d => d.id !== id));
+    } else {
+      alert("Error deleting deal: " + error.message);
     }
   };
 
@@ -212,7 +227,7 @@ export default function PersonalizedDealsManager() {
                 placeholder="Search products..." 
                 value={productSearch}
                 onChange={e => setProductSearch(e.target.value)}
-                className="bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-xl text-xs outline-none font-medium text-slate-800 w-48"
+                className="bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-xl text-xs outline-none font-medium text-slate-800 w-48 bg-white"
               />
             </div>
 
@@ -244,7 +259,7 @@ export default function PersonalizedDealsManager() {
           /* Conditional Category Selection Box */
           <div className="space-y-2 animate-fadeIn">
             <label className="block font-bold text-stone-700">Select Target Categories ({selectedCategoryIds.length} Selected)</label>
-            <p className="text-[11px] text-stone-500">Deals will automatically apply to all current and future products falling under these selected categories.</p>
+            <p className="text-[11px] text-stone-500">Deals will automatically apply to products falling under these selected categories.</p>
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 max-h-52 overflow-y-auto space-y-1.5">
               {categories.length === 0 ? (
                 <p className="text-stone-400 italic text-center py-4">No categories found.</p>
@@ -306,40 +321,46 @@ export default function PersonalizedDealsManager() {
 
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-4">
         <h3 className="font-black text-sm text-slate-900">Active Personalized Deals ({deals.length})</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {deals.map(deal => {
-            const isCategoryDeal = deal.deal_type === 'category' || deal.category_id;
-            const targetName = isCategoryDeal ? deal.categories?.name || 'Category Rule' : deal.products?.name;
-            const targetImg = isCategoryDeal ? deal.categories?.image_url : deal.products?.image_url;
+        {loading ? (
+          <p className="text-stone-400 italic py-4 text-center">Loading deals...</p>
+        ) : deals.length === 0 ? (
+          <p className="text-stone-400 italic py-4 text-center">No active personalized deals found.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {deals.map(deal => {
+              const isCategoryDeal = deal.deal_type === 'category' || deal.category_id;
+              const targetName = isCategoryDeal ? deal.categories?.name || 'Category Rule' : deal.products?.name || 'Product Rule';
+              const targetImg = isCategoryDeal ? deal.categories?.image_url : deal.products?.image_url;
 
-            return (
-              <div key={deal.id} className={`p-4 rounded-2xl border flex items-center justify-between gap-3 ${editingId === deal.id ? 'bg-amber-50/60 border-amber-300' : 'bg-stone-50/50 border-stone-200'}`}>
-                <div className="flex items-center gap-3 min-w-0">
-                  {targetImg ? (
-                    <img src={targetImg} alt="" className="w-12 h-12 object-cover rounded-xl border bg-white shrink-0" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black shrink-0 text-xs">
-                      {isCategoryDeal ? 'CAT' : 'PROD'}
+              return (
+                <div key={deal.id} className={`p-4 rounded-2xl border flex items-center justify-between gap-3 ${editingId === deal.id ? 'bg-amber-50/60 border-amber-300' : 'bg-stone-50/50 border-stone-200'}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {targetImg ? (
+                      <img src={targetImg} alt="" className="w-12 h-12 object-cover rounded-xl border bg-white shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black shrink-0 text-xs">
+                        {isCategoryDeal ? 'CAT' : 'PROD'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 block truncate">{targetName}</span>
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full mt-1 inline-block">{deal.discount_tag}</span>
+                      <span className="text-[9px] text-stone-500 block truncate mt-0.5 uppercase tracking-wide font-bold">{isCategoryDeal ? '⚡ Full Category Rule' : '🛒 Specific Product'}</span>
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 block truncate">{targetName}</span>
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full mt-1 inline-block">{deal.discount_tag}</span>
-                    <span className="text-[9px] text-stone-500 block truncate mt-0.5 uppercase tracking-wide font-bold">{isCategoryDeal ? '⚡ Full Category Rule' : '🛒 Specific Product'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => handleEditClick(deal)} className="text-blue-600 hover:text-blue-800 p-1.5 cursor-pointer" title="Edit Deal">
+                      <Edit size={16} />
+                    </button>
+                    <button onClick={() => handleDeleteDeal(deal.id)} className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer" title="Delete Deal">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => handleEditClick(deal)} className="text-blue-600 hover:text-blue-800 p-1.5 cursor-pointer" title="Edit Deal">
-                    <Edit size={16} />
-                  </button>
-                  <button onClick={() => handleDeleteDeal(deal.id)} className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer" title="Delete Deal">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
