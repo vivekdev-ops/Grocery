@@ -69,7 +69,7 @@ export default function CartDrawer({
         {/* Scrollable Body */}
         <div className="p-5 flex-1 overflow-y-auto space-y-5 bg-[#F0FDF4]/30">
           
-          {/* Step 1: Cart Items / Empty State */}
+          {/* Step 1: Review Items / Empty State */}
           <div className="space-y-3">
             <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
               <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">1</span>
@@ -80,7 +80,7 @@ export default function CartDrawer({
               <div className="bg-white p-8 rounded-2xl border border-emerald-100 text-center space-y-2 shadow-2xs">
                 <ShoppingCart className="mx-auto text-emerald-300" size={32} />
                 <p className="text-xs font-bold text-slate-700">Your cart is empty</p>
-                <p className="text-[10px] text-slate-400">Add products to your cart to proceed with checkout.</p>
+                <p className="text-[10px] text-slate-400">Add products to your cart to unlock delivery and checkout options.</p>
               </div>
             ) : (
               <>
@@ -123,9 +123,9 @@ export default function CartDrawer({
             )}
           </div>
 
-          {/* Step 2: Delivery Address Selection (Only active/unlocked if cart has items) */}
-          {session ? (
-            <div className={`space-y-4 pt-3 border-t border-emerald-100 transition-opacity ${isCartEmpty ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+          {/* Step 2 & 3: Hidden completely until an item is added to the cart */}
+          {!isCartEmpty && session && (
+            <div className="space-y-4 pt-3 border-t border-emerald-100 animate-fadeIn">
               <h4 className="font-black text-slate-800 text-xs flex items-center gap-2">
                 <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">2</span>
                 <MapPin size={16} className="text-emerald-700"/> Delivery Address
@@ -160,72 +160,76 @@ export default function CartDrawer({
                 </form>
               )}
 
-              {/* Step 3: Coupon Code Selection */}
-              <div className={`pt-2 border-t border-emerald-100 space-y-3 transition-opacity ${isAddressMissing ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-                <h4 className="font-black text-slate-800 text-xs flex items-center gap-2 uppercase tracking-wider">
-                  <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">3</span>
-                  Promo Code (Optional)
-                </h4>
-                {appliedCoupon ? (
-                  <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
-                    <div>
-                      <span className="font-mono font-black text-emerald-800 text-xs">{appliedCoupon.code}</span>
-                      <p className="text-[11px] text-emerald-600">Discount applied!</p>
-                    </div>
-                    <button onClick={removeCoupon} className="text-xs text-rose-600 font-bold hover:underline cursor-pointer">Remove</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" placeholder="Enter coupon code" 
-                        className="flex-1 border border-emerald-200 p-2 rounded-xl text-xs uppercase outline-none font-bold focus:border-emerald-500 bg-emerald-50/30 text-slate-900"
-                        value={couponInput} onChange={e => setCouponInput(e.target.value)}
-                      />
-                      <button onClick={handleApplyCoupon} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">Apply</button>
-                    </div>
-
-                    {availableCoupons.length > 0 && (
-                      <div className="space-y-2 pt-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Available Offers</span>
-                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                          {availableCoupons.map(coupon => {
-                            return (
-                              <div key={coupon.id} className="bg-emerald-50/50 border border-emerald-200/80 p-2.5 rounded-2xl flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="p-1.5 bg-emerald-600 text-white rounded-xl shrink-0">
-                                    <Tag size={12} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-mono font-black text-xs text-slate-900 uppercase">{coupon.code}</span>
-                                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-full">
-                                        {coupon.discount_type === 'percentage' ? `${coupon.discount_value}% OFF` : `₹${coupon.discount_value} OFF`}
-                                      </span>
-                                    </div>
-                                    <p className="text-[10px] text-slate-500 truncate">
-                                      {coupon.min_order_value ? `Min order ₹${coupon.min_order_value}` : 'No min order'} • {coupon.usage_limit_type === 'one_time' ? 'One-time use' : 'Multiple use'}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <button 
-                                  onClick={() => applySpecificCoupon(coupon.code)}
-                                  className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black px-3 py-1.5 rounded-xl transition shadow-xs shrink-0 cursor-pointer"
-                                >
-                                  Apply
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
+              {/* Step 3: Promo Code Selection (Unlocked only when address is selected) */}
+              {!isAddressMissing && (
+                <div className="pt-2 border-t border-emerald-100 space-y-3 animate-fadeIn">
+                  <h4 className="font-black text-slate-800 text-xs flex items-center gap-2 uppercase tracking-wider">
+                    <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">3</span>
+                    Promo Code (Optional)
+                  </h4>
+                  {appliedCoupon ? (
+                    <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
+                      <div>
+                        <span className="font-mono font-black text-emerald-800 text-xs">{appliedCoupon.code}</span>
+                        <p className="text-[11px] text-emerald-600">Discount applied!</p>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
+                      <button onClick={removeCoupon} className="text-xs text-rose-600 font-bold hover:underline cursor-pointer">Remove</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" placeholder="Enter coupon code" 
+                          className="flex-1 border border-emerald-200 p-2 rounded-xl text-xs uppercase outline-none font-bold focus:border-emerald-500 bg-emerald-50/30 text-slate-900"
+                          value={couponInput} onChange={e => setCouponInput(e.target.value)}
+                        />
+                        <button onClick={handleApplyCoupon} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer">Apply</button>
+                      </div>
+
+                      {availableCoupons.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Available Offers</span>
+                          <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                            {availableCoupons.map(coupon => {
+                              return (
+                                <div key={coupon.id} className="bg-emerald-50/50 border border-emerald-200/80 p-2.5 rounded-2xl flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="p-1.5 bg-emerald-600 text-white rounded-xl shrink-0">
+                                      <Tag size={12} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-mono font-black text-xs text-slate-900 uppercase">{coupon.code}</span>
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-full">
+                                          {coupon.discount_type === 'percentage' ? `${coupon.discount_value}% OFF` : `₹${coupon.discount_value} OFF`}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 truncate">
+                                        {coupon.min_order_value ? `Min order ₹${coupon.min_order_value}` : 'No min order'} • {coupon.usage_limit_type === 'one_time' ? 'One-time use' : 'Multiple use'}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <button 
+                                    onClick={() => applySpecificCoupon(coupon.code)}
+                                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black px-3 py-1.5 rounded-xl transition shadow-xs shrink-0 cursor-pointer"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
+          )}
+
+          {!isCartEmpty && !session && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-2">
               <p className="text-xs font-bold text-amber-900">Please log in to add addresses and complete your checkout.</p>
               <Link to="/login" className="inline-block bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-black shadow-sm">Login Now</Link>
@@ -248,14 +252,14 @@ export default function CartDrawer({
               </div>
             )}
 
-            {selectedAddressDistance !== null && cart.length > 0 && (
+            {selectedAddressDistance !== null && !isCartEmpty && (
               <div className="flex justify-between text-slate-500">
                 <span>Store Distance:</span>
                 <span className="font-bold text-slate-800">{selectedAddressDistance} KM</span>
               </div>
             )}
             
-            {cart.length > 0 && (
+            {!isCartEmpty && (
               <div className="flex justify-between text-slate-500">
                 <span>Delivery Fee:</span>
                 <span>{deliveryFee === 0 ? <strong className="text-emerald-700">FREE</strong> : `₹${(deliveryFee || 0).toFixed(2)}`}</span>
@@ -264,7 +268,7 @@ export default function CartDrawer({
 
             <div className="flex justify-between items-center text-base font-black text-slate-900 pt-2 border-t border-emerald-200">
               <span>To Pay:</span>
-              <span className="text-emerald-700">₹{cart.length > 0 ? cartTotal.toFixed(2) : '0.00'}</span>
+              <span className="text-emerald-700">₹{!isCartEmpty ? cartTotal.toFixed(2) : '0.00'}</span>
             </div>
           </div>
 

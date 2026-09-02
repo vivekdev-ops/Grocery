@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Heart, Mic, MicOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import ValueGoLogo from '../ValueGoLogo';
 
 export default function StoreHeader({ session, searchQuery, setSearchQuery, totalItemsCount, onOpenProfile, onOpenCart }) {
   const [locationName, setLocationName] = useState('Detecting location...');
@@ -86,10 +85,16 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
       <header className="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-emerald-100 shadow-xs transition-all font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
-          {/* Logo & Dynamic Location Selector */}
-          <div className="flex items-center gap-5">
-            <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="cursor-pointer">
-              <ValueGoLogo />
+          {/* Logo & Brand Name: KD Store */}
+          <div className="flex items-center gap-4">
+            <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="cursor-pointer flex items-center gap-2.5">
+              <div className="w-10 h-10 bg-emerald-700 text-white rounded-2xl flex items-center justify-center font-black text-lg shadow-sm">
+                KD
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-sm font-black text-slate-900 tracking-wide leading-none">KD Store</h1>
+                <p className="text-[10px] text-emerald-700 font-bold mt-0.5">Quick Commerce</p>
+              </div>
             </div>
 
             {/* Clickable Geolocation Widget */}
@@ -202,7 +207,7 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-emerald-100 px-6 py-2.5 md:hidden flex justify-between items-center shadow-2xl font-sans">
         <button 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
-          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-emerald-700"
+          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-emerald-700 cursor-pointer"
         >
           <Zap size={20} className="fill-emerald-700" />
           <span>Shop</span>
@@ -210,7 +215,7 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
 
         <button 
           onClick={onOpenCart} 
-          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-slate-400 relative"
+          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-slate-400 relative cursor-pointer"
         >
           <ShoppingCart size={20} />
           <span>Cart</span>
@@ -219,7 +224,7 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
 
         <button 
           onClick={onOpenProfile} 
-          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-slate-400"
+          className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-slate-400 cursor-pointer"
         >
           <User size={20} />
           <span>Account</span>

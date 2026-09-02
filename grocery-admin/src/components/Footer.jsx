@@ -82,13 +82,13 @@ export default function Footer({ onSelectCategory, onNavigate }) {
               <div className="w-9 h-9 bg-emerald-700 text-white rounded-xl flex items-center justify-center font-black shadow-md">
                 V
               </div>
-              <span className="font-black text-lg text-slate-900 tracking-tight">Valuego</span>
+              <span className="font-black text-lg text-slate-900 tracking-tight">KD Store</span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
               Your ultimate quick-commerce platform delivering groceries, dairy, fresh produce, and essentials in minutes.
             </p>
             <div className="text-xs text-slate-400 font-mono">
-              © {new Date().getFullYear()} Valuego Inc. All rights reserved.
+              © {new Date().getFullYear()} KD Store Inc. All rights reserved.
             </div>
           </div>
 
@@ -172,7 +172,7 @@ export default function Footer({ onSelectCategory, onNavigate }) {
             <h4 className="font-black text-xs uppercase tracking-widest text-slate-900">Stay Connected</h4>
             <p className="text-xs text-slate-500">Subscribe to get instant updates on flash sales and discount drops.</p>
             
-            <form onSubmit={(e) => { e.preventDefault(); alert("Subscribed successfully! Welcome to Valuego."); e.target.reset(); }} className="space-y-2">
+            <form onSubmit={(e) => { e.preventDefault(); alert("Subscribed successfully! Welcome to KD Store."); e.target.reset(); }} className="space-y-2">
               <input 
                 type="email" 
                 required 
