@@ -1,176 +1,262 @@
 // src/components/AdminUserDetailModal.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { X, Package, ShoppingBag, DollarSign, CheckCircle } from 'lucide-react';
+import { X, Store, Truck, DollarSign, ShoppingBag, Calendar, Printer } from 'lucide-react';
+
+const getApplicableCommissionPct = (rules, roleType, cartAmount) => {
+  const roleRules = rules.filter(r => r.role_type === roleType && r.is_active);
+  const matchedRule = roleRules.find(r => {
+    const min = Number(r.min_cart_value || 0);
+    const max = r.max_cart_value !== null ? Number(r.max_cart_value) : Infinity;
+    return cartAmount >= min && cartAmount <= max;
+  });
+  if (matchedRule) return Number(matchedRule.commission_pct);
+  return roleType === 'shopkeeper' ? 2 : 1; 
+};
 
 export default function AdminUserDetailModal({ user, role, isOpen, onClose }) {
-  const [details, setDetails] = useState({ items: [], orders: [], stats: { revenue: 0, count: 0 } });
   const [loading, setLoading] = useState(true);
+  const [datePreset, setDatePreset] = useState('all'); // 'today', 'week', 'month', 'custom', 'all'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  const [performanceData, setPerformanceData] = useState({
+    totalOrders: 0,
+    grossEarnings: 0,
+    netEarnings: 0,
+    ordersList: []
+  });
 
   useEffect(() => {
     if (isOpen && user) {
-      fetchUserData();
+      fetchUserPerformance();
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, datePreset, startDate, endDate]);
 
-  const fetchUserData = async () => {
+  const fetchUserPerformance = async () => {
     setLoading(true);
+    try {
+      let query = supabase.from('orders').select('*, order_items(*, products(name, price, shopkeeper_id, shopkeeper_profiles(store_name)))');
 
-    const [rulesRes, settingsRes] = await Promise.all([
-      supabase.from('cart_commission_rules').select('*').eq('is_active', true),
-      supabase.from('platform_settings').select('*').eq('id', 1).single()
-    ]);
-
-    const rules = rulesRes.data || [];
-    const settingsData = settingsRes.data;
-
-    const defaultShopkeeperPct = settingsData ? Number(settingsData.shopkeeper_commission_pct) : 85;
-    const defaultDeliveryPct = settingsData ? Number(settingsData.delivery_commission_pct) : 100;
-
-    const getCommissionPct = (roleType, cartValue) => {
-      const roleRules = rules.filter(r => r.role_type === roleType);
-      const matched = roleRules.find(r => {
-        const min = Number(r.min_cart_value);
-        const max = r.max_cart_value !== null ? Number(r.max_cart_value) : Infinity;
-        return cartValue >= min && cartValue <= max;
-      });
-      if (matched) return Number(matched.commission_pct);
-      return roleType === 'shopkeeper' ? defaultShopkeeperPct : defaultDeliveryPct;
-    };
-
-    const targetId = String(user.user_id || user.id || '');
-
-    if (role === 'shopkeeper') {
-      const { data: prods } = await supabase.from('products').select('*').eq('shopkeeper_id', targetId);
-      const { data: orderItems } = await supabase.from('order_items').select('*, orders(*, products(*))').eq('products.shopkeeper_id', targetId);
-      
-      const validOrders = orderItems?.map(oi => oi.orders).filter(Boolean) || [];
-      const revenue = validOrders.reduce((sum, o) => {
-        if (o.status === 'delivered') {
-          const cartTotal = Number(o.total_amount || 0);
-          const pct = getCommissionPct('shopkeeper', cartTotal);
-          return sum + ((cartTotal * pct) / 100);
+      const now = new Date();
+      if (datePreset === 'today') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        query = query.gte('created_at', startOfDay);
+      } else if (datePreset === 'week') {
+        const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
+        query = query.gte('created_at', startOfWeek);
+      } else if (datePreset === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        query = query.gte('created_at', startOfMonth);
+      } else if (datePreset === 'custom') {
+        if (startDate) query = query.gte('created_at', new Date(startDate).toISOString());
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          query = query.lte('created_at', endDateTime.toISOString());
         }
-        return sum;
-      }, 0);
+      }
 
-      setDetails({
-        items: prods || [],
-        orders: validOrders,
-        stats: { revenue, count: validOrders.length }
+      const [rulesRes, ordersRes] = await Promise.all([
+        supabase.from('cart_commission_rules').select('*').eq('is_active', true),
+        query
+      ]);
+
+      const rules = rulesRes.data || [];
+      const allOrders = ordersRes.data || [];
+
+      let matchedOrders = [];
+      let gross = 0;
+      let net = 0;
+
+      if (role === 'shopkeeper') {
+        allOrders.forEach(ord => {
+          const cartAmount = Number(ord.total_amount || 0);
+          const storeItems = ord.order_items?.filter(item => 
+            item.products?.shopkeeper_id === user.id || 
+            item.products?.shopkeeper_profiles?.store_name === user.store_name
+          ) || [];
+
+          if (storeItems.length > 0 && ord.status === 'delivered') {
+            const storeGross = storeItems.reduce((sum, item) => sum + (Number(item.price || 0) * item.quantity), 0);
+            const tierPct = getApplicableCommissionPct(rules, 'shopkeeper', cartAmount);
+            const adminCut = (storeGross * tierPct) / 100;
+            const storeNet = storeGross - adminCut;
+
+            gross += storeGross;
+            net += storeNet;
+            matchedOrders.push({
+              ...ord,
+              storeItems,
+              storeGross,
+              tierPct,
+              adminCut,
+              storeNet
+            });
+          }
+        });
+      } else if (role === 'delivery' || role === 'delivery_boy' || role === 'delivery_partner') {
+        const agentOrders = allOrders.filter(ord => (ord.delivery_agent_id === user.id || ord.delivery_agent_id === user.email) && ord.status === 'delivered');
+        agentOrders.forEach(ord => {
+          const cartAmount = Number(ord.total_amount || 0);
+          const tierPct = getApplicableCommissionPct(rules, 'delivery', cartAmount);
+          const fee = (cartAmount * tierPct) / 100;
+
+          gross += cartAmount;
+          net += fee;
+          matchedOrders.push({
+            ...ord,
+            tierPct,
+            earnedFee: fee
+          });
+        });
+      }
+
+      setPerformanceData({
+        totalOrders: matchedOrders.length,
+        grossEarnings: gross,
+        netEarnings: net,
+        ordersList: matchedOrders
       });
-    } else if (role === 'delivery') {
-      const { data: allOrders } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(300);
 
-      const matchedOrders = (allOrders || []).filter(o => {
-        const pId = String(o.delivery_partner_id || '');
-        const bId = String(o.delivery_boy_id || '');
-        const aId = String(o.delivery_agent_id || '');
-        return pId === targetId || pId === String(user.id) || 
-               bId === targetId || bId === String(user.id) || 
-               aId === targetId || aId === String(user.id);
-      });
-
-      const deliveredOrders = matchedOrders.filter(o => o.status === 'delivered');
-      
-      // Corrected logic: Evaluates the tier percentage against the total order amount
-      const totalEarned = deliveredOrders.reduce((sum, o) => {
-        const cartTotal = Number(o.total_amount || 0);
-        const pct = getCommissionPct('delivery', cartTotal);
-        return sum + ((cartTotal * pct) / 100);
-      }, 0);
-
-      setDetails({
-        items: [],
-        orders: matchedOrders,
-        stats: { revenue: totalEarned, count: deliveredOrders.length }
-      });
+    } catch (err) {
+      console.error('Error fetching performance report:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!isOpen || !user) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 font-sans">
-      <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans text-xs">
+      <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-stone-200 space-y-6 max-h-[90vh] overflow-y-auto">
         
-        <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+        {/* Header & Controls */}
+        <div className="flex justify-between items-center border-b pb-4 print:hidden">
           <div>
-            <h3 className="font-black text-base text-gray-900 capitalize">
-              {role === 'delivery' ? 'Delivery Partner' : 'Shopkeeper'} Details: <span className="text-emerald-700">{user.store_name || user.email || user.name}</span>
+            <h3 className="font-black text-sm text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              {role === 'shopkeeper' ? <Store size={16} className="text-emerald-600" /> : <Truck size={16} className="text-blue-600" />}
+              {user.store_name || user.email || 'User Performance Statement'}
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">Performance & Earnings Overview (Tiered Commissions)</p>
+            <p className="text-stone-400 text-[11px] capitalize">Role: {role} | Statement Report</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200 cursor-pointer transition">
-            <X size={18}/>
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.print()} className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 cursor-pointer">
+              <Printer size={13} /> Print PDF
+            </button>
+            <button onClick={onClose} className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded-full text-stone-600 cursor-pointer">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Date Filter Selection Bar */}
+        <div className="bg-stone-50 p-3 rounded-2xl border space-y-3 print:hidden">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="font-bold text-stone-500">Filter Period:</span>
+            <div className="flex gap-1 flex-wrap">
+              {['today', 'week', 'month', 'custom', 'all'].map(d => (
+                <button 
+                  key={d} 
+                  onClick={() => setDatePreset(d)} 
+                  className={`px-3 py-1 rounded-xl font-bold transition capitalize cursor-pointer ${datePreset === d ? 'bg-white text-emerald-800 shadow-xs border' : 'text-stone-600 hover:text-stone-900'}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {datePreset === 'custom' && (
+            <div className="flex gap-3 items-center pt-2 border-t border-stone-200">
+              <div className="flex-1">
+                <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">From Date</label>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={e => setStartDate(e.target.value)} 
+                  className="w-full bg-white border p-2 rounded-xl text-xs font-bold outline-none" 
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">To Date</label>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)} 
+                  className="w-full bg-white border p-2 rounded-xl text-xs font-bold outline-none" 
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-gray-400 text-xs font-bold">Loading user performance stats...</div>
+          <div className="py-12 text-center text-stone-400 font-bold">Compiling earnings & date range report...</div>
         ) : (
-          <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          <div className="space-y-6">
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs space-y-1">
-                <p className="font-black text-emerald-800 uppercase tracking-wider text-[10px]">Total Profit / Earnings</p>
-                <h4 className="text-xl font-black text-emerald-950">₹{details.stats.revenue.toFixed(2)}</h4>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-1">
+                <span className="text-stone-400 font-bold uppercase text-[10px]">Delivered Orders</span>
+                <h4 className="text-lg font-black text-slate-900">{performanceData.totalOrders} Completed</h4>
               </div>
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-2xs space-y-1">
-                <p className="font-black text-blue-800 uppercase tracking-wider text-[10px]">
-                  {role === 'shopkeeper' ? 'Total Orders' : 'Delivered Orders'}
-                </p>
-                <h4 className="text-xl font-black text-blue-950">{details.stats.count}</h4>
+              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-1">
+                <span className="text-stone-400 font-bold uppercase text-[10px]">{role === 'shopkeeper' ? 'Gross Sales' : 'Order Volume'}</span>
+                <h4 className="text-lg font-black text-slate-900">₹{performanceData.grossEarnings.toLocaleString()}</h4>
+              </div>
+              <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 space-y-1">
+                <span className="text-emerald-700 font-bold uppercase text-[10px]">Net Payout Earnings</span>
+                <h4 className="text-lg font-black text-emerald-800">₹{performanceData.netEarnings.toFixed(2)}</h4>
               </div>
             </div>
 
-            {role === 'shopkeeper' && (
-              <div className="space-y-2">
-                <h4 className="font-black text-gray-800 uppercase tracking-wider text-[10px]">Listed Products ({details.items.length})</h4>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-2xl p-2.5 bg-gray-50">
-                  {details.items.length === 0 ? (
-                    <p className="text-xs text-gray-400 p-2 text-center italic">No products added yet.</p>
-                  ) : (
-                    details.items.map(p => (
-                      <div key={p.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 text-xs">
-                        <span className="font-bold text-gray-900">{p.name}</span>
-                        <span className="text-emerald-700 font-black">₹{Number(p.price || 0).toFixed(2)} <span className="text-gray-400 font-normal">({p.stock} in stock)</span></span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
+            {/* Detailed Transaction List */}
             <div className="space-y-2">
-              <h4 className="font-black text-gray-800 uppercase tracking-wider text-[10px]">Order History ({details.orders.length})</h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-2xl p-2.5 bg-gray-50">
-                {details.orders.length === 0 ? (
-                  <p className="text-xs text-gray-400 p-3 text-center italic">No orders recorded for this account.</p>
-                ) : (
-                  details.orders.map(o => (
-                    <div key={o.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 text-xs">
-                      <div>
-                        <span className="font-mono font-black text-gray-900">#{o.id.slice(0, 8)}</span>
-                        <span className="text-gray-400 block text-[10px] mt-0.5">{new Date(o.created_at).toLocaleString()}</span>
-                      </div>
-                      <span className="font-black text-gray-900">₹{Number(o.total_amount || 0).toFixed(2)}</span>
-                      <span className={`px-2.5 py-1 rounded-full font-black uppercase text-[9px] ${o.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {o.status}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+              <h4 className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Filtered Period Statement & Commission Tiers</h4>
+              
+              {performanceData.ordersList.length === 0 ? (
+                <div className="p-8 text-center text-stone-400 italic border rounded-2xl">No delivered orders found matching this date range.</div>
+              ) : (
+                <div className="border rounded-2xl overflow-hidden max-h-60 overflow-y-auto">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead className="bg-stone-50 border-b text-stone-400 uppercase">
+                      <tr>
+                        <th className="p-3">Order ID</th>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Tier % Applied</th>
+                        <th className="p-3 text-right">{role === 'shopkeeper' ? 'Net Payout' : 'Earned Fee'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y font-medium text-slate-800">
+                      {performanceData.ordersList.map((ord, idx) => (
+                        <tr key={idx} className="hover:bg-stone-50">
+                          <td className="p-3 font-mono">#{ord.id.slice(0, 8)}</td>
+                          <td className="p-3 text-stone-500">{new Date(ord.created_at).toLocaleDateString()}</td>
+                          <td className="p-3 font-bold text-amber-700">{ord.tierPct}%</td>
+                          <td className="p-3 text-right font-black text-emerald-700">
+                            ₹{role === 'shopkeeper' ? ord.storeNet?.toFixed(2) : ord.earnedFee?.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
           </div>
         )}
+
+        <div className="pt-2 print:hidden">
+          <button onClick={onClose} className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black uppercase tracking-wider cursor-pointer text-xs">
+            Close Statement View
+          </button>
+        </div>
+
       </div>
     </div>
   );

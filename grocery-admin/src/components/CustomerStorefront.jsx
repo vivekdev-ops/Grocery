@@ -113,7 +113,7 @@ export default function CustomerStorefront() {
   // --- AI ENHANCEMENTS STATE ---
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [aiChatMessages, setAiChatMessages] = useState([
-    { sender: 'ai', text: 'Hello! I am your ValueGo AI Grocery Concierge. Tell me what you want to cook or what items you need, and I will instantly set up your cart!' }
+    { sender: 'ai', text: 'Hello! I am your KD Store AI Grocery Concierge. Tell me what you want to cook or what items you need, and I will instantly set up your cart!' }
   ]);
   const [aiInputText, setAiInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -251,7 +251,6 @@ export default function CustomerStorefront() {
 
       setPersonalizedDeals(activeDeals);
 
-      // Create separate maps for product-level and category-level deals
       const productDealMap = {};
       const categoryDealMap = {};
 
@@ -268,7 +267,6 @@ export default function CustomerStorefront() {
         const jsonVariants = p.variants || [];
         let mergedVariants = relationalVariants.length > 0 ? relationalVariants : jsonVariants;
 
-        // Check for active deal (Product-level takes precedence over Category-level)
         const activeDeal = productDealMap[p.id] || categoryDealMap[p.category_id];
         let dealBadge = null;
         let discountPercent = 0;
@@ -284,7 +282,6 @@ export default function CustomerStorefront() {
           }
         }
 
-        // Compute discounted product price and original MRP
         let originalPrice = Number(p.price || 0);
         let originalMrp = Number(p.mrp || originalPrice);
         let finalPrice = originalPrice;
@@ -296,7 +293,6 @@ export default function CustomerStorefront() {
           finalPrice = Math.round(originalMrp * (1 - discountPercent / 100));
         }
 
-        // Apply discount to variants if they exist
         mergedVariants = mergedVariants.map(v => {
           let vPrice = Number(v.price || 0);
           let vMrp = Number(v.mrp || vPrice);
@@ -907,7 +903,7 @@ export default function CustomerStorefront() {
   const shareOnWhatsApp = (product) => {
     const productUrl = window.location.href;
     const message = encodeURIComponent(
-      `Hey! Check out *${product.name}* on ValueGo delivered in 10 minutes! 🛒✨\n\nView here: ${productUrl}`
+      `Hey! Check out *${product.name}* on KD Store delivered in 10 minutes! 🛒✨\n\nView here: ${productUrl}`
     );
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
@@ -918,7 +914,17 @@ export default function CustomerStorefront() {
   const handleCheckout = async (e) => {
     e.preventDefault();
     if (!session) { navigate('/login'); return; }
-    if (cart.length === 0) return;
+
+    // Enforce Requirement 2: Cannot place order if cart is empty OR address not added
+    if (cart.length === 0) {
+      alert("Your cart is empty. Please add items before placing an order.");
+      return;
+    }
+    if (!addressForm.address || !addressForm.address.trim()) {
+      alert("Please select or add a delivery address before placing an order.");
+      return;
+    }
+
     setCheckingOut(true);
 
     try {
@@ -1008,47 +1014,15 @@ export default function CustomerStorefront() {
   return (
     <div className="min-h-screen bg-[#F0FDF4] text-slate-900 pb-44 font-sans selection:bg-emerald-500 selection:text-white">
       
-      {/* 1. Header Component */}
+      {/* 1. Header Component (Includes KD Store Logo & Brand Name) */}
       <StoreHeader 
-        session={session}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        totalItemsCount={totalItemsCount}
-        onOpenProfile={() => setIsProfileOpen(true)}
-        onOpenCart={() => setIsCartOpen(true)}
-      />
-
-      {/* Voice Search Button Bar */}
-      <div className="max-w-7xl mx-auto px-4 mt-3 flex items-center justify-between gap-3">
-        <button 
-          onClick={startVoiceSearch}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs transition shadow-2xs cursor-pointer border ${
-            isListening ? 'bg-rose-600 text-white border-rose-700 animate-pulse' : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
-          }`}
-        >
-          {isListening ? <MicOff size={15} /> : <Mic size={15} className="text-emerald-600" />}
-          {isListening ? 'Listening... Speak now' : 'Voice Search'}
-        </button>
-
-        {session && predictedRefillItems.length > 0 && (
-          <div className="hidden md:flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-2xl">
-            <Sparkles size={14} className="text-amber-500 fill-amber-500 shrink-0" />
-            <span className="text-[11px] font-black text-emerald-900">AI Refill Basket Ready:</span>
-            <div className="flex gap-1.5">
-              {predictedRefillItems.map(p => (
-                <button 
-                  key={p.id}
-                  onClick={() => addToCart(p)}
-                  className="bg-white hover:bg-emerald-100 text-slate-800 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-emerald-200 transition cursor-pointer truncate max-w-[100px]"
-                  title={`Add ${p.name}`}
-                >
-                  + {p.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+        session={session} 
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery} 
+        totalItemsCount={totalItemsCount} 
+        onOpenProfile={() => setIsProfileOpen(true)} 
+        onOpenCart={() => setIsCartOpen(true)} 
+      />     
 
       {personalizedDeals.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 mt-6">
@@ -1075,7 +1049,6 @@ export default function CustomerStorefront() {
                 const matchPercent = badgeText.match(/(\d+)\s*%/);
                 const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
 
-                // Correct math: if 80% OFF, final price should be original * (1 - 0.80)
                 let finalPrice = originalPrice;
                 let displayMrp = baseMrp > originalPrice ? baseMrp : null;
 
@@ -1730,7 +1703,7 @@ export default function CustomerStorefront() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
                       <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-200">
-                        <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'ValueGo'}
+                        <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'KD Store'}
                       </span>
                       {selectedProductDetails.avgRating && (
                         <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
@@ -1846,7 +1819,7 @@ export default function CustomerStorefront() {
                   <Bot size={18} />
                 </div>
                 <div>
-                  <h4 className="font-black text-sm">ValueGo AI Concierge</h4>
+                  <h4 className="font-black text-sm">KD Store AI Concierge</h4>
                   <p className="text-[10px] text-emerald-300">Ask for recipes or grocery items</p>
                 </div>
               </div>
@@ -1899,7 +1872,7 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-      {/* 3. Cart Drawer Component */}
+      {/* 3. Cart Drawer Component (Enforces validation for empty cart and address) */}
       <CartDrawer 
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}

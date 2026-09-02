@@ -1,17 +1,52 @@
 // src/components/ShopkeeperPortal.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X } from 'lucide-react';
+import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+// Replace your existing getApplicableCommissionPct in ShopkeeperPortal.jsx with this:
+const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
+  // 1. If an individual custom rate is set on this shopkeeper's profile, use it
+  if (profile?.custom_commission_pct !== null && profile?.custom_commission_pct !== undefined && profile?.custom_commission_pct !== '') {
+    return Number(profile.custom_commission_pct);
+  }
+
+  // 2. Otherwise, evaluate the order's cart total against your cart-value tier rules from the database
+  if (!rules || !Array.isArray(rules) || rules.length === 0) {
+    return 2; // fallback
+  }
+
+  const targetRole = typeof roleType === 'string' ? roleType.toLowerCase() : 'shopkeeper';
+  const roleRules = rules.filter(r => r.role_type?.toLowerCase() === targetRole && r.is_active);
+
+  const matchedRule = roleRules.find(r => {
+    const min = Number(r.min_cart_value || 0);
+    const max = r.max_cart_value !== null && r.max_cart_value !== undefined && r.max_cart_value !== '' 
+      ? Number(r.max_cart_value) 
+      : Infinity;
+    return cartAmount >= min && cartAmount <= max;
+  });
+
+  if (matchedRule) {
+    return Number(matchedRule.commission_pct);
+  }
+
+  return 2; // default fallback
+};
 
 export default function ShopkeeperPortal() {
   const [session, setSession] = useState(null);
   const [shopkeeperProfile, setShopkeeperProfile] = useState(null);
+  const [commissionRules, setCommissionRules] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  const [datePreset, setDatePreset] = useState('all'); 
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [productForm, setProductForm] = useState({ 
     name: '', 
@@ -48,40 +83,51 @@ export default function ShopkeeperPortal() {
       }
     });
 
-    fetchCategories();
+    fetchDependencies();
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (shopkeeperProfile?.id) {
+      fetchStoreData(shopkeeperProfile.id);
+    }
+  }, [datePreset, startDate, endDate, commissionRules]);
+
+  const fetchDependencies = async () => {
+    const [catData, rulesData] = await Promise.all([
+      supabase.from('categories').select('*').order('name'),
+      supabase.from('cart_commission_rules').select('*').eq('is_active', true)
+    ]);
+    if (catData.data) setCategories(catData.data);
+    if (rulesData.data) setCommissionRules(rulesData.data);
+  };
 
   const fetchOrCreateShopkeeperProfile = async (user) => {
     setLoading(true);
     try {
-      // Check profile by user_id or id
-      let { data: profileData } = await supabase
+      let { data: profileData, error: profileErr } = await supabase
         .from('shopkeeper_profiles')
-        .select('*')
-        .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+        .select('id, user_id, store_name, phone, address, custom_commission_pct') // <-- explicitly include custom_commission_pct
+        .or(`user_id.eq.${user.id},id.eq.${user.id}`)
         .maybeSingle();
 
-      if (!profileData) {
+      if (!profileData || profileErr) {
         const newProfile = {
           id: user.id,
-          user_id: user.id, // Providing user_id to satisfy the column constraint
+          user_id: user.id,
           store_name: user.email.split('@')[0] + "'s Store"
         };
-        const { data: insertedProfile, error: insertErr } = await supabase
+        const { data: insertedProfile } = await supabase
           .from('shopkeeper_profiles')
-          .insert([newProfile])
+          .upsert([newProfile], { onConflict: 'user_id' })
           .select()
           .single();
         
-        if (insertErr) {
-          console.error("Error creating shopkeeper profile:", insertErr.message);
-        }
         profileData = insertedProfile || newProfile;
       }
 
       setShopkeeperProfile(profileData);
-      await fetchStoreData(profileData?.id || user.id);
+      await fetchStoreData(profileData.id);
     } catch (err) {
       console.error('Error handling profile:', err);
       setShopkeeperProfile({ id: user.id, store_name: 'My Store' });
@@ -101,10 +147,31 @@ export default function ShopkeeperPortal() {
 
     const productIds = (prodData || []).map(p => p.id);
     if (productIds.length > 0) {
-      const { data: itemData } = await supabase
+      let query = supabase
         .from('order_items')
         .select('*, orders(*), products(name, shopkeeper_id)')
         .in('product_id', productIds);
+
+      const now = new Date();
+      if (datePreset === 'today') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        query = query.gte('orders.created_at', startOfDay);
+      } else if (datePreset === 'week') {
+        const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
+        query = query.gte('orders.created_at', startOfWeek);
+      } else if (datePreset === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        query = query.gte('orders.created_at', startOfMonth);
+      } else if (datePreset === 'custom') {
+        if (startDate) query = query.gte('orders.created_at', new Date(startDate).toISOString());
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          query = query.lte('orders.created_at', endDateTime.toISOString());
+        }
+      }
+
+      const { data: itemData } = await query;
 
       const uniqueOrdersMap = new Map();
       (itemData || []).forEach(item => {
@@ -115,15 +182,10 @@ export default function ShopkeeperPortal() {
           uniqueOrdersMap.get(item.orders.id).items.push(item);
         }
       });
-      setOrders(Array.from(uniqueOrdersMap.values()));
+      setOrders(Array.from(uniqueOrdersMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
     } else {
       setOrders([]);
     }
-  };
-
-  const fetchCategories = async () => {
-    const { data } = await supabase.from('categories').select('*').order('name');
-    if (data) setCategories(data);
   };
 
   const handleGalleryUpload = async (e) => {
@@ -174,7 +236,13 @@ export default function ShopkeeperPortal() {
       return;
     }
 
-    const targetShopkeeperId = shopkeeperProfile?.id || session.user.id;
+    let { data: profileCheck } = await supabase
+      .from('shopkeeper_profiles')
+      .select('id')
+      .or(`user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+      .maybeSingle();
+
+    let targetShopkeeperId = profileCheck?.id || session.user.id;
 
     const payload = {
       name: productForm.name,
@@ -223,46 +291,51 @@ export default function ShopkeeperPortal() {
     if (!error && session) fetchStoreData(shopkeeperProfile?.id || session.user.id);
   };
 
-  const totalRevenue = orders
+  const totalNetRevenue = orders
     .filter(o => o.status === 'delivered')
     .reduce((sum, o) => {
-      const shopkeeperOrderTotal = o.items
+      const cartAmount = Number(o.total_amount || 0);
+      const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+
+      const shopkeeperGross = o.items
         ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
         .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
-      return sum + shopkeeperOrderTotal;
+
+      const adminCut = (shopkeeperGross * tierPct) / 100;
+      return sum + (shopkeeperGross - adminCut);
     }, 0);
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-stone-600 font-medium">Loading store dashboard...</div>;
   if (!session) return <div className="text-center py-20"><p>Please log in as a shopkeeper.</p><button onClick={() => navigate('/login')} className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-xl">Login</button></div>;
 
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans">
+    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans text-xs">
       
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-sm">
+      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-xs print:hidden">
         <div className="p-6 border-b border-stone-200">
-          <h1 className="text-lg font-black text-emerald-600">{shopkeeperProfile?.store_name || 'My Store'}</h1>
-          <p className="text-xs text-stone-500 truncate mt-0.5">{session.user.email}</p>
+          <h1 className="text-sm font-black text-emerald-700 truncate">{shopkeeperProfile?.store_name || 'My Store'}</h1>
+          <p className="text-[10px] text-stone-400 truncate mt-0.5">{session.user.email}</p>
         </div>
         
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${activeTab === 'dashboard' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <Store size={18} /> Dashboard & Stats
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'dashboard' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
+            <Store size={16} /> Dashboard & Stats
           </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${activeTab === 'products' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <Package size={18} /> My Products ({products.length})
+          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'products' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
+            <Package size={16} /> My Products ({products.length})
           </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <ShoppingCart size={18} /> My Store Orders ({orders.length})
+          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
+            <ShoppingCart size={16} /> My Store Orders ({orders.length})
           </button>
         </nav>
 
         <div className="p-4 border-t border-stone-200 space-y-2">
-          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition">
-            <Store size={18} /> View Storefront
+          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition cursor-pointer">
+            <Store size={16} /> View Storefront
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition">
-            <LogOut size={18} /> Sign Out
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition cursor-pointer">
+            <LogOut size={16} /> Sign Out
           </button>
         </div>
       </aside>
@@ -270,87 +343,121 @@ export default function ShopkeeperPortal() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         
+        {/* Global Filter & Statement Toolbar */}
+        <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex-wrap gap-4 print:hidden">
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-emerald-700" />
+            <span className="font-bold text-stone-700">Filter Range:</span>
+            <div className="flex gap-1 flex-wrap">
+              {['today', 'week', 'month', 'custom', 'all'].map(d => (
+                <button 
+                  key={d} 
+                  onClick={() => setDatePreset(d)} 
+                  className={`px-3 py-1 rounded-xl font-bold transition capitalize cursor-pointer ${datePreset === d ? 'bg-emerald-700 text-white shadow-xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-xs">
+            <Printer size={14} /> Print Statement PDF
+          </button>
+        </div>
+
+        {datePreset === 'custom' && (
+          <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex gap-4 items-center print:hidden">
+            <div className="flex-1">
+              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">From Date</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+            </div>
+            <div className="flex-1">
+              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">To Date</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-black text-stone-900">Store Performance Dashboard</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Overview of your catalog, revenue, and active orders.</p>
+              <h2 className="text-xl font-black text-slate-900">Store Performance Dashboard</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Overview of your catalog, net earnings, and filtered orders.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Total Revenue</span>
-                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">
-                    <DollarSign size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">Filtered Net Payout</span>
+                  <div className="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                    <DollarSign size={18} />
                   </div>
                 </div>
-                <h3 className="text-3xl font-black text-stone-900">₹{totalRevenue.toFixed(2)}</h3>
-                <p className="text-xs text-emerald-600 font-medium">From delivered store items</p>
+                <h3 className="text-2xl font-black text-slate-900">₹{totalNetRevenue.toFixed(2)}</h3>
+                <p className="text-[11px] text-emerald-700 font-bold">From delivered store items</p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-2">
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">My Products</span>
-                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold">
-                    <Package size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">My Products</span>
+                  <div className="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+                    <Package size={18} />
                   </div>
                 </div>
-                <h3 className="text-3xl font-black text-stone-900">{products.length}</h3>
-                <p className="text-xs text-stone-500">Active items in catalog</p>
+                <h3 className="text-2xl font-black text-slate-900">{products.length}</h3>
+                <p className="text-[11px] text-stone-500 font-medium">Active items in catalog</p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-2">
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-xs font-bold uppercase tracking-wider">Store Orders</span>
-                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold">
-                    <ShoppingCart size={20} />
+                  <span className="text-[10px] font-black uppercase tracking-wider">Filtered Orders</span>
+                  <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold">
+                    <ShoppingCart size={18} />
                   </div>
                 </div>
-                <h3 className="text-3xl font-black text-stone-900">{orders.length}</h3>
-                <p className="text-xs text-stone-500">Total customer orders</p>
+                <h3 className="text-2xl font-black text-slate-900">{orders.length}</h3>
+                <p className="text-[11px] text-stone-500 font-medium">Customer orders matching filter</p>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'products' && (
-          <div className="space-y-6">
+          <div className="space-y-6 print:hidden">
             <div>
-              <h2 className="text-2xl font-black text-stone-900">Manage My Products</h2>
+              <h2 className="text-xl font-black text-slate-900">Manage My Products</h2>
               <p className="text-xs text-stone-500 mt-0.5">Add, edit, or remove items belonging exclusively to your store.</p>
             </div>
 
-            {/* Add / Edit Product Form matching Admin Module UI */}
-            <form onSubmit={handleSaveProduct} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
-              <h3 className="font-bold text-sm text-stone-800 flex items-center gap-2 border-b pb-3">
+            <form onSubmit={handleSaveProduct} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-6">
+              <h3 className="font-bold text-xs text-slate-900 flex items-center gap-2 border-b pb-3 uppercase tracking-wider">
                 <Plus size={16} /> {editingId ? 'Edit Product & Gallery' : 'Add Product & Gallery'}
               </h3>
               
-              {/* Basic Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Product Name</label>
-                  <input type="text" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium" placeholder="e.g. Organic Milk" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Product Name</label>
+                  <input type="text" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="e.g. Organic Milk" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Base Price (₹)</label>
-                  <input type="number" step="0.01" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium" placeholder="0.00" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} />
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Base Price (₹)</label>
+                  <input type="number" step="0.01" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="0.00" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">MRP (₹)</label>
-                  <input type="number" step="0.01" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium" placeholder="0.00" value={productForm.mrp} onChange={e => setProductForm({...productForm, mrp: e.target.value})} />
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">MRP (₹)</label>
+                  <input type="number" step="0.01" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="0.00" value={productForm.mrp} onChange={e => setProductForm({...productForm, mrp: e.target.value})} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Base Stock</label>
-                  <input type="number" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium" placeholder="Available units" value={productForm.stock} onChange={e => setProductForm({...productForm, stock: e.target.value})} />
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Base Stock</label>
+                  <input type="number" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="Available units" value={productForm.stock} onChange={e => setProductForm({...productForm, stock: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1">Select Category</label>
-                  <select required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium cursor-pointer" value={productForm.category_id} onChange={e => setProductForm({...productForm, category_id: e.target.value})}>
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Select Category</label>
+                  <select required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium cursor-pointer" value={productForm.category_id} onChange={e => setProductForm({...productForm, category_id: e.target.value})}>
                     <option value="">Select Category</option>
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -359,9 +466,8 @@ export default function ShopkeeperPortal() {
                 </div>
               </div>
 
-              {/* Browse & Upload Multiple Images */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-stone-700">Browse & Upload Multiple Images</label>
+                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">Browse & Upload Multiple Images</label>
                 <div className="border-2 border-dashed border-stone-200 rounded-3xl p-6 text-center bg-stone-50/50 hover:bg-stone-50 transition relative">
                   <input type="file" multiple accept="image/*" onChange={handleGalleryUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                   <div className="space-y-1">
@@ -376,27 +482,25 @@ export default function ShopkeeperPortal() {
                     {galleryImages.map((img, idx) => (
                       <div key={idx} className="relative w-16 h-16 rounded-2xl overflow-hidden border shadow-2xs group">
                         <img src={img} alt="" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setGalleryImages(galleryImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[10px]"><X size={10}/></button>
+                        <button type="button" onClick={() => setGalleryImages(galleryImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[10px] cursor-pointer"><X size={10}/></button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Description */}
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Description</label>
-                <textarea rows="3" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50 outline-none focus:border-emerald-500 font-medium" placeholder="Product details, ingredients, or specifications..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
+                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Description</label>
+                <textarea rows="3" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="Product details, ingredients, or specifications..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
               </div>
 
-              {/* Product Variants */}
               <div className="space-y-3 pt-2 border-t">
                 <div className="flex justify-between items-center">
                   <div>
                     <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider">Product Variants (e.g. 500g, 1kg, 5L)</h4>
                     <p className="text-[10px] text-stone-400">Add custom packaging sizes with individual pricing and stock.</p>
                   </div>
-                  <button type="button" onClick={addVariantTier} className="bg-stone-900 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-2xs hover:bg-stone-800 transition">
+                  <button type="button" onClick={addVariantTier} className="bg-stone-900 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-2xs hover:bg-stone-800 transition cursor-pointer">
                     <Plus size={14} /> Add Variant Tier
                   </button>
                 </div>
@@ -411,7 +515,7 @@ export default function ShopkeeperPortal() {
                         <input type="number" step="0.01" placeholder="Price (₹)" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} />
                         <input type="number" step="0.01" placeholder="MRP (₹)" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.mrp} onChange={e => updateVariant(index, 'mrp', e.target.value)} />
                         <input type="number" placeholder="Stock" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.stock} onChange={e => updateVariant(index, 'stock', e.target.value)} />
-                        <button type="button" onClick={() => removeVariant(index)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-xl text-xs font-bold text-center">Remove</button>
+                        <button type="button" onClick={() => removeVariant(index)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-xl text-xs font-bold text-center cursor-pointer">Remove</button>
                       </div>
                     ))}
                   </div>
@@ -419,20 +523,19 @@ export default function ShopkeeperPortal() {
               </div>
 
               <div className="flex gap-3 pt-4 border-t">
-                <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl text-xs transition shadow-md active:scale-95">
+                <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-3 rounded-2xl text-xs transition shadow-xs active:scale-95 cursor-pointer">
                   {editingId ? 'Update Product' : 'Add Product (Pending Approval)'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={resetForm} className="bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold px-5 py-3 rounded-2xl text-xs">
+                  <button type="button" onClick={resetForm} className="bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold px-5 py-3 rounded-2xl text-xs cursor-pointer">
                     Cancel
                   </button>
                 )}
               </div>
             </form>
 
-            {/* Products List */}
             <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4">
-              <h3 className="font-bold text-sm text-stone-900">Your Product Catalog</h3>
+              <h3 className="font-black text-xs text-slate-900 uppercase tracking-wider">Your Product Catalog</h3>
               {products.length === 0 ? (
                 <p className="text-xs text-stone-400 italic text-center py-8">You haven't added any products yet.</p>
               ) : (
@@ -443,7 +546,7 @@ export default function ShopkeeperPortal() {
                         <img src={prod.image_url || '/placeholder.png'} alt="" className="w-12 h-12 object-cover rounded-xl bg-white border" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-stone-900 block text-sm">{prod.name}</span>
+                            <span className="font-bold text-slate-900 block text-sm">{prod.name}</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                               prod.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                             }`}>
@@ -452,7 +555,7 @@ export default function ShopkeeperPortal() {
                           </div>
                           <span className="text-stone-500">Stock: {prod.stock} | Price: ₹{prod.price?.toFixed(2)}</span>
                           {prod.variants?.length > 0 && (
-                            <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">{prod.variants.length} variant tier(s)</span>
+                            <span className="block text-[10px] text-emerald-700 font-bold mt-0.5">{prod.variants.length} variant tier(s)</span>
                           )}
                         </div>
                       </div>
@@ -462,8 +565,8 @@ export default function ShopkeeperPortal() {
                           setProductForm({ name: prod.name, price: prod.price, mrp: prod.mrp || '', stock: prod.stock, category_id: prod.category_id || '', description: prod.description || '', image_url: prod.image_url || '' }); 
                           setGalleryImages(prod.gallery || prod.images || []);
                           setVariants(prod.variants || []);
-                        }} className="p-2 bg-stone-200 hover:bg-stone-300 rounded-lg text-stone-700"><Edit size={14}/></button>
-                        <button onClick={() => handleDeleteProduct(prod.id)} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg"><Trash2 size={14}/></button>
+                        }} className="p-2 bg-stone-200 hover:bg-stone-300 rounded-xl text-stone-700 cursor-pointer"><Edit size={14}/></button>
+                        <button onClick={() => handleDeleteProduct(prod.id)} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl cursor-pointer"><Trash2 size={14}/></button>
                       </div>
                     </div>
                   ))}
@@ -475,39 +578,124 @@ export default function ShopkeeperPortal() {
 
         {activeTab === 'orders' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-black text-stone-900">Store Orders</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Orders containing items from your catalog.</p>
+            <div className="flex justify-between items-center flex-wrap gap-4 print:hidden">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Store Orders & Fulfillment</h2>
+                <p className="text-xs text-stone-500 mt-0.5">Comprehensive view of customer orders containing items from your catalog.</p>
+              </div>
+              <div className="flex bg-stone-100 p-1.5 rounded-2xl gap-2 font-bold text-[11px]">
+                <span className="bg-white px-3 py-1 rounded-xl shadow-2xs text-stone-800">Total Filtered Orders: {orders.length}</span>
+              </div>
             </div>
 
             {orders.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border text-center text-stone-400">No orders received for your store items yet.</div>
+              <div className="bg-white p-16 rounded-3xl border border-stone-200 text-center text-stone-400 font-bold">
+                No orders received for your store items within this period.
+              </div>
             ) : (
               <div className="space-y-4">
-                {orders.map(order => (
-                  <div key={order.id} className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm">
-                    <div className="flex justify-between items-center pb-3 border-b border-stone-100">
-                      <div>
-                        <span className="font-mono font-bold text-stone-800">Order #{order.id.slice(0, 8)}</span>
-                        <p className="text-xs text-stone-400">{new Date(order.created_at).toLocaleString()}</p>
-                      </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-800">
-                        {order.status}
-                      </span>
-                    </div>
+                {orders.map(order => {
+                  const cartAmount = Number(order.total_amount || 0);
+                  const storeItems = order.items?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id)) || [];
+                  const storeOrderGross = storeItems.reduce((acc, item) => acc + (Number(item.price || 0) * item.quantity), 0);
+                  
+                  const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+                  const adminCut = (storeOrderGross * tierPct) / 100;
+                  const netPayout = storeOrderGross - adminCut;
 
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-stone-400 uppercase">Customer Items in this Order:</p>
-                      {order.items
-                        ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
-                        .map(item => (
-                          <span key={item.id} className="block text-xs bg-stone-50 p-2.5 rounded-xl">
-                            {item.products?.name} x {item.quantity}
+                  return (
+                    <div key={order.id} className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs">
+                      
+                      <div className="flex justify-between items-center pb-4 border-b border-stone-100 flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold">
+                            <ShoppingCart size={18} />
+                          </div>
+                          <div>
+                            <span className="font-mono font-black text-slate-900 text-sm">Order #{order.id.slice(0, 8)}</span>
+                            <p className="text-[10px] text-stone-400 flex items-center gap-1 mt-0.5">
+                              <Calendar size={12} /> {new Date(order.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                            order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' :
+                            'bg-amber-100 text-amber-800 animate-pulse'
+                          }`}>
+                            Status: {order.status || 'Pending'}
                           </span>
-                        ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/70 p-4 rounded-2xl border border-stone-100">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">Customer Information</span>
+                          <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                            <Mail size={13} className="text-emerald-700" /> {order.customer_email || 'N/A'}
+                          </p>
+                          {order.customer_phone && (
+                            <p className="font-medium text-stone-600 flex items-center gap-1.5">
+                              <Phone size={13} className="text-stone-400" /> {order.customer_phone}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">Delivery Address</span>
+                          <p className="font-medium text-stone-700 flex items-start gap-1.5 leading-snug">
+                            <MapPin size={13} className="text-rose-500 shrink-0 mt-0.5" /> 
+                            <span>{order.delivery_address || order.address || 'Standard Delivery Location'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">Catalog Items Included from Your Store</span>
+                        
+                        <div className="border border-stone-200 rounded-2xl overflow-hidden">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-stone-50 border-b text-[10px] uppercase text-stone-400 font-bold">
+                                <th className="p-3">Product</th>
+                                <th className="p-3">Qty</th>
+                                <th className="p-3">Unit Price</th>
+                                <th className="p-3 text-right">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-100 font-medium text-slate-800">
+                              {storeItems.map((item, idx) => {
+                                const subtotal = Number(item.price || 0) * item.quantity;
+                                return (
+                                  <tr key={idx} className="hover:bg-stone-50">
+                                    <td className="p-3 font-bold text-slate-900">{item.products?.name || 'Custom Product'}</td>
+                                    <td className="p-3">{item.quantity} units</td>
+                                    <td className="p-3">₹{Number(item.price || 0).toLocaleString()}</td>
+                                    <td className="p-3 text-right font-black text-emerald-700">₹{subtotal.toLocaleString()}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2 border-t border-stone-100 flex-wrap gap-2">
+                        <span className="text-stone-500 font-medium text-[11px]">
+                          Gross Sales: <strong className="text-slate-800">₹{storeOrderGross.toLocaleString()}</strong> 
+                          <span className="ml-2 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-lg font-bold">Tier Rate: {tierPct}%</span>
+                        </span>
+                        <div className="text-right flex items-center gap-2">
+                          <span className="text-[10px] text-stone-400 uppercase font-black">Net Payout Share:</span>
+                          <span className="text-sm font-black text-emerald-700">₹{netPayout.toFixed(2)}</span>
+                        </div>
+                      </div>
+
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,12 +1,13 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
-import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Heart } from 'lucide-react';
+import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Heart, Mic, MicOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ValueGoLogo from '../ValueGoLogo';
 
 export default function StoreHeader({ session, searchQuery, setSearchQuery, totalItemsCount, onOpenProfile, onOpenCart }) {
   const [locationName, setLocationName] = useState('Detecting location...');
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     fetchCurrentLocation();
@@ -49,6 +50,30 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
     );
   };
 
+  const startVoiceSearch = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser. Please use Chrome or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognition.onresult = (event) => {
+      const speechToText = event.results[0][0].transcript;
+      setSearchQuery(speechToText);
+    };
+
+    recognition.start();
+  };
+
   return (
     <>
       {/* Top Banner / Delivery Ticker */}
@@ -84,17 +109,27 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
             </div>
           </div>
 
-          {/* Central Search Bar */}
+          {/* Central Search Bar with Voice Input */}
           <div className="flex-1 max-w-xl mx-4 hidden md:block">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition" size={18} />
               <input 
                 type="text" 
                 placeholder='Search "Fresh Milk", "Organic Tomatoes", "Snacks"...' 
-                className="w-full pl-11 pr-4 py-3 bg-emerald-50/40 focus:bg-white rounded-2xl text-sm font-medium text-slate-900 outline-none border-2 border-emerald-200/80 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition shadow-2xs"
+                className="w-full pl-11 pr-12 py-3 bg-emerald-50/40 focus:bg-white rounded-2xl text-sm font-medium text-slate-900 outline-none border-2 border-emerald-200/80 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition shadow-2xs"
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              <button 
+                type="button"
+                onClick={startVoiceSearch}
+                className={`absolute inset-y-1.5 right-1.5 px-3 rounded-xl flex items-center justify-center transition cursor-pointer ${
+                  isListening ? 'bg-rose-600 text-white animate-pulse' : 'bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                }`}
+                title={isListening ? "Listening... Speak now" : "Search by voice"}
+              >
+                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
             </div>
           </div>
 
@@ -147,8 +182,18 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
               placeholder="Search groceries, essentials..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-emerald-50/50 border border-emerald-200 pl-11 pr-4 py-2.5 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 focus:bg-white"
+              className="w-full bg-emerald-50/50 border border-emerald-200 pl-11 pr-12 py-2.5 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 focus:bg-white"
             />
+            <button 
+              type="button"
+              onClick={startVoiceSearch}
+              className={`absolute inset-y-1.5 right-1.5 px-2.5 rounded-xl flex items-center justify-center transition cursor-pointer ${
+                isListening ? 'bg-rose-600 text-white animate-pulse' : 'bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+              }`}
+              title={isListening ? "Listening... Speak now" : "Search by voice"}
+            >
+              {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
           </div>
         </div>
       </header>

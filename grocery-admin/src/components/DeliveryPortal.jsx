@@ -1,14 +1,48 @@
 // src/components/DeliveryPortal.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut, ShieldCheck, Mail, Lock, Eye, X, Navigation, ExternalLink } from 'lucide-react';
+import { Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut, ShieldCheck, Mail, Lock, Eye, X, Navigation, ExternalLink, Calendar, Printer, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
+  if (profile?.custom_commission_pct !== null && profile?.custom_commission_pct !== undefined && profile?.custom_commission_pct !== '') {
+    return Number(profile.custom_commission_pct);
+  }
+
+  if (!rules || !Array.isArray(rules) || rules.length === 0) {
+    return 1; // Default fallback for delivery commission
+  }
+
+  const targetRole = typeof roleType === 'string' ? roleType.toLowerCase() : 'delivery';
+  const roleRules = rules.filter(r => r.role_type?.toLowerCase() === targetRole && r.is_active);
+
+  const matchedRule = roleRules.find(r => {
+    const min = Number(r.min_cart_value || 0);
+    const max = r.max_cart_value !== null && r.max_cart_value !== undefined && r.max_cart_value !== '' 
+      ? Number(r.max_cart_value) 
+      : Infinity;
+    return cartAmount >= min && cartAmount <= max;
+  });
+
+  if (matchedRule) {
+    return Number(matchedRule.commission_pct);
+  }
+
+  return 1;
+};
 
 export default function DeliveryPortal() {
   const [session, setSession] = useState(null);
+  const [staffProfile, setStaffProfile] = useState(null);
+  const [commissionRules, setCommissionRules] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('available');
+
+  // Date Range & Period Filter State for Delivery Dashboard & Earnings
+  const [datePreset, setDatePreset] = useState('all'); // 'today', 'week', 'month', 'custom', 'all'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [verifyingOrder, setVerifyingOrder] = useState(null);
@@ -23,51 +57,92 @@ export default function DeliveryPortal() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchDeliveryOrders(session);
-      setLoading(false);
+      if (session) {
+        fetchStaffProfileAndDependencies(session.user);
+      } else {
+        setLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchDeliveryOrders(session);
-      setLoading(false);
+      if (session) {
+        fetchStaffProfileAndDependencies(session.user);
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // Re-fetch delivery orders when filters change
   useEffect(() => {
-    if (!session) return;
-    const interval = setInterval(() => fetchDeliveryOrders(session), 5000);
-    return () => clearInterval(interval);
-  }, [session]);
+    if (session) {
+      fetchDeliveryOrders(session, staffProfile);
+    }
+  }, [datePreset, startDate, endDate]);
 
-  const fetchDeliveryOrders = async (currentSession) => {
+  const fetchStaffProfileAndDependencies = async (user) => {
+    try {
+      const [staffRes, rulesRes] = await Promise.all([
+        supabase.from('staff_profiles').select('id, user_id, email, role, custom_commission_pct').or(`user_id.eq.${user.id},email.eq.${user.email}`).maybeSingle(),
+        supabase.from('cart_commission_rules').select('*').eq('is_active', true)
+      ]);
+
+      if (staffRes.data) {
+        setStaffProfile(staffRes.data);
+      }
+      if (rulesRes.data) {
+        setCommissionRules(rulesRes.data);
+      }
+
+      await fetchDeliveryOrders(session || { user }, staffRes.data);
+    } catch (err) {
+      console.error('Error loading staff profile & rules:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDeliveryOrders = async (currentSession, currentStaff) => {
     const activeSession = currentSession || session;
     if (!activeSession?.user?.email) return;
 
     const userEmail = activeSession.user.email;
     const userId = activeSession.user.id;
+    const staffId = currentStaff?.id || staffProfile?.id;
 
-    console.log("Fetching orders for staff email:", userEmail, "and ID:", userId);
+    // Build base query for assigned / completed orders with date filters
+    let baseQuery = supabase.from('orders').select('*, order_items(*, products(name, image_url))');
 
-    // 1. Find if this user exists in staff_profiles to get their staff record ID
-    const { data: staffData } = await supabase
-      .from('staff_profiles')
-      .select('id')
-      .eq('email', userEmail)
-      .single();
+    const now = new Date();
+    if (datePreset === 'today') {
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      baseQuery = baseQuery.gte('created_at', startOfDay);
+    } else if (datePreset === 'week') {
+      const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
+      baseQuery = baseQuery.gte('created_at', startOfWeek);
+    } else if (datePreset === 'month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      baseQuery = baseQuery.gte('created_at', startOfMonth);
+    } else if (datePreset === 'custom') {
+      if (startDate) baseQuery = baseQuery.gte('created_at', new Date(startDate).toISOString());
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        baseQuery = baseQuery.lte('created_at', endDateTime.toISOString());
+      }
+    }
 
-    const staffId = staffData ? staffData.id : null;
-
-    // 2. Fetch available orders (unassigned & processing)
+    // 1. Fetch available orders (unassigned & processing)
     const { data: availData } = await supabase
       .from('orders')
       .select('*, order_items(*, products(name, image_url))')
       .eq('status', 'processing')
       .is('delivery_agent_id', null);
 
-    // 3. Fetch orders assigned to ME (checking both Auth ID and Staff Profile ID)
+    // 2. Fetch orders assigned to ME
     let activeQuery = supabase
       .from('orders')
       .select('*, order_items(*, products(name, image_url))')
@@ -81,11 +156,8 @@ export default function DeliveryPortal() {
 
     const { data: activeData } = await activeQuery;
 
-    // 4. Fetch completed orders by ME
-    let completedQuery = supabase
-      .from('orders')
-      .select('*, order_items(*, products(name, image_url))')
-      .eq('status', 'delivered');
+    // 3. Fetch completed orders by ME (respecting date filter)
+    let completedQuery = baseQuery.eq('status', 'delivered');
 
     if (staffId) {
       completedQuery = completedQuery.or(`delivery_agent_id.eq.${userId},delivery_agent_id.eq.${staffId}`);
@@ -98,7 +170,6 @@ export default function DeliveryPortal() {
     const allFetched = [...(availData || []), ...(activeData || []), ...(completedData || [])];
     const uniqueOrders = Array.from(new Map(allFetched.map(item => [item.id, item])).values());
     
-    console.log("Total unique orders loaded:", uniqueOrders.length);
     setOrders(uniqueOrders);
   };
 
@@ -111,7 +182,7 @@ export default function DeliveryPortal() {
       alert("Login failed: " + error.message);
     } else if (data.session) {
       setSession(data.session);
-      fetchDeliveryOrders(data.session);
+      await fetchStaffProfileAndDependencies(data.session.user);
     }
     setLoggingIn(false);
   };
@@ -120,9 +191,7 @@ export default function DeliveryPortal() {
     const updatePayload = { status: newStatus };
     
     if (newStatus === 'accepted' && session) {
-      // Fetch staff ID or fallback to user ID
-      const { data: staffData } = await supabase.from('staff_profiles').select('id').eq('email', session.user.email).single();
-      updatePayload.delivery_agent_id = staffData ? staffData.id : session.user.id;
+      updatePayload.delivery_agent_id = staffProfile ? staffProfile.id : session.user.id;
     }
 
     const { error } = await supabase
@@ -172,7 +241,11 @@ export default function DeliveryPortal() {
     o.delivery_agent_id && o.status === 'delivered'
   );
 
-  const totalEarnings = myCompletedOrders.length * 40;
+  const totalEarnings = myCompletedOrders.reduce((sum, order) => {
+    const cartAmount = Number(order.total_amount || 0);
+    const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+    return sum + ((cartAmount * tierPct) / 100);
+  }, 0);
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-stone-600 font-medium">Loading delivery portal...</div>;
 
@@ -235,76 +308,125 @@ export default function DeliveryPortal() {
   }
 
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans">
-      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-sm">
+    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans text-xs">
+      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-sm print:hidden">
         <div className="p-6 border-b border-stone-200">
-          <h1 className="text-lg font-black text-emerald-600 flex items-center gap-2"><Truck size={20}/> Delivery Portal</h1>
-          <p className="text-xs text-stone-500 truncate mt-0.5">{session.user.email}</p>
+          <h1 className="text-sm font-black text-emerald-600 flex items-center gap-2 truncate"><Truck size={18}/> Delivery Portal</h1>
+          <p className="text-[10px] text-stone-400 truncate mt-0.5">{session.user.email}</p>
         </div>
         
         <nav className="flex-1 p-4 space-y-1.5">
-          <button onClick={() => setActiveTab('available')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition ${activeTab === 'available' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
-            <span className="flex items-center gap-3"><Package size={18} /> Available Orders</span>
+          <button onClick={() => setActiveTab('available')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition cursor-pointer ${activeTab === 'available' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
+            <span className="flex items-center gap-3"><Package size={16} /> Available Orders</span>
             <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">{availableOrders.length}</span>
           </button>
-          <button onClick={() => setActiveTab('active')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition ${activeTab === 'active' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
-            <span className="flex items-center gap-3"><Clock size={18} /> Active Deliveries</span>
+          <button onClick={() => setActiveTab('active')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition cursor-pointer ${activeTab === 'active' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
+            <span className="flex items-center gap-3"><Clock size={16} /> Active Deliveries</span>
             <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-black">{myActiveOrders.length}</span>
           </button>
-          <button onClick={() => setActiveTab('completed')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition ${activeTab === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
-            <span className="flex items-center gap-3"><CheckCircle size={18} /> Earnings & History</span>
+          <button onClick={() => setActiveTab('completed')} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition cursor-pointer ${activeTab === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
+            <span className="flex items-center gap-3"><CheckCircle size={16} /> Earnings & History</span>
             <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">{myCompletedOrders.length}</span>
           </button>
         </nav>
 
         <div className="p-4 border-t border-stone-200 space-y-2">
-          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-700 hover:bg-stone-100 rounded-2xl font-medium transition text-xs">
-            <Truck size={16} /> View Storefront
+          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-700 hover:bg-stone-100 rounded-xl font-medium transition text-xs cursor-pointer">
+            <Truck size={14} /> View Storefront
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-2xl font-medium transition text-xs">
-            <LogOut size={16} /> Sign Out
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition text-xs cursor-pointer">
+            <LogOut size={14} /> Sign Out
           </button>
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto">
+        
+        {/* Global Filter & Statement Toolbar */}
+        <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex-wrap gap-4 print:hidden">
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-emerald-700" />
+            <span className="font-bold text-stone-700">Filter Range:</span>
+            <div className="flex gap-1 flex-wrap">
+              {['today', 'week', 'month', 'custom', 'all'].map(d => (
+                <button 
+                  key={d} 
+                  onClick={() => setDatePreset(d)} 
+                  className={`px-3 py-1 rounded-xl font-bold transition capitalize cursor-pointer ${datePreset === d ? 'bg-emerald-700 text-white shadow-xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-xs">
+            <Printer size={14} /> Print Earnings PDF
+          </button>
+        </div>
+
+        {datePreset === 'custom' && (
+          <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex gap-4 items-center print:hidden">
+            <div className="flex-1">
+              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">From Date</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+            </div>
+            <div className="flex-1">
+              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">To Date</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'available' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-stone-900">Available Orders for Pickup</h2>
+            <h2 className="text-xl font-black text-stone-900">Available Orders for Pickup</h2>
             {availableOrders.length === 0 ? (
               <div className="bg-white p-12 rounded-3xl border text-center text-stone-500 font-medium shadow-sm">No new orders available.</div>
             ) : (
               <div className="space-y-4">
-                {availableOrders.map(order => (
-                  <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center pb-3 border-b border-stone-100">
-                      <span className="font-mono font-bold text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
-                      <span className="text-lg font-black text-stone-900">₹{order.total_amount.toFixed(2)}</span>
-                    </div>
-                    <p className="text-xs text-stone-700 font-medium">Address: {order.delivery_address}</p>
-                    
-                    {order.latitude && order.longitude && (
-                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-                        <span className="text-emerald-800 font-mono">📍 GPS Location Available</span>
-                        <a 
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 shadow-2xs"
-                        >
-                          <Navigation size={12} /> Open Maps
-                        </a>
-                      </div>
-                    )}
+                {availableOrders.map(order => {
+                  const cartAmount = Number(order.total_amount || 0);
+                  const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+                  const estimatedEarning = (cartAmount * tierPct) / 100;
 
-                    <div className="flex justify-between items-center pt-2">
-                      <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
-                        <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
-                      </button>
-                      <button onClick={() => handleUpdateStatus(order.id, 'accepted')} className="bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-2xl text-xs hover:bg-emerald-700 transition">Accept Order</button>
+                  return (
+                    <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                        <div>
+                          <span className="font-mono font-bold text-stone-900 text-sm">Order #{order.id.slice(0, 8)}</span>
+                          <span className="ml-3 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-bold">Tier Rate: {tierPct}%</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-base font-black text-stone-900">₹{order.total_amount.toFixed(2)}</span>
+                          <span className="block text-[10px] text-emerald-600 font-bold">Est. Earnings: ₹{estimatedEarning.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-stone-700 font-medium">Address: {order.delivery_address}</p>
+                      
+                      {order.latitude && order.longitude && (
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
+                          <span className="text-emerald-800 font-mono">📍 GPS Location Available</span>
+                          <a 
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 shadow-2xs"
+                          >
+                            <Navigation size={12} /> Open Maps
+                          </a>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center pt-2">
+                        <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1 cursor-pointer">
+                          <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
+                        </button>
+                        <button onClick={() => handleUpdateStatus(order.id, 'accepted')} className="bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-2xl text-xs hover:bg-emerald-700 transition cursor-pointer">Accept Order</button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -312,75 +434,84 @@ export default function DeliveryPortal() {
 
         {activeTab === 'active' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-stone-900">Active Deliveries Workflow</h2>
+            <h2 className="text-xl font-black text-stone-900">Active Deliveries Workflow</h2>
             {myActiveOrders.length === 0 ? (
               <div className="bg-white p-12 rounded-3xl border text-center text-stone-500 font-medium shadow-sm">No orders in progress or assigned to you yet.</div>
             ) : (
               <div className="space-y-4">
-                {myActiveOrders.map(order => (
-                  <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center pb-3 border-b border-stone-100">
-                      <span className="font-mono font-bold text-stone-900 text-base">Order #{order.id.slice(0, 8)}</span>
-                      <span className="px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800">
-                        Status: {order.status}
-                      </span>
-                    </div>
+                {myActiveOrders.map(order => {
+                  const cartAmount = Number(order.total_amount || 0);
+                  const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+                  const estimatedEarning = (cartAmount * tierPct) / 100;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <span className="font-bold text-stone-400 uppercase">Delivery Address</span>
-                        <p className="text-stone-800 font-medium mt-0.5">{order.delivery_address}</p>
-                      </div>
-                      <div>
-                        <span className="font-bold text-stone-400 uppercase">Customer Phone</span>
-                        <p className="text-stone-800 font-medium mt-0.5">{order.phone || 'N/A'}</p>
-                      </div>
-                    </div>
-
-                    {order.latitude && order.longitude && (
-                      <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between text-xs shadow-2xs">
+                  return (
+                    <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-stone-100">
                         <div>
-                          <span className="font-black text-emerald-900 block">Customer GPS Coordinates</span>
-                          <span className="font-mono text-emerald-700">{order.latitude}, {order.longitude}</span>
+                          <span className="font-mono font-bold text-stone-900 text-sm">Order #{order.id.slice(0, 8)}</span>
+                          <span className="ml-3 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-bold">Tier: {tierPct}% (₹{estimatedEarning.toFixed(2)})</span>
                         </div>
-                        <a 
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 transition shadow-sm"
-                        >
-                          <Navigation size={14} /> Open Google Maps <ExternalLink size={12} />
-                        </a>
+                        <span className="px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800">
+                          Status: {order.status}
+                        </span>
                       </div>
-                    )}
 
-                    <div className="flex items-center justify-between pt-2">
-                      <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
-                        <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
-                      </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="font-bold text-stone-400 uppercase">Delivery Address</span>
+                          <p className="text-stone-800 font-medium mt-0.5">{order.delivery_address}</p>
+                        </div>
+                        <div>
+                          <span className="font-bold text-stone-400 uppercase">Customer Phone</span>
+                          <p className="text-stone-800 font-medium mt-0.5">{order.phone || 'N/A'}</p>
+                        </div>
+                      </div>
 
-                      <div className="flex flex-wrap gap-2 justify-end items-center">
-                        {(order.status === 'accepted' || order.status === 'shipped' || order.status === 'processing' || order.status === 'pending') && (
-                          <button onClick={() => handleUpdateStatus(order.id, 'pickup')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition">
-                            Reached Store / Pickup
-                          </button>
-                        )}
+                      {order.latitude && order.longitude && (
+                        <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between text-xs shadow-2xs">
+                          <div>
+                            <span className="font-black text-emerald-900 block">Customer GPS Coordinates</span>
+                            <span className="font-mono text-emerald-700">{order.latitude}, {order.longitude}</span>
+                          </div>
+                          <a 
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 transition shadow-sm"
+                          >
+                            <Navigation size={14} /> Open Google Maps <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      )}
 
-                        {order.status === 'pickup' && (
-                          <button onClick={() => handleUpdateStatus(order.id, 'out_for_delivery')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition">
-                            Out for Delivery
-                          </button>
-                        )}
+                      <div className="flex items-center justify-between pt-2">
+                        <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1 cursor-pointer">
+                          <Eye size={14} /> View Order Items ({order.order_items?.length || 0})
+                        </button>
 
-                        {order.status === 'out_for_delivery' && (
-                          <button onClick={() => { setVerifyingOrder(order); setEnteredOtp(''); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow transition flex items-center gap-1.5">
-                            <CheckCircle size={14}/> Enter OTP & Complete Delivery
-                          </button>
-                        )}
+                        <div className="flex flex-wrap gap-2 justify-end items-center">
+                          {(order.status === 'accepted' || order.status === 'shipped' || order.status === 'processing' || order.status === 'pending') && (
+                            <button onClick={() => handleUpdateStatus(order.id, 'pickup')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition cursor-pointer">
+                              Reached Store / Pickup
+                            </button>
+                          )}
+
+                          {order.status === 'pickup' && (
+                            <button onClick={() => handleUpdateStatus(order.id, 'out_for_delivery')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition cursor-pointer">
+                              Out for Delivery
+                            </button>
+                          )}
+
+                          {order.status === 'out_for_delivery' && (
+                            <button onClick={() => { setVerifyingOrder(order); setEnteredOtp(''); }} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow transition flex items-center gap-1.5 cursor-pointer">
+                              <CheckCircle size={14}/> Enter OTP & Complete Delivery
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -388,33 +519,41 @@ export default function DeliveryPortal() {
 
         {activeTab === 'completed' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-black text-stone-900">Earnings & History</h2>
+            <h2 className="text-xl font-black text-stone-900">Earnings & History</h2>
             <div className="bg-white p-6 rounded-3xl border shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-xs font-bold text-stone-400 uppercase">Total Earnings</span>
+                <span className="text-xs font-bold text-stone-400 uppercase">Filtered Tier Earnings</span>
                 <h3 className="text-3xl font-black text-emerald-600 mt-1">₹{totalEarnings.toFixed(2)}</h3>
-                <p className="text-xs text-stone-500 mt-0.5">{myCompletedOrders.length} completed orders</p>
+                <p className="text-xs text-stone-500 mt-0.5">{myCompletedOrders.length} completed orders matching filter</p>
               </div>
               <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold shadow-inner">
                 <DollarSign size={28} />
               </div>
             </div>
 
-            {myCompletedOrders.map(order => (
-              <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-5 shadow-sm flex justify-between items-center text-xs">
-                <div>
-                  <span className="font-mono font-bold text-stone-900">Order #{order.id.slice(0, 8)}</span>
-                  <p className="text-stone-500 mt-0.5">{order.delivery_address}</p>
-                </div>
-                <div className="text-right flex items-center gap-3">
-                  <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline">Items</button>
-                  <div>
-                    <span className="font-black text-emerald-600 block text-sm">+₹40.00 Earned</span>
-                    <span className="text-[10px] text-stone-400 uppercase font-bold">Delivered</span>
+            <div className="space-y-3">
+              {myCompletedOrders.map(order => {
+                const cartAmount = Number(order.total_amount || 0);
+                const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+                const earnedFee = (cartAmount * tierPct) / 100;
+
+                return (
+                  <div key={order.id} className="bg-white rounded-3xl border border-stone-200/80 p-5 shadow-sm flex justify-between items-center text-xs">
+                    <div>
+                      <span className="font-mono font-bold text-stone-900">Order #{order.id.slice(0, 8)}</span>
+                      <p className="text-stone-500 mt-0.5">{order.delivery_address}</p>
+                    </div>
+                    <div className="text-right flex items-center gap-3">
+                      <button onClick={() => setSelectedOrderDetails(order)} className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer">Items</button>
+                      <div>
+                        <span className="font-black text-emerald-600 block text-sm">+₹{earnedFee.toFixed(2)} <span className="text-[10px] text-stone-400">({tierPct}%)</span></span>
+                        <span className="text-[10px] text-stone-400 uppercase font-bold">Delivered</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
       </main>
@@ -425,7 +564,7 @@ export default function DeliveryPortal() {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-base text-stone-900">Verify Customer OTP</h3>
-              <button onClick={() => setVerifyingOrder(null)} className="p-1.5 rounded-full hover:bg-stone-100 text-stone-500"><X size={16}/></button>
+              <button onClick={() => setVerifyingOrder(null)} className="p-1.5 rounded-full hover:bg-stone-100 text-stone-500 cursor-pointer"><X size={16}/></button>
             </div>
 
             <p className="text-xs text-stone-600 font-medium">
@@ -443,7 +582,7 @@ export default function DeliveryPortal() {
 
               <button 
                 type="submit" 
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl text-xs shadow-lg transition active:scale-95"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl text-xs shadow-lg transition active:scale-95 cursor-pointer"
               >
                 Verify & Mark Delivered
               </button>
@@ -461,7 +600,7 @@ export default function DeliveryPortal() {
                 <h3 className="font-black text-lg text-stone-900">Order #{selectedOrderDetails.id.slice(0, 8)}</h3>
                 <p className="text-xs text-stone-400">{new Date(selectedOrderDetails.created_at).toLocaleString()}</p>
               </div>
-              <button onClick={() => setSelectedOrderDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500"><X size={18}/></button>
+              <button onClick={() => setSelectedOrderDetails(null)} className="p-2 rounded-full hover:bg-stone-100 text-stone-500 cursor-pointer"><X size={18}/></button>
             </div>
 
             <div className="space-y-3 text-xs bg-stone-50 p-4 rounded-2xl border">
@@ -501,7 +640,7 @@ export default function DeliveryPortal() {
               <span className="text-lg font-black text-stone-900">₹{selectedOrderDetails.total_amount.toFixed(2)}</span>
             </div>
 
-            <button onClick={() => setSelectedOrderDetails(null)} className="w-full bg-stone-900 text-white font-bold py-3 rounded-2xl text-xs">
+            <button onClick={() => setSelectedOrderDetails(null)} className="w-full bg-stone-900 text-white font-bold py-3 rounded-2xl text-xs cursor-pointer">
               Close Details
             </button>
           </div>

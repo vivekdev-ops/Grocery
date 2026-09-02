@@ -145,8 +145,8 @@ export default function Staff() {
       const { data: sessionData } = await supabase.auth.getSession();
       const adminSession = sessionData?.session;
 
-      // Create user and pass store details in metadata for the database trigger
-      const { error: authError } = await supabase.auth.signUp({
+      // 1. Create user in auth.users
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -164,6 +164,28 @@ export default function Staff() {
         return;
       }
 
+      const newUserId = authData?.user?.id;
+
+      if (newUserId) {
+        // 2. Explicitly ensure staff_profiles entry is written
+        await supabase.from('staff_profiles').upsert([
+          { user_id: newUserId, email: form.email, role: form.role }
+        ], { onConflict: 'user_id' });
+
+        // 3. Explicitly ensure shopkeeper_profiles entry is written if role is shopkeeper
+        if (form.role === 'shopkeeper') {
+          await supabase.from('shopkeeper_profiles').upsert([
+            { 
+              id: newUserId,
+              user_id: newUserId, 
+              store_name: form.store_name || 'My Store', 
+              phone: form.phone || '', 
+              address: form.address || '' 
+            }
+          ], { onConflict: 'user_id' });
+        }
+      }
+
       // Restore admin session immediately
       if (adminSession) {
         await supabase.auth.setSession({
@@ -176,7 +198,7 @@ export default function Staff() {
       closeAndResetModal();
     }
   };
-
+  
   const closeAndResetModal = () => {
     setForm({ email: '', password: '', role: 'delivery', store_name: '', phone: '', address: '' });
     setEditingEntity(null);
@@ -261,7 +283,7 @@ export default function Staff() {
                   <input 
                     type="number" 
                     step="1" 
-                    required
+                    required 
                     placeholder="e.g. 0"
                     value={commissionForm.min_cart_value}
                     onChange={e => setCommissionForm({...commissionForm, min_cart_value: e.target.value})}
@@ -284,7 +306,7 @@ export default function Staff() {
                   <input 
                     type="number" 
                     step="0.1" 
-                    required
+                    required 
                     placeholder="e.g. 85"
                     value={commissionForm.commission_pct}
                     onChange={e => setCommissionForm({...commissionForm, commission_pct: e.target.value})}

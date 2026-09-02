@@ -16,7 +16,6 @@ export default function CartDrawer({
 }) {
   const [availableCoupons, setAvailableCoupons] = useState([]);
 
-  // Fetch active coupons to display as suggestions
   useEffect(() => {
     if (isOpen) {
       fetchAvailableCoupons();
@@ -37,7 +36,6 @@ export default function CartDrawer({
 
   if (!isOpen) return null;
 
-  // Dynamically calculate the free delivery threshold from admin rules where fee is 0
   const freeDeliveryRule = deliveryRules
     .filter(r => Number(r.delivery_fee) === 0)
     .sort((a, b) => Number(a.min_cart_value) - Number(b.min_cart_value))[0];
@@ -49,6 +47,10 @@ export default function CartDrawer({
   const applySpecificCoupon = (code) => {
     setCouponInput(code);
   };
+
+  const isCartEmpty = cart.length === 0;
+  const isAddressMissing = savedAddresses.length === 0 || !selectedAddressId;
+  const isCheckoutDisabled = checkingOut || isCartEmpty || isAddressMissing;
 
   return (
     <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300 font-sans">
@@ -67,47 +69,65 @@ export default function CartDrawer({
         {/* Scrollable Body */}
         <div className="p-5 flex-1 overflow-y-auto space-y-5 bg-[#F0FDF4]/30">
           
-          {/* Dynamic Free Delivery Progress */}
-          {freeDeliveryThreshold > 0 && cart.length > 0 && (
-            <div className="bg-emerald-950/80 rounded-2xl p-3 space-y-2">
-              <p className="text-[11px] font-bold text-emerald-300">
-                {amountNeededForFreeDelivery > 0
-                  ? `Add ₹${amountNeededForFreeDelivery.toFixed(2)} more for FREE delivery!`
-                  : '🎉 You qualify for FREE delivery!'}
-              </p>
-              <div className="w-full bg-emerald-950/60 h-2 rounded-full overflow-hidden border border-emerald-700/50">
-                <div 
-                  className="bg-gradient-to-r from-emerald-400 to-amber-400 h-full transition-all duration-500 rounded-full" 
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Cart Items List */}
+          {/* Step 1: Cart Items / Empty State */}
           <div className="space-y-3">
-            {cart.map(item => (
-              <div key={item.cartItemId} className="flex items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-emerald-100 shadow-2xs">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <img src={item.image || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-100 bg-emerald-50/30 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="font-bold text-xs text-slate-900 block truncate">{item.title}</span>
-                    <span className="text-[11px] text-slate-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
-                  </div>
-                </div>
-                <span className="text-xs font-black text-emerald-700 shrink-0">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
-                <div className="flex items-center gap-1.5 bg-emerald-50/60 p-1 rounded-xl border border-emerald-200 shrink-0">
-                  <button onClick={() => updateQuantity(item.cartItemId, -1)} className="p-1 hover:bg-emerald-100 text-slate-700 rounded-lg transition cursor-pointer"><Minus size={12}/></button>
-                  <span className="text-xs font-black w-4 text-center text-slate-900">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.cartItemId, 1)} className="p-1 hover:bg-emerald-100 text-slate-700 rounded-lg transition cursor-pointer"><Plus size={12}/></button>
-                </div>
+            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+              <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">1</span>
+              Review Items
+            </h4>
+
+            {isCartEmpty ? (
+              <div className="bg-white p-8 rounded-2xl border border-emerald-100 text-center space-y-2 shadow-2xs">
+                <ShoppingCart className="mx-auto text-emerald-300" size={32} />
+                <p className="text-xs font-bold text-slate-700">Your cart is empty</p>
+                <p className="text-[10px] text-slate-400">Add products to your cart to proceed with checkout.</p>
               </div>
-            ))}
+            ) : (
+              <>
+                {freeDeliveryThreshold > 0 && (
+                  <div className="bg-emerald-950/80 rounded-2xl p-3 space-y-2">
+                    <p className="text-[11px] font-bold text-emerald-300">
+                      {amountNeededForFreeDelivery > 0
+                        ? `Add ₹${amountNeededForFreeDelivery.toFixed(2)} more for FREE delivery!`
+                        : '🎉 You qualify for FREE delivery!'}
+                    </p>
+                    <div className="w-full bg-emerald-950/60 h-2 rounded-full overflow-hidden border border-emerald-700/50">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-400 to-amber-400 h-full transition-all duration-500 rounded-full" 
+                        style={{ width: `${progressPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {cart.map(item => (
+                    <div key={item.cartItemId} className="flex items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-emerald-100 shadow-2xs">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <img src={item.image || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-100 bg-emerald-50/30 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="font-bold text-xs text-slate-900 block truncate">{item.title}</span>
+                          <span className="text-[11px] text-slate-500 font-medium">₹{Number(item.price || 0).toFixed(2)} each</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-emerald-700 shrink-0">₹{(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
+                      <div className="flex items-center gap-1.5 bg-emerald-50/60 p-1 rounded-xl border border-emerald-200 shrink-0">
+                        <button onClick={() => updateQuantity(item.cartItemId, -1)} className="p-1 hover:bg-emerald-100 text-slate-700 rounded-lg transition cursor-pointer"><Minus size={12}/></button>
+                        <span className="text-xs font-black w-4 text-center text-slate-900">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.cartItemId, 1)} className="p-1 hover:bg-emerald-100 text-slate-700 rounded-lg transition cursor-pointer"><Plus size={12}/></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Step 2: Delivery Address Selection (Only active/unlocked if cart has items) */}
           {session ? (
-            <div className="space-y-4 pt-3 border-t border-emerald-100">
+            <div className={`space-y-4 pt-3 border-t border-emerald-100 transition-opacity ${isCartEmpty ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
               <h4 className="font-black text-slate-800 text-xs flex items-center gap-2">
+                <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">2</span>
                 <MapPin size={16} className="text-emerald-700"/> Delivery Address
               </h4>
               
@@ -140,8 +160,12 @@ export default function CartDrawer({
                 </form>
               )}
 
-              <div className="pt-2 border-t border-emerald-100 space-y-3">
-                <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Promo Code</h4>
+              {/* Step 3: Coupon Code Selection */}
+              <div className={`pt-2 border-t border-emerald-100 space-y-3 transition-opacity ${isAddressMissing ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                <h4 className="font-black text-slate-800 text-xs flex items-center gap-2 uppercase tracking-wider">
+                  <span className="w-5 h-5 bg-emerald-700 text-white rounded-full inline-flex items-center justify-center text-[10px]">3</span>
+                  Promo Code (Optional)
+                </h4>
                 {appliedCoupon ? (
                   <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
                     <div>
@@ -203,7 +227,7 @@ export default function CartDrawer({
             </div>
           ) : (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-2">
-              <p className="text-xs font-bold text-amber-900">Please log in to complete your checkout.</p>
+              <p className="text-xs font-bold text-amber-900">Please log in to add addresses and complete your checkout.</p>
               <Link to="/login" className="inline-block bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-black shadow-sm">Login Now</Link>
             </div>
           )}
@@ -224,27 +248,38 @@ export default function CartDrawer({
               </div>
             )}
 
-            {selectedAddressDistance !== null && (
+            {selectedAddressDistance !== null && cart.length > 0 && (
               <div className="flex justify-between text-slate-500">
                 <span>Store Distance:</span>
                 <span className="font-bold text-slate-800">{selectedAddressDistance} KM</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-500">
-              <span>Delivery Fee:</span>
-              <span>{deliveryFee === 0 ? <strong className="text-emerald-700">FREE</strong> : `₹${(deliveryFee || 0).toFixed(2)}`}</span>
-            </div>
+            
+            {cart.length > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Delivery Fee:</span>
+                <span>{deliveryFee === 0 ? <strong className="text-emerald-700">FREE</strong> : `₹${(deliveryFee || 0).toFixed(2)}`}</span>
+              </div>
+            )}
+
             <div className="flex justify-between items-center text-base font-black text-slate-900 pt-2 border-t border-emerald-200">
               <span>To Pay:</span>
-              <span className="text-emerald-700">₹{cartTotal.toFixed(2)}</span>
+              <span className="text-emerald-700">₹{cart.length > 0 ? cartTotal.toFixed(2) : '0.00'}</span>
             </div>
           </div>
+
+          {/* Validation Notice for Checkout Button */}
+          {isCartEmpty ? (
+            <p className="text-[10px] text-rose-600 font-bold text-center">Your cart is empty. Please add items to order.</p>
+          ) : isAddressMissing && session ? (
+            <p className="text-[10px] text-rose-600 font-bold text-center">Please select or add a delivery address to checkout.</p>
+          ) : null}
 
           <button 
             type="button" 
             onClick={session ? handleCheckout : () => { onClose(); navigate('/login'); }}
-            disabled={checkingOut || (session && savedAddresses.length === 0)}
-            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-700/20 transition duration-200 transform active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+            disabled={session ? isCheckoutDisabled : false}
+            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-700/20 transition duration-200 transform active:scale-95 flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ShieldCheck size={16} />
             {checkingOut ? 'Placing Order...' : session ? 'Place Secure Order' : 'Login to Checkout'}
