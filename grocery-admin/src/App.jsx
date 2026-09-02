@@ -4,6 +4,10 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import { LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck, Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
 
+import ForgotPassword from './components/ForgotPassword';
+// (And if you haven't yet, also create and import UpdatePassword)
+import UpdatePassword from './components/UpdatePassword';
+import CustomerProfile from './components/CustomerProfile';
 import HomeSelector from './components/HomeSelector';
 import CustomerStorefront from './components/CustomerStorefront';
 import CustomerAuth from './components/CustomerAuth';
@@ -270,6 +274,9 @@ export default function App() {
       <Route path="/delivery" element={<DeliveryPortal />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-of-service" element={<TermsOfService />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
+      <Route path="/profile" element={<CustomerProfile />} />
     </Routes>
   );
 }

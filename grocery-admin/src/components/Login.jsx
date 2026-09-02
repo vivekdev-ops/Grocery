@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -53,7 +53,7 @@ export default function Login() {
       if (staff.role === 'delivery' || staff.role === 'delivery_man') {
         navigate('/delivery');
       } else if (staff.role === 'manager') {
-        navigate('/manager'); // Set your manager route here if separate, or default to admin
+        navigate('/manager');
       } else {
         navigate('/admin');
       }
@@ -113,10 +113,19 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-[#0c831f] hover:bg-[#0b6f1a] text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 mt-2"
+            className="w-full bg-[#0c831f] hover:bg-[#0b6f1a] text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 mt-2 cursor-pointer"
           >
             {loading ? 'Signing in...' : 'Sign In'} <ArrowRight size={16} />
           </button>
+
+          {/* Forgot Password Button matching the Login style */}
+          <Link 
+            to="/forgot-password" 
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm cursor-pointer block text-center"
+          >
+            <KeyRound size={16} className="text-gray-600" />
+            Forgot Password?
+          </Link>
         </form>
 
         <div className="mt-6 text-center border-t pt-4">

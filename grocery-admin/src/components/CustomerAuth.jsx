@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, KeyRound } from 'lucide-react';
 
 export default function CustomerAuth() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -35,8 +35,8 @@ export default function CustomerAuth() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
-      <Link to="/" className="absolute top-4 left-4 text-gray-500 font-medium flex items-center gap-1">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4 relative">
+      <Link to="/" className="absolute top-4 left-4 text-gray-500 font-medium flex items-center gap-1 hover:text-gray-800 transition">
         <ArrowLeft size={18} /> Back to Store
       </Link>
 
@@ -64,13 +64,24 @@ export default function CustomerAuth() {
               value={password} onChange={e => setPassword(e.target.value)}
             />
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 transition">
+          <button type="submit" disabled={loading} className="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 transition cursor-pointer">
             {loading ? 'Please wait...' : isSignUp ? 'Register Account' : 'Login'}
           </button>
+
+          {/* Forgot Password Button - shows only in Login mode */}
+          {!isSignUp && (
+            <Link 
+              to="/forgot-password" 
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm cursor-pointer block text-center"
+            >
+              <KeyRound size={16} className="text-gray-600" />
+              Forgot Password?
+            </Link>
+          )}
         </form>
 
         <div className="mt-6 text-sm">
-          <button onClick={() => setIsSignUp(!isSignUp)} className="text-green-700 font-medium hover:underline">
+          <button onClick={() => setIsSignUp(!isSignUp)} className="text-green-700 font-medium hover:underline cursor-pointer">
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Register"}
           </button>
         </div>

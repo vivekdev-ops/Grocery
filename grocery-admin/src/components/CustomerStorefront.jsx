@@ -13,6 +13,7 @@ import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { Geolocation } from '@capacitor/geolocation';
+import CustomerProfileModal from './store/CustomerProfileModal';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -45,6 +46,7 @@ export default function CustomerStorefront() {
   const [wishlistIds, setWishlistIds] = useState([]);
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [customerProfile, setCustomerProfile] = useState(null);
 
   // Profile Collapsible Accordion & Detail States
   const [openSection, setOpenSection] = useState(null);
@@ -144,6 +146,7 @@ export default function CustomerStorefront() {
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
         fetchUserReviews(session.user.id);
+        fetchCustomerProfile(session.user.id);
       }
     });
 
@@ -155,6 +158,7 @@ export default function CustomerStorefront() {
         fetchSavedAddresses(session.user.id);
         fetchWishlist(session.user.id);
         fetchUserReviews(session.user.id);
+        fetchCustomerProfile(session.user.id);
       }
     });
 
@@ -167,6 +171,22 @@ export default function CustomerStorefront() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchCustomerProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('customer_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (data) {
+        setCustomerProfile(data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer profile:', err.message);
+    }
+  };
 
   useEffect(() => {
     if (myOrders.length > 0 && products.length > 0) {
@@ -1029,14 +1049,16 @@ export default function CustomerStorefront() {
     <div className="min-h-screen bg-[#F0FDF4] text-slate-900 pb-44 font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* 1. Header Component (Includes KD Store Logo & Brand Name) */}
-      <StoreHeader 
-        session={session} 
-        searchQuery={searchQuery} 
-        setSearchQuery={setSearchQuery} 
-        totalItemsCount={totalItemsCount} 
-        onOpenProfile={() => setIsProfileOpen(true)} 
-        onOpenCart={() => setIsCartOpen(true)} 
-      />     
+     {/* 1. Header Component */}
+<StoreHeader 
+  session={session} 
+  customerProfile={customerProfile}
+  searchQuery={searchQuery} 
+  setSearchQuery={setSearchQuery} 
+  totalItemsCount={totalItemsCount} 
+  onOpenProfile={() => setIsProfileOpen(true)} 
+  onOpenCart={() => setIsCartOpen(true)} 
+/>
 
       {personalizedDeals.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 mt-6">
@@ -1114,7 +1136,7 @@ export default function CustomerStorefront() {
 
       {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-50 transition-opacity duration-300">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-[999] transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
             <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
               <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5"><User size={20} className="text-emerald-700" /> My Account & Dashboard</h3>
@@ -1125,6 +1147,114 @@ export default function CustomerStorefront() {
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
                 <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
+              </div>
+
+              {/* Edit Profile Section */}
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+                <button 
+                  onClick={() => setOpenSection(openSection === 'profile_edit' ? null : 'profile_edit')}
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <User size={16} className="text-emerald-700" /> Edit Profile & Preferences
+                  </span>
+                  {openSection === 'profile_edit' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </button>
+
+                {openSection === 'profile_edit' && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!session?.user) return;
+                    const formData = new FormData(e.target);
+                    const updates = {
+                      user_id: session.user.id,
+                      full_name: formData.get('fullName'),
+                      phone: formData.get('phone'),
+                      avatar_url: formData.get('avatarUrl'),
+                      interests: formData.get('interests'),
+                      updated_at: new Date(),
+                    };
+                    const { error } = await supabase.from('customer_profiles').upsert(updates, { onConflict: 'user_id' });
+                    if (error) {
+                      alert('Error updating profile: ' + error.message);
+                    } else {
+                      setCustomerProfile(updates);
+                      alert('Profile updated successfully!');
+                    }
+                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
+                    <div className="space-y-1 pt-2">
+                      <label className="block font-bold text-slate-600 uppercase text-[10px]">Full Name</label>
+                      <input 
+                        type="text" 
+                        name="fullName"
+                        placeholder="Enter your name" 
+                        defaultValue={customerProfile?.full_name || ''}
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block font-bold text-slate-600 uppercase text-[10px]">Phone Number</label>
+                      <input 
+                        type="text" 
+                        name="phone"
+                        placeholder="+91 98765 43210" 
+                        defaultValue={customerProfile?.phone || ''}
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                      />
+                    </div>
+                    
+                    {/* Avatar Selection Grid & URL input */}
+                    <div className="space-y-1.5">
+                      <label className="block font-bold text-slate-600 uppercase text-[10px]">Profile Avatar</label>
+                      <p className="text-[10px] text-slate-400">Choose a preset avatar or paste a custom image URL below:</p>
+                      <div className="flex gap-2 py-1 overflow-x-auto">
+                        {[
+                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
+                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Zack',
+                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Mimi',
+                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo'
+                        ].map((presetUrl, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              const urlInput = document.getElementById('avatarUrlInput');
+                              if (urlInput) urlInput.value = presetUrl;
+                            }}
+                            className="w-10 h-10 rounded-full border-2 border-emerald-200 overflow-hidden shrink-0 hover:scale-105 transition bg-emerald-50 cursor-pointer flex items-center justify-center"
+                            title="Click to select avatar preset"
+                          >
+                            <img src={presetUrl} alt="Preset" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+
+                      <input 
+                        id="avatarUrlInput"
+                        type="url" 
+                        name="avatarUrl"
+                        placeholder="https://example.com/avatar.jpg" 
+                        defaultValue={customerProfile?.avatar_url || ''}
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-bold text-slate-600 uppercase text-[10px]">Interests & Preferences</label>
+                      <textarea 
+                        name="interests"
+                        rows="2"
+                        placeholder="e.g. Organic, Snacks, Dairy..." 
+                        defaultValue={customerProfile?.interests || ''}
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium resize-none" 
+                      />
+                    </div>
+                    <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
+                      Save Profile Changes
+                    </button>
+                  </form>
+                )}
               </div>
 
               {predictedRefillItems.length > 0 && (
@@ -1339,7 +1469,6 @@ export default function CustomerStorefront() {
           </div>
         </div>
       )}
-
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">

@@ -1,16 +1,25 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
 import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Heart, Mic, MicOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-export default function StoreHeader({ session, searchQuery, setSearchQuery, totalItemsCount, onOpenProfile, onOpenCart }) {
+export default function StoreHeader({ session, customerProfile, searchQuery, setSearchQuery, totalItemsCount, onOpenProfile, onOpenCart }) {
   const [locationName, setLocationName] = useState('Detecting location...');
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchCurrentLocation();
   }, []);
+
+  const handleProfileClick = () => {
+    if (session) {
+      onOpenProfile();
+    } else {
+      navigate('/login');
+    }
+  };
 
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -72,6 +81,9 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
 
     recognition.start();
   };
+
+  const displayName = customerProfile?.full_name ? customerProfile.full_name.split(' ')[0] : session?.user?.email?.split('@')[0];
+  const avatarUrl = customerProfile?.avatar_url;
 
   return (
     <>
@@ -142,11 +154,18 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
           <div className="flex items-center gap-3">
             {session ? (
               <button 
-                onClick={onOpenProfile}
-                className="w-11 h-11 bg-emerald-50/70 hover:bg-emerald-100 text-slate-700 rounded-2xl transition duration-200 flex items-center justify-center border border-emerald-200 active:scale-95 shadow-2xs cursor-pointer"
+                onClick={handleProfileClick}
+                className="h-11 px-3.5 bg-emerald-50/75 hover:bg-emerald-100 text-slate-800 rounded-2xl transition duration-200 flex items-center gap-2.5 border border-emerald-200 active:scale-95 shadow-2xs cursor-pointer"
                 title="My Profile"
               >
-                <User size={20} />
+                <div className="w-7 h-7 rounded-full bg-emerald-200 overflow-hidden flex items-center justify-center shrink-0 border border-emerald-300">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={14} className="text-emerald-800" />
+                  )}
+                </div>
+                <span className="text-xs font-black truncate max-w-[100px] hidden sm:inline">{displayName}</span>
               </button>
             ) : (
               <Link to="/login" className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition duration-200 shadow-sm active:scale-95">
@@ -223,10 +242,12 @@ export default function StoreHeader({ session, searchQuery, setSearchQuery, tota
         </button>
 
         <button 
-          onClick={onOpenProfile} 
+          onClick={handleProfileClick} 
           className="flex flex-col items-center gap-0.5 text-[10px] font-black uppercase text-slate-400 cursor-pointer"
         >
-          <User size={20} />
+          <div className="w-5 h-5 rounded-full overflow-hidden bg-emerald-200 flex items-center justify-center">
+            {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : <User size={12} />}
+          </div>
           <span>Account</span>
         </button>
       </div>
