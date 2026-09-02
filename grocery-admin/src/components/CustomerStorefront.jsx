@@ -12,6 +12,7 @@ import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
+import { Geolocation } from '@capacitor/geolocation';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -62,6 +63,19 @@ export default function CustomerStorefront() {
     message: ''
   });
   const [submittingHelp, setSubmittingHelp] = useState(false);
+
+  const getCurrentPositionNative = async () => {
+  try {
+    const coordinates = await Geolocation.getCurrentPosition();
+    return {
+      latitude: coordinates.coords.latitude,
+      longitude: coordinates.coords.longitude
+    };
+  } catch (error) {
+    console.error('Error getting native location:', error);
+    return null;
+  }
+};
 
   // Feedback Modal State
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
