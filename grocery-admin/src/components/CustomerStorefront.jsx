@@ -67,6 +67,41 @@ export default function CustomerStorefront() {
   });
   const [submittingHelp, setSubmittingHelp] = useState(false);
 
+  // Cart & Checkout State Synchronization with localStorage
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(null);
+
+  useEffect(() => {
+    const handleCartUpdate = (e) => {
+      if (e.detail) {
+        setCart(e.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem('cart_items');
+          setCart(saved ? JSON.parse(saved) : []);
+        } catch (err) {
+          setCart([]);
+        }
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('storage', handleCartUpdate);
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('storage', handleCartUpdate);
+    };
+  }, []);
+
   const getCurrentPositionNative = async () => {
   try {
     const coordinates = await Geolocation.getCurrentPosition();
@@ -89,43 +124,110 @@ export default function CustomerStorefront() {
   const [productReviews, setProductReviews] = useState([]);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-  // Cart & Checkout State
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cart_items');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
+  const handleCheckout = async (e) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
     }
-  });
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState(null);
+    if (!session) { navigate('/login'); return; }
 
-  useEffect(() => {
-    const handleCartUpdate = (e) => {
-      if (e.detail) {
-        setCart(e.detail);
-      } else {
-        const saved = localStorage.getItem('cart_items');
-        setCart(saved ? JSON.parse(saved) : []);
+    // Enforce Requirement 2: Cannot place order if cart is empty OR address not added
+    if (!cart || cart.length === 0) {
+      alert("Your cart is empty. Please add items before placing an order.");
+      return;
+    }
+    if (!addressForm.address || !addressForm.address.trim()) {
+      alert("Please select or add a delivery address before placing an order.");
+      return;
+    }
+
+    setCheckingOut(true);
+
+    try {
+      for (const item of cart) {
+        if (item.variant && item.variant.id) {
+          const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variant.id).single();
+          if (!vData || vData.stock < item.quantity) {
+            alert(`Sorry! "${item.title}" is now out of stock.`);
+            setCheckingOut(false);
+            return;
+          }
+        } else {
+          const productId = item?.product?.id || item?.id || item?.product_id;
+          if (productId) {
+            const { data: pData } = await supabase.from('products').select('stock').eq('id', productId).single();
+            if (!pData || pData.stock < item.quantity) {
+              alert(`Sorry! "${item.title || item.name}" is now out of stock.`);
+              setCheckingOut(false);
+              return;
+            }
+          }
+        }
       }
-    };
 
-    window.addEventListener('cartUpdated', handleCartUpdate);
-    window.addEventListener('storage', handleCartUpdate);
-    return () => {
-      window.removeEventListener('cartUpdated', handleCartUpdate);
-      window.removeEventListener('storage', handleCartUpdate);
-    };
-  }, []);
+      const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      const selectedAddrObj = savedAddresses.find(a => a.id === selectedAddressId);
 
-  const removeFromCart = (productId) => {
-    const updatedCart = cart.filter(item => item.id !== productId && item.product_id !== productId);
-    setCart(updatedCart);
-    localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-    window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-    window.dispatchEvent(new Event('storage'));
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_email: session.user.email,
+          customer_id: session.user.id, // Fixed from user_id to match your orders table schema
+          total_amount: cartTotal,
+          status: 'pending',
+          delivery_address: addressForm.address,
+          phone: addressForm.phone,
+          otp: generatedOtp,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          latitude: selectedAddrObj?.latitude || null,
+          longitude: selectedAddrObj?.longitude || null
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItemsData = cart.map(item => ({
+        order_id: orderData.id,
+        product_id: item?.product?.id || item?.id || item?.product_id,
+        quantity: Number(item?.quantity) || 1,
+        price: Number(item?.price) || 0
+      })).filter(item => item.product_id);
+
+      if (orderItemsData.length === 0) {
+        throw new Error("No valid items with IDs found in the cart for checkout.");
+      }
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
+      if (itemsError) throw itemsError;
+
+      for (const item of cart) {
+        if (item.variant && item.variant.id) {
+          await supabase.from('product_variants').update({ stock: item.variant.stock - item.quantity }).eq('id', item.variant.id);
+        } else {
+          const pId = item?.product?.id || item?.id || item?.product_id;
+          const currentStock = Number(item?.product?.stock || item?.stock || 0);
+          if (pId) {
+            await supabase.from('products').update({ stock: currentStock - item.quantity }).eq('id', pId);
+          }
+        }
+      }
+
+      setOrderSuccess(orderData.id.slice(0, 8));
+      setCart([]);
+      localStorage.removeItem('cart_items');
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: [] }));
+      window.dispatchEvent(new Event('storage'));
+
+      setIsCartOpen(false);
+      setAppliedCoupon(null);
+      setDiscountAmount(0);
+      fetchStoreData();
+      fetchMyOrders(session.user.email);
+    } catch (err) {
+      alert(`Checkout failed: ${err.message}`);
+    } finally {
+      setCheckingOut(false);
+    }
   };
 
   // Invoice Modal State
@@ -647,34 +749,45 @@ export default function CustomerStorefront() {
     if (!order.order_items || order.order_items.length === 0) return;
 
     let addedCount = 0;
+    let updatedCart = [...cart];
+
     order.order_items.forEach(item => {
       const prod = item.products;
       if (prod && Number(prod.stock || 0) > 0) {
         const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
         const itemImage = pImages[0] || '';
+        const cartItemId = prod.id;
 
-        setCart(prev => {
-          const cartItemId = prod.id;
-          const existing = prev.find(ci => ci.cartItemId === cartItemId);
-          if (existing) {
-            return prev.map(ci => ci.cartItemId === cartItemId ? { ...ci, quantity: ci.quantity + item.quantity } : ci);
-          }
-          return [...prev, {
+        const existingIndex = updatedCart.findIndex(ci => ci.cartItemId === cartItemId);
+        if (existingIndex > -1) {
+          updatedCart[existingIndex] = {
+            ...updatedCart[existingIndex],
+            quantity: updatedCart[existingIndex].quantity + item.quantity
+          };
+        } else {
+          updatedCart.push({
             cartItemId,
             product: prod,
             variant: null,
+            id: prod.id,
+            product_id: prod.id,
             title: prod.name,
             price: Number(item.price),
             quantity: item.quantity,
             stock: Number(prod.stock || 10),
             image: itemImage
-          }];
-        });
+          });
+        }
         addedCount++;
       }
     });
 
     if (addedCount > 0) {
+      setCart(updatedCart);
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+      window.dispatchEvent(new Event('storage'));
+
       alert("Items from past order successfully added to your cart!");
       setIsCartOpen(true);
     } else {
@@ -849,26 +962,50 @@ export default function CustomerStorefront() {
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
+      let updatedCart;
       if (existing) {
-        return prev.map(item => 
+        updatedCart = prev.map(item => 
           item.cartItemId === cartItemId 
             ? { ...item, quantity: Math.min(itemStock, item.quantity + 1) }
             : item
         );
+      } else {
+        updatedCart = [...prev, { 
+          cartItemId, 
+          product, 
+          variant, 
+          id: product.id, 
+          product_id: product.id, 
+          title: itemTitle, 
+          price: itemPrice, 
+          quantity: 1, 
+          stock: itemStock, 
+          image: itemImage 
+        }];
       }
-      return [...prev, { cartItemId, product, variant, title: itemTitle, price: itemPrice, quantity: 1, stock: itemStock, image: itemImage }];
+
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+      window.dispatchEvent(new Event('storage'));
+      return updatedCart;
     });
   };
 
   const updateQuantity = (cartItemId, delta) => {
     setCart(prev => {
-      return prev.map(item => {
-        if (item.cartItemId === cartItemId) {
+      const updatedCart = prev.map(item => {
+        const currentKey = item.cartItemId || item.id || item.product_id;
+        if (currentKey === cartItemId) {
           const newQty = item.quantity + delta;
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
         return item;
       }).filter(Boolean);
+
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+      window.dispatchEvent(new Event('storage'));
+      return updatedCart;
     });
   };
 
@@ -978,95 +1115,6 @@ export default function CustomerStorefront() {
 
   const cartTotal = Math.max(0, cartSubtotal - discountAmount) + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const handleCheckout = async (e) => {
-    e.preventDefault();
-    if (!session) { navigate('/login'); return; }
-
-    // Enforce Requirement 2: Cannot place order if cart is empty OR address not added
-    if (cart.length === 0) {
-      alert("Your cart is empty. Please add items before placing an order.");
-      return;
-    }
-    if (!addressForm.address || !addressForm.address.trim()) {
-      alert("Please select or add a delivery address before placing an order.");
-      return;
-    }
-
-    setCheckingOut(true);
-
-    try {
-      for (const item of cart) {
-        if (item.variant && item.variant.id) {
-          const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variant.id).single();
-          if (!vData || vData.stock < item.quantity) {
-            alert(`Sorry! "${item.title}" is now out of stock.`);
-            setCheckingOut(false);
-            return;
-          }
-        } else {
-          const { data: pData } = await supabase.from('products').select('stock').eq('id', item.product.id).single();
-          if (!pData || pData.stock < item.quantity) {
-            alert(`Sorry! "${item.title}" is now out of stock.`);
-            setCheckingOut(false);
-            return;
-          }
-        }
-      }
-
-      const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-      const selectedAddrObj = savedAddresses.find(a => a.id === selectedAddressId);
-
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-          customer_email: session.user.email,
-          customer_id: session.user.id,
-          total_amount: cartTotal,
-          status: 'pending',
-          delivery_address: addressForm.address,
-          phone: addressForm.phone,
-          otp: generatedOtp,
-          coupon_code: appliedCoupon ? appliedCoupon.code : null,
-          latitude: selectedAddrObj?.latitude || null,
-          longitude: selectedAddrObj?.longitude || null
-        }])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItemsData = cart.map(item => ({
-        order_id: orderData.id,
-        product_id: item.product.id,
-        quantity: item.quantity,
-        price: item.price
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
-      if (itemsError) throw itemsError;
-
-      for (const item of cart) {
-        if (item.variant && item.variant.id) {
-          await supabase.from('product_variants').update({ stock: item.variant.stock - item.quantity }).eq('id', item.variant.id);
-        } else {
-          await supabase.from('products').update({ stock: item.product.stock - item.quantity }).eq('id', item.product.id);
-        }
-      }
-
-      setOrderSuccess(orderData.id.slice(0, 8));
-      setCart([]);
-      setIsCartOpen(false);
-      setAppliedCoupon(null);
-      setDiscountAmount(0);
-      fetchStoreData();
-      fetchMyOrders(session.user.email);
-    } catch (err) {
-      alert(`Checkout failed: ${err.message}`);
-    } finally {
-      setCheckingOut(false);
-    }
-  };
 
   const filteredProducts = products.filter(product => {
     const matchesCategory = activeCategory === 'All' || product.category_id === activeCategory || product.category === activeCategory;
@@ -1181,7 +1229,7 @@ export default function CustomerStorefront() {
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
                 <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
-              </div>
+            </div>
 
               {/* Edit Profile Section */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
@@ -1668,434 +1716,434 @@ export default function CustomerStorefront() {
                                     setNewReviewForm({ rating: hasReviewed.rating, review_text: hasReviewed.review_text });
                                   } else {
                                     setNewReviewForm({ rating: 5, review_text: '' });
-                                  }
-                                }}
-                                className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
                                     : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                                }`}
-                              >
+                              }`}
+                            >
                                 {hasReviewed ? <><Star size={11} className="fill-amber-500 text-amber-500" /> Review</> : <><Star size={11} /> Rate</>}
                               </button>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
-                <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
-              </div>
-
-              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
-                <span>Total Amount Paid:</span>
-                <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="space-y-2 pt-2">
-              {selectedProfileOrder.status === 'pending' && (
-                <button 
-                  onClick={() => handleCancelOrder(selectedProfileOrder.id)}
-                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-                >
-                  <Ban size={15} /> Cancel Order
-                </button>
-              )}
+            <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
+              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
+              <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
+            </div>
+
+            <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
+              <span>Total Amount Paid:</span>
+              <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            {selectedProfileOrder.status === 'pending' && (
               <button 
-                onClick={() => setSelectedProfileOrder(null)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
+                onClick={() => handleCancelOrder(selectedProfileOrder.id)}
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
               >
-                Close
+                <Ban size={15} /> Cancel Order
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {orderHelpTarget && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
-              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                <LifeBuoy size={16} className="text-teal-700" />
-                {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
-              </h3>
-              <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
-            </div>
-
-            <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
-              <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
-                <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">Target Reference</span>
-                <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
-                {orderHelpTarget.item && (
-                  <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Issue Category</label>
-                <select 
-                  value={helpForm.issueType} 
-                  onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
-                >
-                  <option value="Damaged / Defective Item">Damaged / Defective Item</option>
-                  <option value="Missing Item from Package">Missing Item from Package</option>
-                  <option value="Expired / Freshness Issue">Expired / Freshness Issue</option>
-                  <option value="Wrong Item Delivered">Wrong Item Delivered</option>
-                  <option value="Billing / Payment Dispute">Billing / Payment Dispute</option>
-                  <option value="Other Issue">Other Issue</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Describe the Issue</label>
-                <textarea 
-                  rows="3"
-                  placeholder="Explain the issue in detail so our support team can assist..." 
-                  required
-                  value={helpForm.message}
-                  onChange={e => setHelpForm({...helpForm, message: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={submittingHelp}
-                className="w-full bg-teal-700 hover:bg-teal-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-700/20 disabled:opacity-50 cursor-pointer"
-              >
-                {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {reviewModalProduct && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
-              <h3 className="font-black text-sm text-slate-900">
-                {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
-              </h3>
-              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
-            </div>
-
-            <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
-              <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
-                <img 
-                  src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
-                  alt="" 
-                  className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
-                />
-                <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Star Rating</label>
-                <select 
-                  value={newReviewForm.rating} 
-                  onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
-                >
-                  <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
-                  <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
-                  <option value="3">⭐⭐⭐ (3/5 - Average)</option>
-                  <option value="2">⭐⭐ (2/5 - Poor)</option>
-                  <option value="1">⭐ (1/5 - Terrible)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Your Review</label>
-                <textarea 
-                  rows="3"
-                  placeholder="Share details of your experience with this item..." 
-                  required
-                  value={newReviewForm.review_text}
-                  onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
-                />
-              </div>
-
-              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20 cursor-pointer">
-                {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {orderSuccess && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto border border-emerald-200">
-              <CheckCircle size={40} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900">Order Placed!</h2>
-              <p className="text-slate-500 text-xs mt-1">Your quick delivery order <span className="font-mono font-bold text-slate-900">#{orderSuccess}</span> is being packed.</p>
-            </div>
+            )}
             <button 
-              onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
-              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              onClick={() => setSelectedProfileOrder(null)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
             >
-              Track Order Status <ArrowRight size={16} />
+              Close
             </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
-      {/* 2. Product Grid Component */}
-      <ProductGrid 
-        banners={banners}
-        currentSlide={currentSlide}
-        activeFlashSale={activeFlashSale}
-        timeLeft={timeLeft}
-        formatTime={formatTime}
-        categories={categories}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-        loading={loading}
-        products={products}
-        filteredProducts={filteredProducts}
-        currentProducts={currentProducts}
-        totalPages={totalPages}
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        wishlistIds={wishlistIds}
-        toggleWishlist={toggleWishlist}
-        selectedVariants={selectedVariants}
-        setSelectedVariants={setSelectedVariants}
-        cart={cart}
-        addToCart={addToCart}
-        updateQuantity={updateQuantity}
-        onSelectProduct={async (product) => {
-          setSelectedProductDetails(product);
-          setIsDescriptionExpanded(false);
-          const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-          setActiveGalleryImage(pImages[0] || '');
-          await fetchProductReviews(product.id);
-        }}
-      />
+    {orderHelpTarget && (
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
+        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+          <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+            <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <LifeBuoy size={16} className="text-teal-700" />
+              {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
+            </h3>
+            <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+          </div>
 
-      {/* Product Details Modal */}
-      {selectedProductDetails && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
-             
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3 gap-3">
-              <h3 className="font-black text-base md:text-lg text-slate-900 truncate">{selectedProductDetails.name}</h3>
-              <button 
-                onClick={() => { setSelectedProductDetails(null); setIsDescriptionExpanded(false); }} 
-                className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer shrink-0"
-              >
-                <X size={18}/>
-              </button>
+          <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
+            <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
+              <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">Target Reference</span>
+              <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
+              {orderHelpTarget.item && (
+                <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
+              )}
             </div>
 
-            {(() => {
-              const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
-              const currentVariantKey = selectedVariants[selectedProductDetails.id];
-              const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
-              
-              const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
-              const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
-              const hasModalMrp = modalMrp > modalPrice;
-              const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
-              const isModalOutOfStock = modalStock <= 0;
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Issue Category</label>
+              <select 
+                value={helpForm.issueType} 
+                onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
+                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+              >
+                <option value="Damaged / Defective Item">Damaged / Defective Item</option>
+                <option value="Missing Item from Package">Missing Item from Package</option>
+                <option value="Expired / Freshness Issue">Expired / Freshness Issue</option>
+                <option value="Wrong Item Delivered">Wrong Item Delivered</option>
+                <option value="Billing / Payment Dispute">Billing / Payment Dispute</option>
+                <option value="Other Issue">Other Issue</option>
+              </select>
+            </div>
 
-              return (
-                <>
-                  <div className="space-y-3">
-                    <div className="h-60 bg-emerald-50/40 rounded-2xl overflow-hidden flex items-center justify-center border border-emerald-100 relative">
-                      {activeGalleryImage ? (
-                        <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <Package size={48} className="text-emerald-300" />
-                      )}
-                      {isModalOutOfStock && (
-                        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center">
-                          <span className="bg-rose-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow">Sold Out</span>
-                        </div>
-                      )}
-                    </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Describe the Issue</label>
+              <textarea 
+                rows="3"
+                placeholder="Explain the issue in detail so our support team can assist..." 
+                required
+                value={helpForm.message}
+                onChange={e => setHelpForm({...helpForm, message: e.target.value})}
+                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+              />
+            </div>
 
-                    {modalImages.length > 1 && (
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {modalImages.map((imgUrl, i) => (
-                          <button 
-                            key={i} 
-                            onClick={() => setActiveGalleryImage(imgUrl)}
-                            className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-emerald-50/30 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-emerald-100 opacity-70 hover:opacity-100'}`}
-                          >
-                            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            <button 
+              type="submit" 
+              disabled={submittingHelp}
+              className="w-full bg-teal-700 hover:bg-teal-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-700/20 disabled:opacity-50 cursor-pointer"
+            >
+              {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-200">
-                        <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'KD Store'}
-                      </span>
-                      {selectedProductDetails.avgRating && (
-                        <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
-                          <Star size={14} className="fill-amber-500 text-amber-500" />
-                          <span>{selectedProductDetails.avgRating} ({selectedProductDetails.reviewCount})</span>
-                        </div>
-                      )}
-                    </div>
+    {reviewModalProduct && (
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+          <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+            <h3 className="font-black text-sm text-slate-900">
+              {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
+            </h3>
+            <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+          </div>
 
-                    {selectedProductDetails.description ? (
-                      <div className="mt-3 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 space-y-2 text-xs">
-                        <span className="font-black text-slate-700 uppercase tracking-wider block text-[10px]">Product Description</span>
-                        
-                        <div className={`text-slate-600 leading-relaxed overflow-hidden transition-all duration-300 ${
-                          !isDescriptionExpanded ? 'max-h-16 relative after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:bg-gradient-to-t after:from-emerald-50/80 after:to-transparent' : ''
-                        }`}>
-                          <div 
-                            className="[&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mb-1.5 [&>p]:mb-1.5 [&_b]:font-black [&_i]:italic text-xs break-words" 
-                            dangerouslySetInnerHTML={{ __html: selectedProductDetails.description }} 
-                          />
-                        </div>
+          <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
+            <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
+              <img 
+                src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
+                alt="" 
+                className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
+              />
+              <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
+            </div>
 
-                        <button 
-                          type="button"
-                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                          className="text-emerald-700 font-black hover:underline pt-1 flex items-center gap-1 cursor-pointer text-[11px]"
-                        >
-                          {isDescriptionExpanded ? 'Read Less ▲' : 'Read More ▼'}
-                        </button>
-                      </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Star Rating</label>
+              <select 
+                value={newReviewForm.rating} 
+                onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
+                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+              >
+                <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
+                <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
+                <option value="3">⭐⭐⭐ (3/5 - Average)</option>
+                <option value="2">⭐⭐ (2/5 - Poor)</option>
+                <option value="1">⭐ (1/5 - Terrible)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Your Review</label>
+              <textarea 
+                rows="3"
+                placeholder="Share details of your experience with this item..." 
+                required
+                value={newReviewForm.review_text}
+                onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
+                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+              />
+            </div>
+
+            <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20 cursor-pointer">
+              {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {orderSuccess && (
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
+          <div className="w-20 h-20 bg-emerald-50 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto border border-emerald-200">
+            <CheckCircle size={40} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900">Order Placed!</h2>
+            <p className="text-slate-500 text-xs mt-1">Your quick delivery order <span className="font-mono font-bold text-slate-900">#{orderSuccess}</span> is being packed.</p>
+          </div>
+          <button 
+            onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
+            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            Track Order Status <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* 2. Product Grid Component */}
+    <ProductGrid 
+      banners={banners}
+      currentSlide={currentSlide}
+      activeFlashSale={activeFlashSale}
+      timeLeft={timeLeft}
+      formatTime={formatTime}
+      categories={categories}
+      activeCategory={activeCategory}
+      setActiveCategory={setActiveCategory}
+      loading={loading}
+      products={products}
+      filteredProducts={filteredProducts}
+      currentProducts={currentProducts}
+      totalPages={totalPages}
+      currentPage={currentPage}
+      setCurrentPage={setCurrentPage}
+      wishlistIds={wishlistIds}
+      toggleWishlist={toggleWishlist}
+      selectedVariants={selectedVariants}
+      setSelectedVariants={setSelectedVariants}
+      cart={cart}
+      addToCart={addToCart}
+      updateQuantity={updateQuantity}
+      onSelectProduct={async (product) => {
+        setSelectedProductDetails(product);
+        setIsDescriptionExpanded(false);
+        const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+        setActiveGalleryImage(pImages[0] || '');
+        await fetchProductReviews(product.id);
+      }}
+    />
+
+    {/* Product Details Modal */}
+    {selectedProductDetails && (
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans">
+        <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
+           
+          <div className="flex justify-between items-center border-b border-emerald-100 pb-3 gap-3">
+            <h3 className="font-black text-base md:text-lg text-slate-900 truncate">{selectedProductDetails.name}</h3>
+            <button 
+              onClick={() => { setSelectedProductDetails(null); setIsDescriptionExpanded(false); }} 
+              className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer shrink-0"
+            >
+              <X size={18}/>
+            </button>
+          </div>
+
+          {(() => {
+            const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
+            const currentVariantKey = selectedVariants[selectedProductDetails.id];
+            const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
+            
+            const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
+            const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
+            const hasModalMrp = modalMrp > modalPrice;
+            const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
+            const isModalOutOfStock = modalStock <= 0;
+
+            return (
+              <>
+                <div className="space-y-3">
+                  <div className="h-60 bg-emerald-50/40 rounded-2xl overflow-hidden flex items-center justify-center border border-emerald-100 relative">
+                    {activeGalleryImage ? (
+                      <img src={activeGalleryImage} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <p className="text-xs text-slate-400 italic mt-2">No detailed description provided for this fresh item.</p>
+                      <Package size={48} className="text-emerald-300" />
+                    )}
+                    {isModalOutOfStock && (
+                      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center">
+                        <span className="bg-rose-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow">Sold Out</span>
+                      </div>
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-emerald-100 space-y-3">
-                    <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider">Customer Ratings & Reviews</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {productReviews.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">No reviews yet for this product.</p>
-                      ) : (
-                        productReviews.map(rev => (
-                          <div key={rev.id} className="p-3 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-1 text-xs">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-slate-900">{rev.user_email.split('@')[0]}</span>
-                              <div className="flex items-center gap-0.5 text-amber-500">
-                                {[...Array(rev.rating)].map((_, i) => (
-                                  <Star key={i} size={12} className="fill-amber-500" />
-                                ))}
-                              </div>
-                            </div>
-                            <p className="text-slate-600">{rev.review_text}</p>
-                          </div>
-                        ))
-                      )}
+                  {modalImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {modalImages.map((imgUrl, i) => (
+                        <button 
+                          key={i} 
+                          onClick={() => setActiveGalleryImage(imgUrl)}
+                          className={`w-14 h-14 rounded-xl border-2 overflow-hidden shrink-0 transition bg-emerald-50/30 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-emerald-100 opacity-70 hover:opacity-100'}`}
+                        >
+                          <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
                     </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-200">
+                      <Store size={12} /> Sold by: {selectedProductDetails.shopkeeper_profiles?.store_name || 'KD Store'}
+                    </span>
+                    {selectedProductDetails.avgRating && (
+                      <div className="flex items-center gap-1 bg-amber-50 text-amber-800 px-3 py-1 rounded-full text-xs font-black border border-amber-200 shrink-0">
+                        <Star size={14} className="fill-amber-500 text-amber-500" />
+                        <span>{selectedProductDetails.avgRating} ({selectedProductDetails.reviewCount})</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="pt-4 border-t border-emerald-100 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="text-xl font-black text-slate-900">
-                        ₹{modalPrice.toFixed(2)}
-                      </span>
-                      {hasModalMrp && (
-                        <span className="text-xs text-slate-400 line-through ml-2">₹{modalMrp.toFixed(2)}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
+                  {selectedProductDetails.description ? (
+                    <div className="mt-3 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 space-y-2 text-xs">
+                      <span className="font-black text-slate-700 uppercase tracking-wider block text-[10px]">Product Description</span>
+                      
+                      <div className={`text-slate-600 leading-relaxed overflow-hidden transition-all duration-300 ${
+                        !isDescriptionExpanded ? 'max-h-16 relative after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:bg-gradient-to-t after:from-emerald-50/80 after:to-transparent' : ''
+                      }`}>
+                        <div 
+                          className="[&>ul]:list-disc [&>ul]:pl-4 [&>ul]:mb-1.5 [&>p]:mb-1.5 [&_b]:font-black [&_i]:italic text-xs break-words" 
+                          dangerouslySetInnerHTML={{ __html: selectedProductDetails.description }} 
+                        />
+                      </div>
+
                       <button 
                         type="button"
-                        onClick={() => shareOnWhatsApp(selectedProductDetails)}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 p-3 rounded-2xl transition flex items-center justify-center cursor-pointer"
-                        title="Share on WhatsApp"
+                        onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                        className="text-emerald-700 font-black hover:underline pt-1 flex items-center gap-1 cursor-pointer text-[11px]"
                       >
-                        <MessageCircle size={20} />
-                      </button>
-                      <button 
-                        onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); setIsDescriptionExpanded(false); }}
-                        disabled={isModalOutOfStock}
-                        className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition cursor-pointer ${
-                          isModalOutOfStock 
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                            : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-700/20'
-                        }`}
-                      >
-                        {isModalOutOfStock ? 'Sold Out' : 'Add to Cart'}
+                        {isDescriptionExpanded ? 'Read Less ▲' : 'Read More ▼'}
                       </button>
                     </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic mt-2">No detailed description provided for this fresh item.</p>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-emerald-100 space-y-3">
+                  <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider">Customer Ratings & Reviews</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {productReviews.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No reviews yet for this product.</p>
+                    ) : (
+                      productReviews.map(rev => (
+                        <div key={rev.id} className="p-3 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-1 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-900">{rev.user_email.split('@')[0]}</span>
+                            <div className="flex items-center gap-0.5 text-amber-500">
+                              {[...Array(rev.rating)].map((_, i) => (
+                                <Star key={i} size={12} className="fill-amber-500" />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-slate-600">{rev.review_text}</p>
+                        </div>
+                      ))
+                    )}
                   </div>
-                </>
-              );
-            })()}
-          </div>
+                </div>
+
+                <div className="pt-4 border-t border-emerald-100 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xl font-black text-slate-900">
+                      ₹{modalPrice.toFixed(2)}
+                    </span>
+                    {hasModalMrp && (
+                      <span className="text-xs text-slate-400 line-through ml-2">₹{modalMrp.toFixed(2)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => shareOnWhatsApp(selectedProductDetails)}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 p-3 rounded-2xl transition flex items-center justify-center cursor-pointer"
+                      title="Share on WhatsApp"
+                    >
+                      <MessageCircle size={20} />
+                    </button>
+                    <button 
+                      onClick={() => { addToCart(selectedProductDetails); setSelectedProductDetails(null); setIsDescriptionExpanded(false); }}
+                      disabled={isModalOutOfStock}
+                      className={`font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition cursor-pointer ${
+                        isModalOutOfStock 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                          : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-700/20'
+                      }`}
+                    >
+                      {isModalOutOfStock ? 'Sold Out' : 'Add to Cart'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
-      )}
-
-      {/* Floating AI Grocery Concierge Chatbot Widget */}
-      <div className="fixed bottom-24 right-6 z-40">
-        {!isAiChatOpen ? (
-          <button 
-            onClick={() => setIsAiChatOpen(true)}
-            className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
-            title="Ask AI Grocery Assistant"
-          >
-            <Bot size={22} className="animate-bounce" />
-            <span className="hidden sm:inline">AI Assistant</span>
-          </button>
-        ) : (
-          <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
-            <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-                  <Bot size={18} />
-                </div>
-                <div>
-                  <h4 className="font-black text-sm">KD Store AI Concierge</h4>
-                  <p className="text-[10px] text-emerald-300">Ask for recipes or grocery items</p>
-                </div>
-              </div>
-              <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer"><X size={16}/></button>
-            </div>
-
-            <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
-              {aiChatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
-                    msg.sender === 'user' ? 'bg-emerald-700 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
-              <input 
-                type="text" 
-                placeholder="e.g. Add ingredients for tea..." 
-                value={aiInputText}
-                onChange={e => setAiInputText(e.target.value)}
-                className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
-              />
-              <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm">
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        )}
       </div>
+    )}
+
+    {/* Floating AI Grocery Concierge Chatbot Widget */}
+    <div className="fixed bottom-24 right-6 z-40">
+      {!isAiChatOpen ? (
+        <button 
+          onClick={() => setIsAiChatOpen(true)}
+          className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
+          title="Ask AI Grocery Assistant"
+        >
+          <Bot size={22} className="animate-bounce" />
+          <span className="hidden sm:inline">AI Assistant</span>
+        </button>
+      ) : (
+        <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
+          <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                <Bot size={18} />
+              </div>
+              <div>
+                <h4 className="font-black text-sm">KD Store AI Concierge</h4>
+                <p className="text-[10px] text-emerald-300">Ask for recipes or grocery items</p>
+            </div>
+          </div>
+          <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer"><X size={16}/></button>
+        </div>
+
+        <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
+          {aiChatMessages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
+                msg.sender === 'user' ? 'bg-emerald-700 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
+              }`}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
+          <input 
+            type="text" 
+            placeholder="e.g. Add ingredients for tea..." 
+            value={aiInputText}
+            onChange={e => setAiInputText(e.target.value)}
+            className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
+          />
+          <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm">
+            <Send size={16} />
+          </button>
+        </form>
+      </div>
+    )}
+  </div>
 
       {/* Floating Bottom Cart Bar */}
       {totalItemsCount > 0 && !isCartOpen && (
