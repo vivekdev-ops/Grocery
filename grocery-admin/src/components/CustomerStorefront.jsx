@@ -130,48 +130,23 @@ export default function CustomerStorefront() {
     }
     if (!session) { navigate('/login'); return; }
 
-    // Enforce Requirement 2: Cannot place order if cart is empty OR address not added
     if (!cart || cart.length === 0) {
       alert("Your cart is empty. Please add items before placing an order.");
-      return;
-    }
-    if (!addressForm.address || !addressForm.address.trim()) {
-      alert("Please select or add a delivery address before placing an order.");
       return;
     }
 
     setCheckingOut(true);
 
     try {
-      for (const item of cart) {
-        if (item.variant && item.variant.id) {
-          const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variant.id).single();
-          if (!vData || vData.stock < item.quantity) {
-            alert(`Sorry! "${item.title}" is now out of stock.`);
-            setCheckingOut(false);
-            return;
-          }
-        } else {
-          const productId = item?.product?.id || item?.id || item?.product_id;
-          if (productId) {
-            const { data: pData } = await supabase.from('products').select('stock').eq('id', productId).single();
-            if (!pData || pData.stock < item.quantity) {
-              alert(`Sorry! "${item.title || item.name}" is now out of stock.`);
-              setCheckingOut(false);
-              return;
-            }
-          }
-        }
-      }
-
       const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
       const selectedAddrObj = savedAddresses.find(a => a.id === selectedAddressId);
 
+      // 1. Insert the parent order into the 'orders' table
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{
           customer_email: session.user.email,
-          customer_id: session.user.id, // Fixed from user_id to match your orders table schema
+          customer_id: session.user.id,
           total_amount: cartTotal,
           status: 'pending',
           delivery_address: addressForm.address,
@@ -186,18 +161,24 @@ export default function CustomerStorefront() {
 
       if (orderError) throw orderError;
 
-      const orderItemsData = cart.map(item => ({
+      // 2. Insert cart items along with variant details into 'order_items'
+      const itemsToInsert = cart.map(item => ({
         order_id: orderData.id,
         product_id: item?.product?.id || item?.id || item?.product_id,
+        variant_id: item?.variant?.id || null,
+        variant_label: item?.variant?.unit_label || item?.variant?.label || item?.variant_label || null,
         quantity: Number(item?.quantity) || 1,
         price: Number(item?.price) || 0
       })).filter(item => item.product_id);
 
-      if (orderItemsData.length === 0) {
-        throw new Error("No valid items with IDs found in the cart for checkout.");
+      if (itemsToInsert.length === 0) {
+        throw new Error("No valid items found in the cart for checkout.");
       }
 
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(itemsToInsert);
+
       if (itemsError) throw itemsError;
 
       for (const item of cart) {
@@ -814,12 +795,24 @@ export default function CustomerStorefront() {
         }
         return item;
       }).filter(Boolean);
-
-      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-      window.dispatchEvent(new Event('storage'));
+      // Pure updater — no side effects here (StrictMode double-invokes updaters in dev)
       return updatedCart;
     });
+
+    // Side effects run once, outside the updater
+    setTimeout(() => {
+      const currentCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
+      const updatedCart = currentCart.map(item => {
+        const currentKey = item?.cartItemId || item?.id || item?.product_id;
+        if (currentKey === cartItemId) {
+          const newQty = (item.quantity || 1) + delta;
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      }).filter(Boolean);
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+    }, 0);
   };
   
   const handleCancelOrder = async (orderId) => {
@@ -959,19 +952,19 @@ export default function CustomerStorefront() {
     const lat = addrObj.latitude || storeLocation.latitude;
     const lon = addrObj.longitude || storeLocation.longitude;
     const distanceKm = calculateDistanceKm(storeLocation.latitude, storeLocation.longitude, lat, lon);
-    
+     
     setSelectedAddressDistance(distanceKm);
 
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const fee = calculateFee(cartSubtotal, distanceKm);
-    
+     
     setDeliveryFee(fee);
   };
 
   const addToCart = (product) => {
     const variantKey = selectedVariants[product.id];
     const variant = product.variants?.find(v => (v.id === variantKey || v.label === variantKey || v.unit_label === variantKey));
-    
+     
     const stockCheck = Number(variant ? variant.stock : product.stock || 0);
     if (stockCheck <= 0) {
       alert("Sorry, this item is currently out of stock.");
@@ -980,43 +973,62 @@ export default function CustomerStorefront() {
 
     const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
-    
+     
     // Ensure we always take the single unit price
     const itemPrice = Number(variant ? variant.price : product.price || 0);
     const itemStock = stockCheck;
-    
+     
     const productImages = product.images || product.gallery || [product.image_url].filter(Boolean);
     const itemImage = productImages[0] || '';
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
-      let updatedCart;
       if (existing) {
-        updatedCart = prev.map(item => 
-          item.cartItemId === cartItemId 
+        return prev.map(item =>
+          item.cartItemId === cartItemId
             ? { ...item, quantity: Math.min(itemStock, item.quantity + 1) }
             : item
         );
-      } else {
-        updatedCart = [...prev, { 
-          cartItemId, 
-          product, 
-          variant, 
-          id: product.id, 
-          product_id: product.id, 
-          title: itemTitle, 
-          price: itemPrice, // Correct single unit price
-          quantity: 1, 
-          stock: itemStock, 
-          image: itemImage 
-        }];
       }
+      return [...prev, {
+        cartItemId,
+        product,
+        variant,
+        id: product.id,
+        product_id: product.id,
+        title: itemTitle,
+        price: itemPrice,
+        quantity: 1,
+        stock: itemStock,
+        image: itemImage
+      }];
+    });
 
+    // Side effects run once outside the updater (avoids StrictMode double-invoke issues)
+    setTimeout(() => {
+      const currentCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
+      const existing = currentCart.find(item => item.cartItemId === cartItemId);
+      const updatedCart = existing
+        ? currentCart.map(item =>
+            item.cartItemId === cartItemId
+              ? { ...item, quantity: Math.min(itemStock, item.quantity + 1) }
+              : item
+          )
+        : [...currentCart, {
+            cartItemId,
+            product,
+            variant,
+            id: product.id,
+            product_id: product.id,
+            title: itemTitle,
+            price: itemPrice,
+            quantity: 1,
+            stock: itemStock,
+            image: itemImage
+          }];
       localStorage.setItem('cart_items', JSON.stringify(updatedCart));
       window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-      window.dispatchEvent(new Event('storage'));
-      return updatedCart;
-    });
+    }, 0);
   };
 
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -1047,7 +1059,7 @@ export default function CustomerStorefront() {
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
-    
+     
     try {
       const { data, error } = await supabase
         .from('coupons')
@@ -1167,9 +1179,9 @@ export default function CustomerStorefront() {
               {personalizedDeals.map(deal => {
                 const prod = deal.products;
                 if (!prod) return null;
-                
+                 
                 const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-                
+                 
                 const originalPrice = Number(prod.price || prod.mrp || 0);
                 const baseMrp = Number(prod.mrp || originalPrice);
 
@@ -1186,7 +1198,7 @@ export default function CustomerStorefront() {
                   }
                   finalPrice = Math.round(displayMrp * (1 - extractedPercent / 100));
                 }
-                
+                 
                 const productWithDealPrice = { ...prod, price: finalPrice, mrp: displayMrp || originalPrice };
 
                 return (
@@ -1194,7 +1206,7 @@ export default function CustomerStorefront() {
                     <div className="space-y-2">
                       <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
                         <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
-                        
+                         
                         {badgeText && (
                           <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
                             {badgeText}
@@ -1239,7 +1251,7 @@ export default function CustomerStorefront() {
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
                 <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
-            </div>
+              </div>
 
               {/* Edit Profile Section */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
@@ -1294,7 +1306,7 @@ export default function CustomerStorefront() {
                         className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
                       />
                     </div>
-                    
+                     
                     {/* Avatar Selection Grid & URL input */}
                     <div className="space-y-1.5">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Profile Avatar</label>
@@ -1575,7 +1587,7 @@ export default function CustomerStorefront() {
                     {showAddAddressBox && (
                       <form onSubmit={handleAddAddress} className="bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-200 space-y-2.5">
                         <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
-                        
+                         
                         <div className="p-2.5 bg-emerald-50 text-emerald-800 rounded-xl font-bold flex items-center gap-1.5 border border-emerald-200 text-[11px]">
                           <Navigation size={13} className="shrink-0" />
                           <span>{newAddressForm.latitude ? 'GPS Location automatically detected!' : 'Detecting GPS location...'}</span>
@@ -1726,55 +1738,55 @@ export default function CustomerStorefront() {
                                     setNewReviewForm({ rating: hasReviewed.rating, review_text: hasReviewed.review_text });
                                   } else {
                                     setNewReviewForm({ rating: 5, review_text: '' });
-                                }
-                              }}
-                              className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
+                                  }
+                                }}
+                                className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
                                     : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                              }`}
-                            >
+                                }`}
+                              >
                                 {hasReviewed ? <><Star size={11} className="fill-amber-500 text-amber-500" /> Review</> : <><Star size={11} /> Rate</>}
                               </button>
-                          </div>
-                        )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
+                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
+                <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
+              </div>
+
+              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
+                <span>Total Amount Paid:</span>
+                <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
               </div>
             </div>
 
-            <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
-              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
-              <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
-            </div>
-
-            <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
-              <span>Total Amount Paid:</span>
-              <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
-            </div>
-          </div>
-
-          <div className="space-y-2 pt-2">
-            {selectedProfileOrder.status === 'pending' && (
+            <div className="space-y-2 pt-2">
+              {selectedProfileOrder.status === 'pending' && (
+                <button 
+                  onClick={() => handleCancelOrder(selectedProfileOrder.id)}
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <Ban size={15} /> Cancel Order
+                </button>
+              )}
               <button 
-                onClick={() => handleCancelOrder(selectedProfileOrder.id)}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                onClick={() => setSelectedProfileOrder(null)}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
               >
-                <Ban size={15} /> Cancel Order
+                Close
               </button>
-            )}
-            <button 
-              onClick={() => setSelectedProfileOrder(null)}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
-            >
-              Close
-            </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
     {orderHelpTarget && (
       <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
@@ -1963,7 +1975,7 @@ export default function CustomerStorefront() {
             const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
             const currentVariantKey = selectedVariants[selectedProductDetails.id];
             const modalActiveVariant = selectedProductDetails.variants?.find(v => (v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey));
-            
+             
             const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
             const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
             const hasModalMrp = modalMrp > modalPrice;
@@ -2017,7 +2029,7 @@ export default function CustomerStorefront() {
                   {selectedProductDetails.description ? (
                     <div className="mt-3 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 space-y-2 text-xs">
                       <span className="font-black text-slate-700 uppercase tracking-wider block text-[10px]">Product Description</span>
-                      
+                       
                       <div className={`text-slate-600 leading-relaxed overflow-hidden transition-all duration-300 ${
                         !isDescriptionExpanded ? 'max-h-16 relative after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:bg-gradient-to-t after:from-emerald-50/80 after:to-transparent' : ''
                       }`}>

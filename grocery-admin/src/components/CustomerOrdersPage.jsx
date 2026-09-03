@@ -235,63 +235,100 @@ export default function CustomerOrdersPage() {
     }
   };
 
-  const handleReorder = async (order) => {
+  const handleReorder = (order, e) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    
     if (!order.order_items || order.order_items.length === 0) {
       alert('No items found in this order to reorder.');
       return;
     }
 
-    try {
-      const existingCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
-      let addedCount = 0;
+    let addedCount = 0;
+    const existingCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
+    let updatedCart = [...existingCart];
 
-      order.order_items.forEach(item => {
-        const product = item.products;
-        if (product) {
-          // Check if variant info is stored or match it
-          const variantKey = item.variant_id;
-          const matchedVariant = product.variants?.find(v => v.id === variantKey || v.label === variantKey || v.unit_label === variantKey) || null;
-          
-          const cartItemId = matchedVariant ? `${product.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` : product.id;
-          const itemTitle = matchedVariant ? `${product.name} (${matchedVariant.unit_label || matchedVariant.label})` : product.name;
-          const unitPrice = Number(matchedVariant ? matchedVariant.price : product.price) || (Number(item.price) / Number(item.quantity || 1));
+    order.order_items.forEach(item => {
+      const prod = item.products;
+      if (prod) {
+        const variants = prod.variants || [];
+        let matchedVariant = null;
 
-          const existingIndex = existingCart.findIndex(cartItem => cartItem.cartItemId === cartItemId || cartItem.id === product.id);
-          
-          if (existingIndex > -1) {
-            existingCart[existingIndex].quantity = (existingCart[existingIndex].quantity || 1) + (item.quantity || 1);
-          } else {
-            existingCart.push({
-              ...product,
-              cartItemId,
-              variant: matchedVariant,
-              title: itemTitle,
-              price: unitPrice,
-              quantity: item.quantity || 1
-            });
-          }
-          addedCount += (item.quantity || 1);
+        // 1. Try matching by stored variant_id
+        if (item.variant_id) {
+          matchedVariant = variants.find(v => v.id === item.variant_id);
         }
-      });
+        // 2. Try matching by stored variant_label
+        if (!matchedVariant && item.variant_label) {
+          matchedVariant = variants.find(v => v.label === item.variant_label || v.unit_label === item.variant_label);
+        }
+        // 3. Fallback: match by comparing unit price with variant prices
+        if (!matchedVariant && variants.length > 0) {
+          const itemUnitPrice = Number(item.price) / Number(item.quantity || 1);
+          matchedVariant = variants.find(v => Math.abs(Number(v.price) - itemUnitPrice) < 0.01) || variants[0] || null;
+        } else if (!matchedVariant && variants.length === 0 && item.variant_label) {
+          // If variants array is missing/empty on product but label exists, create a dynamic variant object
+          matchedVariant = {
+            id: item.variant_id || 'dyn-var',
+            unit_label: item.variant_label,
+            label: item.variant_label,
+            price: Number(item.price) / Number(item.quantity || 1)
+          };
+        }
 
-      // Save to localStorage
-      localStorage.setItem('cart_items', JSON.stringify(existingCart));
+        // Construct unique cartItemId so different variants remain strictly separated
+        const cartItemId = matchedVariant 
+          ? `${prod.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` 
+          : `${prod.id}-${item.id || 'base'}`;
+        
+        const itemTitle = matchedVariant 
+          ? `${prod.name} (${matchedVariant.unit_label || matchedVariant.label})` 
+          : prod.name;
+        
+        const unitPrice = Number(matchedVariant ? matchedVariant.price : prod.price) || (Number(item.price) / Number(item.quantity || 1));
+        const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+        const itemImage = pImages[0] || '';
 
-      // Dispatch custom event with cart data payload so the store state updates instantly
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: existingCart }));
+        const existingIndex = updatedCart.findIndex(ci => ci.cartItemId === cartItemId);
+        
+        if (existingIndex > -1) {
+          updatedCart[existingIndex] = {
+            ...updatedCart[existingIndex],
+            quantity: updatedCart[existingIndex].quantity + (item.quantity || 1)
+          };
+        } else {
+          updatedCart.push({
+            cartItemId,
+            product: prod,
+            variant: matchedVariant,
+            id: prod.id,
+            product_id: prod.id,
+            title: itemTitle,
+            price: unitPrice,
+            quantity: item.quantity || 1,
+            stock: Number(matchedVariant ? matchedVariant.stock : (prod.stock || 10)),
+            image: itemImage
+          });
+        }
+        addedCount += (item.quantity || 1);
+      }
+    });
+
+    if (addedCount > 0) {
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
       window.dispatchEvent(new Event('storage'));
 
-      alert(`Successfully added ${addedCount} items to your cart!`);
       navigate('/');
-    } catch (err) {
-      console.error('Error reordering items:', err);
-      alert('Failed to add items to cart.');
+    } else {
+      alert("Sorry, items in this order are currently out of stock.");
     }
   };
-
-
-
-  const handleOpenRateModal = (order) => {
+  const handleOpenRateModal = (order, e) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
     setRatingOrder(order);
     setDeliveryRating(5);
     const initialProductRatings = {};
@@ -410,7 +447,7 @@ export default function CustomerOrdersPage() {
         session={session} 
         customerProfile={customerProfile} 
         totalItemsCount={cartCount} 
-        onOpenCart={() => {}} 
+        onOpenCart={() => navigate('/')} 
       />
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
@@ -858,13 +895,13 @@ export default function CustomerOrdersPage() {
                         {/* Reorder and Rate Action Buttons */}
                         <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-100">
                           <button 
-                            onClick={() => handleReorder(order)}
+                            onClick={(e) => handleReorder(order, e)}
                             className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
                           >
                             <RotateCcw size={14} /> Reorder
                           </button>
                           <button 
-                            onClick={() => handleOpenRateModal(order)}
+                            onClick={(e) => handleOpenRateModal(order, e)}
                             className="w-full bg-stone-50 hover:bg-stone-100 text-stone-700 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border border-stone-200"
                           >
                             <Star size={14} className="text-amber-500 fill-amber-400" /> Rate order
@@ -880,28 +917,28 @@ export default function CustomerOrdersPage() {
               <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
                 
                 {/* Back button & Title */}
-<div className="flex items-center justify-between border-b border-stone-100 pb-4">
-  <button 
-    onClick={() => setSelectedOrder(null)}
-    className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition cursor-pointer text-stone-700"
-  >
-    <ArrowLeft size={18} />
-  </button>
-  <div className="text-right">
-    {(selectedOrder.status === 'delivered' || selectedOrder.status === 'arrived') ? (
-      <button 
-        onClick={() => setSelectedInvoiceOrder(selectedOrder)}
-        className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
-      >
-        <Download size={14} /> Invoice
-      </button>
-    ) : (
-      <span className="text-[11px] font-bold text-stone-400 italic">
-        Invoice available after delivery
-      </span>
-    )}
-  </div>
-</div>
+                <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                  <button 
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition cursor-pointer text-stone-700"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <div className="text-right">
+                    {(selectedOrder.status === 'delivered' || selectedOrder.status === 'arrived') ? (
+                      <button 
+                        onClick={() => setSelectedInvoiceOrder(selectedOrder)}
+                        className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
+                      >
+                        <Download size={14} /> Invoice
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-bold text-stone-400 italic">
+                        Invoice available after delivery
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 {/* Arrived status & time */}
                 <div>
@@ -916,29 +953,28 @@ export default function CustomerOrdersPage() {
                   <p className="font-black text-xs text-stone-900 uppercase tracking-wider">{selectedOrder.order_items?.length || 0} items in this order</p>
                   <div className="space-y-3 divide-y divide-stone-100">
                     {selectedOrder.order_items?.map(item => {
-  const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
-  const variantLabel = item.variant_label || item.variant?.unit_label || item.variant?.label || '';
-  
-  return (
-    <div key={item.id} className="pt-3 flex items-center justify-between gap-4 first:pt-0">
-      <div className="flex items-center gap-3.5 min-w-0">
-        <div className="w-14 h-14 rounded-2xl border border-stone-200 bg-stone-50 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-          <img src={img} alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-bold text-slate-900 text-xs truncate">{item.products?.name || 'Product Item'}</p>
-          {variantLabel && (
-            <span className="inline-block mt-0.5 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md">
-              {variantLabel}
-            </span>
-          )}
-          <p className="text-[11px] text-stone-500 mt-0.5">Qty: {item.quantity}</p>
-        </div>
-      </div>
-      <span className="font-black text-slate-900 text-xs shrink-0">₹{item.price * item.quantity}</span>
-    </div>
-  );
-
+                      const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
+                      const variantLabel = item.variant_label || item.variant?.unit_label || item.variant?.label || '';
+                      
+                      return (
+                        <div key={item.id} className="pt-3 flex items-center justify-between gap-4 first:pt-0">
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="w-14 h-14 rounded-2xl border border-stone-200 bg-stone-50 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                              <img src={img} alt="" className="w-full h-full object-contain" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 text-xs truncate">{item.products?.name || 'Product Item'}</p>
+                              {variantLabel && (
+                                <span className="inline-block mt-0.5 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md">
+                                  {variantLabel}
+                                </span>
+                              )}
+                              <p className="text-[11px] text-stone-500 mt-0.5">Qty: {item.quantity}</p>
+                            </div>
+                          </div>
+                          <span className="font-black text-slate-900 text-xs shrink-0">₹{item.price * item.quantity}</span>
+                        </div>
+                      );
                     })}
                   </div>
                 </div>
