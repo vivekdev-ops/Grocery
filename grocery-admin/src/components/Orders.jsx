@@ -2,6 +2,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Package, Search, Truck, ExternalLink, Navigation, UserCheck, ShieldAlert, CheckCircle2, Clock, Tag, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  notifyCustomerOrderStatus,
+  notifyDeliveryAgentAssigned,
+  notifyDeliveryAgentsNewOrder,
+} from '../utils/notifications';
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -58,20 +63,36 @@ export default function Orders() {
     if (remark) updatePayload.cancellation_remark = remark;
 
     const { error } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
-    if (error) alert("Failed to update status: " + error.message);
-    else {
-      alert("Status updated successfully!");
-      fetchOrders();
+    if (error) { alert("Failed to update status: " + error.message); return; }
+
+    // Fire notifications after successful DB update
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      // Notify customer about every status change
+      notifyCustomerOrderStatus({ ...order, ...updatePayload }, newStatus, remark);
+      // When moved to 'processing', alert all delivery agents a new order is available
+      if (newStatus === 'processing') {
+        notifyDeliveryAgentsNewOrder(order);
+      }
     }
+
+    alert("Status updated successfully!");
+    fetchOrders();
   };
 
   const assignAgent = async (orderId, agentId) => {
     const { error } = await supabase.from('orders').update({ delivery_agent_id: agentId || null }).eq('id', orderId);
-    if (error) alert("Failed to assign agent: " + error.message);
-    else {
-      alert("Delivery partner assigned!");
-      fetchOrders();
+    if (error) { alert("Failed to assign agent: " + error.message); return; }
+
+    // Notify the assigned delivery agent
+    if (agentId) {
+      const order = orders.find(o => o.id === orderId);
+      const agent = deliveryBoys.find(b => b.id === agentId || b.user_id === agentId);
+      if (order) notifyDeliveryAgentAssigned(order, agent?.user_id || agentId);
     }
+
+    alert("Delivery partner assigned!");
+    fetchOrders();
   };
 
   const filteredOrders = orders.filter(order => {

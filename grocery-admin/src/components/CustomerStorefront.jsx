@@ -12,6 +12,7 @@ import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
+import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
 import { Geolocation } from '@capacitor/geolocation';
 import CustomerProfileModal from './store/CustomerProfileModal';
 
@@ -204,6 +205,20 @@ export default function CustomerStorefront() {
       setDiscountAmount(0);
       fetchStoreData();
       fetchMyOrders(session.user.email);
+
+      // ── Notify admin & shopkeepers about the new order ──
+      notifyAdminOrderPlaced(orderData);
+      // Collect unique shopkeeper user_ids from cart items
+      const shopkeeperIds = [
+        ...new Set(
+          cart
+            .map(item => item?.product?.shopkeeper_id || item?.shopkeeper_id)
+            .filter(Boolean)
+        ),
+      ];
+      if (shopkeeperIds.length > 0) {
+        notifyShopkeeperOrderPlaced(orderData, shopkeeperIds);
+      }
     } catch (err) {
       alert(`Checkout failed: ${err.message}`);
     } finally {
@@ -264,6 +279,7 @@ export default function CustomerStorefront() {
         fetchWishlist(session.user.id);
         fetchUserReviews(session.user.id);
         fetchCustomerProfile(session.user.id);
+        registerPushToken(session.user.id, 'customer');
       }
     });
 
@@ -820,7 +836,7 @@ export default function CustomerStorefront() {
 
     const { error } = await supabase
       .from('orders')
-      .update({ 
+      .update({
         status: 'cancelled',
         cancellation_remark: 'Cancelled by customer'
       })
@@ -831,6 +847,9 @@ export default function CustomerStorefront() {
       setSelectedProfileOrder(null);
       if (session) fetchMyOrders(session.user.email);
       fetchStoreData();
+      // Notify admin that the customer cancelled (customer themselves already knows)
+      const order = myOrders.find(o => o.id === orderId);
+      if (order) notifyCustomerOrderStatus(order, 'cancelled', 'Cancelled by customer');
     } else {
       alert("Failed to cancel order: " + error.message);
     }

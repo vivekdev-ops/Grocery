@@ -6,10 +6,12 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck,
   Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare,
   PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, TrendingUp,
-  Sparkles, Bell, Search, Moon, Sun
+  Sparkles, Search, Moon, Sun
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import NotificationBell from './components/NotificationBell';
+import { registerPushToken, registerAdminUser } from './utils/notifications';
 import ForgotPassword from './components/ForgotPassword';
 import UpdatePassword from './components/UpdatePassword';
 import CustomerProfile from './components/CustomerProfile';
@@ -105,8 +107,18 @@ function AdminLayout() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      if (session) {
+        registerPushToken(session.user.id, 'admin');
+        registerAdminUser(session.user.id); // registers this user as an admin recipient
+      }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      if (s) {
+        registerPushToken(s.user.id, 'admin');
+        registerAdminUser(s.user.id);
+      }
+    });
     fetchBadgeCounts();
     return () => subscription.unsubscribe();
   }, []);
@@ -361,15 +373,8 @@ function AdminLayout() {
             <h2 className="text-sm font-black text-stone-800">{activeLabel}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Notification bell */}
-            <div className="relative">
-              <button className="p-2 hover:bg-stone-100 rounded-xl text-stone-400 hover:text-stone-700 transition-colors cursor-pointer">
-                <Bell size={16} />
-              </button>
-              {(pendingOrdersCount + pendingComplaintsCount) > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white animate-badge-pop" />
-              )}
-            </div>
+            {/* Real-time notification bell */}
+            <NotificationBell session={session} size={16} />
             {/* Avatar */}
             <div className="w-7 h-7 bg-gradient-to-br from-brand-400 to-brand-600 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-sm">
               {session.user.email?.[0]?.toUpperCase() ?? 'A'}

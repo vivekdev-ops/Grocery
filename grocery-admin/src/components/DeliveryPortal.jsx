@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { registerPushToken, notifyCustomerOrderStatus, notifyAdminDeliveryUpdate } from '../utils/notifications';
+import NotificationBell from './NotificationBell';
 
 /* ─────────────────────────────────────────────
    COMMISSION HELPER  (logic unchanged)
@@ -161,13 +163,17 @@ export default function DeliveryPortal() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchStaffProfileAndDependencies(session.user);
-      else setLoading(false);
+      if (session) {
+        fetchStaffProfileAndDependencies(session.user);
+        registerPushToken(session.user.id, 'delivery');
+      } else setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setSession(session);
-      if (session) fetchStaffProfileAndDependencies(session.user);
-      else setLoading(false);
+      if (session) {
+        fetchStaffProfileAndDependencies(session.user);
+        registerPushToken(session.user.id, 'delivery');
+      } else setLoading(false);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -245,8 +251,18 @@ export default function DeliveryPortal() {
     const payload = { status: newStatus };
     if (newStatus === 'accepted' && session) payload.delivery_agent_id = staffProfile ? staffProfile.id : session.user.id;
     const { error } = await supabase.from('orders').update(payload).eq('id', orderId);
-    if (!error) { fetchDeliveryOrders(); setSelectedOrderDetails(null); }
-    else alert('Failed to update status: ' + error.message);
+    if (error) { alert('Failed to update status: ' + error.message); return; }
+
+    // Notify customer + admin after every status transition
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      const agentName = staffProfile?.full_name || staffProfile?.name || session?.user?.email || 'Rider';
+      notifyCustomerOrderStatus({ ...order, ...payload }, newStatus);
+      notifyAdminDeliveryUpdate(order, newStatus, agentName);
+    }
+
+    fetchDeliveryOrders();
+    setSelectedOrderDetails(null);
   };
 
   const handleVerifyAndDeliver = async (e) => {
@@ -254,8 +270,17 @@ export default function DeliveryPortal() {
     if (!verifyingOrder) return;
     if (enteredOtp.trim() !== verifyingOrder.otp) { alert('Incorrect OTP. Please check and try again.'); return; }
     const { error } = await supabase.from('orders').update({ status: 'delivered' }).eq('id', verifyingOrder.id);
-    if (!error) { alert('Order delivered and verified!'); setVerifyingOrder(null); setEnteredOtp(''); fetchDeliveryOrders(); }
-    else alert('Failed to update status: ' + error.message);
+    if (error) { alert('Failed to update status: ' + error.message); return; }
+
+    // Notify customer delivery is complete + notify admin
+    const agentName = staffProfile?.full_name || staffProfile?.name || session?.user?.email || 'Rider';
+    notifyCustomerOrderStatus(verifyingOrder, 'delivered');
+    notifyAdminDeliveryUpdate(verifyingOrder, 'delivered', agentName);
+
+    alert('Order delivered and verified!');
+    setVerifyingOrder(null);
+    setEnteredOtp('');
+    fetchDeliveryOrders();
   };
 
   const availableOrders  = orders.filter(o => o.status === 'processing' && !o.delivery_agent_id);
@@ -450,10 +475,13 @@ export default function DeliveryPortal() {
               );
             })}
           </div>
-          {/* Print */}
-          <button onClick={() => window.print()} className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-bold text-[10px] transition cursor-pointer">
-            <Printer size={12} /> Print PDF
-          </button>
+          {/* Print + Notification bell */}
+          <div className="flex items-center gap-2">
+            <NotificationBell session={session} size={15} />
+            <button onClick={() => window.print()} className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-bold text-[10px] transition cursor-pointer">
+              <Printer size={12} /> Print PDF
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">

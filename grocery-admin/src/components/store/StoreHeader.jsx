@@ -4,6 +4,7 @@ import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, Mic
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
+import NotificationBell from '../NotificationBell';
 
 export default function StoreHeader({
   session, customerProfile, searchQuery, setSearchQuery,
@@ -290,6 +291,9 @@ export default function StoreHeader({
                 Login
               </Link>
             )}
+
+            {/* Notification bell — shown when logged in */}
+            {session && <NotificationBell session={session} size={16} />}
 
             {/* Cart button */}
             <motion.button

@@ -1,8 +1,10 @@
 // src/components/ShopkeeperPortal.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter } from 'lucide-react';
+import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { registerPushToken } from '../utils/notifications';
+import NotificationBell from './NotificationBell';
 
 // Replace your existing getApplicableCommissionPct in ShopkeeperPortal.jsx with this:
 const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
@@ -69,6 +71,7 @@ export default function ShopkeeperPortal() {
       setSession(session);
       if (session) {
         fetchOrCreateShopkeeperProfile(session.user);
+        registerPushToken(session.user.id, 'shopkeeper');
       } else {
         setLoading(false);
       }
@@ -78,6 +81,7 @@ export default function ShopkeeperPortal() {
       setSession(session);
       if (session) {
         fetchOrCreateShopkeeperProfile(session.user);
+        registerPushToken(session.user.id, 'shopkeeper');
       } else {
         setLoading(false);
       }
@@ -313,9 +317,12 @@ export default function ShopkeeperPortal() {
       
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-xs print:hidden">
-        <div className="p-6 border-b border-stone-200">
-          <h1 className="text-sm font-black text-emerald-700 truncate">{shopkeeperProfile?.store_name || 'My Store'}</h1>
-          <p className="text-[10px] text-stone-400 truncate mt-0.5">{session.user.email}</p>
+        <div className="p-6 border-b border-stone-200 flex items-center justify-between">
+          <div className="min-w-0">
+            <h1 className="text-sm font-black text-emerald-700 truncate">{shopkeeperProfile?.store_name || 'My Store'}</h1>
+            <p className="text-[10px] text-stone-400 truncate mt-0.5">{session.user.email}</p>
+          </div>
+          <NotificationBell session={session} size={15} />
         </div>
         
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
