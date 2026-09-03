@@ -51,6 +51,7 @@ export default function CustomerStorefront() {
   // Profile Collapsible Accordion & Detail States
   const [openSection, setOpenSection] = useState(null);
   const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
+  const [orderTab, setOrderTab] = useState('active'); // 'active' | 'delivered' | 'cancelled'
   const [deliveredProductIds, setDeliveredProductIds] = useState([]);
   const [userReviewsMap, setUserReviewsMap] = useState({});
 
@@ -1047,7 +1048,7 @@ export default function CustomerStorefront() {
 
   return (
     <div className="min-h-screen bg-[#F0FDF4] text-slate-900 pb-44 font-sans selection:bg-emerald-500 selection:text-white">
-      
+       
       {/* 1. Header Component (Includes KD Store Logo & Brand Name) */}
      {/* 1. Header Component */}
 <StoreHeader 
@@ -1279,6 +1280,7 @@ export default function CustomerStorefront() {
                 </div>
               )}
 
+              {/* My Orders Section - Blinkit Tabbed Quick-Commerce Style */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
@@ -1290,69 +1292,132 @@ export default function CustomerStorefront() {
                   {openSection === 'orders' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
 
-                {openSection === 'orders' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
-                    {myOrders.length === 0 ? (
-                      <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
-                    ) : (
-                      myOrders.map(order => {
-                        const complaintTicket = myComplaintsMap[order.id];
+                {openSection === 'orders' && (() => {
+                  const activeOrders = myOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+                  const deliveredOrders = myOrders.filter(o => o.status === 'delivered');
+                  const cancelledOrders = myOrders.filter(o => o.status === 'cancelled');
 
-                        return (
-                          <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
-                              <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
-                                order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                                order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                              }`}>{order.status}</span>
-                            </div>
-                            
-                            {complaintTicket && (
-                              <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border ${
-                                complaintTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
-                              }`}>
-                                <span className="flex items-center gap-1">
-                                  <LifeBuoy size={12} /> Complaint Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong>
-                                </span>
-                                <span className="font-mono text-[9px]">Ticket Active</span>
-                              </div>
+                  const renderOrderCard = (order) => {
+                    const complaintTicket = myComplaintsMap[order.id];
+
+                    return (
+                      <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
+                          <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                            order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                            order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                          }`}>{order.status}</span>
+                        </div>
+                         
+                        {complaintTicket && (
+                          <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border ${
+                            complaintTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}>
+                            <span className="flex items-center gap-1">
+                              <LifeBuoy size={12} /> Complaint Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong>
+                            </span>
+                            <span className="font-mono text-[9px]">Ticket Active</span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-slate-500">
+                          <span>{new Date(order.created_at).toLocaleDateString()}</span>
+                          <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
+                        </div>
+                        <div className="flex gap-2 pt-1 flex-wrap">
+                          <button 
+                            onClick={() => setSelectedProfileOrder(order)}
+                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200 cursor-pointer"
+                          >
+                            <FileText size={13} /> Details
+                          </button>
+                          {order.status === 'delivered' && (
+                            <button 
+                              onClick={() => handleReorder(order)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <RotateCcw size={13} /> Reorder
+                            </button>
+                          )}
+                          {order.status === 'delivered' && (
+                            <button 
+                              onClick={() => setSelectedInvoiceOrder(order)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200 cursor-pointer"
+                            >
+                              Bill
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100 text-xs">
+                      {myOrders.length === 0 ? (
+                        <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
+                      ) : (
+                        <>
+                          {/* Blinkit Tab Bar */}
+                          <div className="flex gap-1 bg-emerald-50/70 p-1 rounded-2xl border border-emerald-100 mt-2">
+                            <button
+                              onClick={() => setOrderTab('active')}
+                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                                orderTab === 'active' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              Active ({activeOrders.length})
+                            </button>
+                            <button
+                              onClick={() => setOrderTab('delivered')}
+                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                                orderTab === 'delivered' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              Delivered ({deliveredOrders.length})
+                            </button>
+                            <button
+                              onClick={() => setOrderTab('cancelled')}
+                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                                orderTab === 'cancelled' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              Cancelled ({cancelledOrders.length})
+                            </button>
+                          </div>
+
+                          {/* Tab Content Panels */}
+                          <div className="space-y-2.5 pt-1">
+                            {orderTab === 'active' && (
+                              activeOrders.length === 0 ? (
+                                <p className="text-slate-400 italic py-4 text-center">No active or ongoing orders.</p>
+                              ) : (
+                                activeOrders.map(order => renderOrderCard(order))
+                              )
                             )}
 
-                            <div className="flex justify-between items-center text-slate-500">
-                              <span>{new Date(order.created_at).toLocaleDateString()}</span>
-                              <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
-                            </div>
-                            <div className="flex gap-2 pt-1 flex-wrap">
-                              <button 
-                                onClick={() => setSelectedProfileOrder(order)}
-                                className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200 cursor-pointer"
-                              >
-                                <FileText size={13} /> Details
-                              </button>
-                              {order.status === 'delivered' && (
-                                <button 
-                                  onClick={() => handleReorder(order)}
-                                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs cursor-pointer"
-                                >
-                                  <RotateCcw size={13} /> Reorder
-                                </button>
-                              )}
-                              {order.status === 'delivered' && (
-                                <button 
-                                  onClick={() => setSelectedInvoiceOrder(order)}
-                                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200 cursor-pointer"
-                                >
-                                  Bill
-                                </button>
-                              )}
-                            </div>
+                            {orderTab === 'delivered' && (
+                              deliveredOrders.length === 0 ? (
+                                <p className="text-slate-400 italic py-4 text-center">No delivered orders history.</p>
+                              ) : (
+                                deliveredOrders.map(order => renderOrderCard(order))
+                              )
+                            )}
+
+                            {orderTab === 'cancelled' && (
+                              cancelledOrders.length === 0 ? (
+                                <p className="text-slate-400 italic py-4 text-center">No cancelled orders.</p>
+                              ) : (
+                                cancelledOrders.map(order => renderOrderCard(order))
+                              )
+                            )}
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
@@ -1469,8 +1534,10 @@ export default function CustomerStorefront() {
           </div>
         </div>
       )}
+
+      {/* Order Details Modal (Isolated with high z-[1000] layer to prevent background bleeding) */}
       {selectedProfileOrder && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fadeIn font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
@@ -1790,7 +1857,7 @@ export default function CustomerStorefront() {
       {selectedProductDetails && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-sans">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
-            
+             
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3 gap-3">
               <h3 className="font-black text-base md:text-lg text-slate-900 truncate">{selectedProductDetails.name}</h3>
               <button 
