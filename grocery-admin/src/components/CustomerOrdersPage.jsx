@@ -248,13 +248,25 @@ export default function CustomerOrdersPage() {
       order.order_items.forEach(item => {
         const product = item.products;
         if (product) {
-          const existingIndex = existingCart.findIndex(cartItem => (cartItem.id === product.id || cartItem.product_id === product.id));
+          // Check if variant info is stored or match it
+          const variantKey = item.variant_id;
+          const matchedVariant = product.variants?.find(v => v.id === variantKey || v.label === variantKey || v.unit_label === variantKey) || null;
+          
+          const cartItemId = matchedVariant ? `${product.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` : product.id;
+          const itemTitle = matchedVariant ? `${product.name} (${matchedVariant.unit_label || matchedVariant.label})` : product.name;
+          const unitPrice = Number(matchedVariant ? matchedVariant.price : product.price) || (Number(item.price) / Number(item.quantity || 1));
+
+          const existingIndex = existingCart.findIndex(cartItem => cartItem.cartItemId === cartItemId || cartItem.id === product.id);
           
           if (existingIndex > -1) {
             existingCart[existingIndex].quantity = (existingCart[existingIndex].quantity || 1) + (item.quantity || 1);
           } else {
             existingCart.push({
               ...product,
+              cartItemId,
+              variant: matchedVariant,
+              title: itemTitle,
+              price: unitPrice,
               quantity: item.quantity || 1
             });
           }
@@ -276,6 +288,8 @@ export default function CustomerOrdersPage() {
       alert('Failed to add items to cart.');
     }
   };
+
+
 
   const handleOpenRateModal = (order) => {
     setRatingOrder(order);
@@ -902,21 +916,29 @@ export default function CustomerOrdersPage() {
                   <p className="font-black text-xs text-stone-900 uppercase tracking-wider">{selectedOrder.order_items?.length || 0} items in this order</p>
                   <div className="space-y-3 divide-y divide-stone-100">
                     {selectedOrder.order_items?.map(item => {
-                      const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
-                      return (
-                        <div key={item.id} className="pt-3 flex items-center justify-between gap-4 first:pt-0">
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-14 h-14 rounded-2xl border border-stone-200 bg-stone-50 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                              <img src={img} alt="" className="w-full h-full object-contain" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 text-xs truncate">{item.products?.name || 'Product Item'}</p>
-                              <p className="text-[11px] text-stone-500 mt-0.5">Qty: {item.quantity}</p>
-                            </div>
-                          </div>
-                          <span className="font-black text-slate-900 text-xs shrink-0">₹{item.price * item.quantity}</span>
-                        </div>
-                      );
+  const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
+  const variantLabel = item.variant_label || item.variant?.unit_label || item.variant?.label || '';
+  
+  return (
+    <div key={item.id} className="pt-3 flex items-center justify-between gap-4 first:pt-0">
+      <div className="flex items-center gap-3.5 min-w-0">
+        <div className="w-14 h-14 rounded-2xl border border-stone-200 bg-stone-50 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+          <img src={img} alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-bold text-slate-900 text-xs truncate">{item.products?.name || 'Product Item'}</p>
+          {variantLabel && (
+            <span className="inline-block mt-0.5 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md">
+              {variantLabel}
+            </span>
+          )}
+          <p className="text-[11px] text-stone-500 mt-0.5">Qty: {item.quantity}</p>
+        </div>
+      </div>
+      <span className="font-black text-slate-900 text-xs shrink-0">₹{item.price * item.quantity}</span>
+    </div>
+  );
+
                     })}
                   </div>
                 </div>

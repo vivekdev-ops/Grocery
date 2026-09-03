@@ -90,7 +90,7 @@ export default function CartDrawer({
   const amountNeeded = Math.max(0, freeDeliveryThreshold - cartSubtotal);
   const progressPct = Math.min(100, (cartSubtotal / freeDeliveryThreshold) * 100);
 
-  const isCartEmpty       = !cart || cart.length === 0;
+  const isCartEmpty       = cart.length === 0;
   const isAddressMissing = savedAddresses.length === 0 || !selectedAddressId;
   const isCheckoutDisabled = checkingOut || isCartEmpty || isAddressMissing;
 
@@ -179,49 +179,55 @@ export default function CartDrawer({
                   ) : (
                     <div className="space-y-2">
                       {cart.map(item => {
-                        const uniqueKey = item?.cartItemId || item?.id || item?.product_id;
-                        const itemImage = item?.image || item?.image_url || (item?.images && item.images[0]);
-                        const itemTitle = item?.title || item?.name || 'Product Item';
-                        const itemPrice = Number(item?.price || 0);
+  const uniqueKey = item?.cartItemId || item?.id || item?.product_id;
+  const itemImage = item?.image || item?.image_url || (item?.images && item.images[0]) || '';
+  const itemTitle = item?.title || item?.name || 'Product Item';
+  const itemPrice = Number(item?.price || 0);
+  const variantLabel = item?.variant?.unit_label || item?.variant?.label || '';
 
-                        if (!uniqueKey) return null;
+  if (!uniqueKey) return null;
 
-                        return (
-                          <motion.div
-                            key={uniqueKey}
-                            layout
-                            initial={{ opacity: 0, x: 16 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -16 }}
-                            transition={{ duration: 0.22 }}
-                            className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-100 shadow-xs"
-                          >
-                            {itemImage ? (
-                              <img src={itemImage} alt={itemTitle} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-100" />
-                            ) : (
-                              <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-                                <ShoppingCart size={16} className="text-brand-300" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-[11px] text-stone-900 truncate leading-tight">{itemTitle}</p>
-                              <p className="text-[10px] text-stone-400 mt-0.5">₹{itemPrice.toFixed(2)} each</p>
-                            </div>
-                            <div className="flex items-center gap-1 bg-stone-100 rounded-xl p-0.5 shrink-0">
-                              <button onClick={() => updateQuantity(uniqueKey, -1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
-                                <Minus size={11} />
-                              </button>
-                              <span className="text-xs font-black w-5 text-center text-stone-900">{item?.quantity || 1}</span>
-                              <button onClick={() => updateQuantity(uniqueKey, 1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
-                                <Plus size={11} />
-                              </button>
-                            </div>
-                            <span className="text-xs font-black text-brand-700 shrink-0 w-14 text-right">
-                              ₹{(itemPrice * (item?.quantity || 1)).toFixed(0)}
-                            </span>
-                          </motion.div>
-                        );
-                      })}
+  return (
+    <motion.div
+      key={uniqueKey}
+      layout
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -16 }}
+      transition={{ duration: 0.22 }}
+      className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-100 shadow-xs"
+    >
+      {itemImage ? (
+        <img src={itemImage} alt={itemTitle} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-100" />
+      ) : (
+        <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+          <ShoppingCart size={16} className="text-brand-300" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-[11px] text-stone-900 truncate leading-tight">{itemTitle}</p>
+        {variantLabel && (
+          <span className="inline-block mt-0.5 text-[9px] font-extrabold text-brand-700 bg-brand-50 px-1.5 py-0.2 rounded-md">
+            {variantLabel}
+          </span>
+        )}
+        <p className="text-[10px] text-stone-400 mt-0.5">₹{itemPrice.toFixed(2)} each</p>
+      </div>
+      <div className="flex items-center gap-1 bg-stone-100 rounded-xl p-0.5 shrink-0">
+        <button onClick={() => updateQuantity(uniqueKey, -1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
+          <Minus size={11} />
+        </button>
+        <span className="text-xs font-black w-5 text-center text-stone-900">{item?.quantity || 1}</span>
+        <button onClick={() => updateQuantity(uniqueKey, 1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
+          <Plus size={11} />
+        </button>
+      </div>
+      <span className="text-xs font-black text-brand-700 shrink-0 w-14 text-right">
+        ₹{(itemPrice * (item?.quantity || 1)).toFixed(0)}
+      </span>
+    </motion.div>
+  );
+})}
                     </div>
                   )}
                 </div>
@@ -266,20 +272,20 @@ export default function CartDrawer({
                               </div>
                               <input type="text" placeholder="Title (Home / Work)" required
                                 className="w-full border border-stone-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 p-2.5 rounded-xl bg-white text-stone-900 outline-none transition"
-                                value={newAddressForm?.title || ''} onChange={e => setNewAddressForm({ ...newAddressForm, title: e.target.value })} />
+                                value={newAddressForm.title} onChange={e => setNewAddressForm({ ...newAddressForm, title: e.target.value })} />
                               <button type="button" onClick={detectCustomerLocation}
                                 className="w-full bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-800 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer transition">
                                 <MapPin size={13} /> Detect GPS Location
                               </button>
                               <input type="text" placeholder="House No." required
                                 className="w-full border border-stone-200 focus:border-brand-500 p-2.5 rounded-xl bg-white text-stone-900 outline-none transition"
-                                value={newAddressForm?.house_no || ''} onChange={e => setNewAddressForm({ ...newAddressForm, house_no: e.target.value })} />
+                                value={newAddressForm.house_no} onChange={e => setNewAddressForm({ ...newAddressForm, house_no: e.target.value })} />
                               <input type="text" placeholder="Ward / Colony Name" required
                                 className="w-full border border-stone-200 focus:border-brand-500 p-2.5 rounded-xl bg-white text-stone-900 outline-none transition"
-                                value={newAddressForm?.ward_no_name || ''} onChange={e => setNewAddressForm({ ...newAddressForm, ward_no_name: e.target.value })} />
+                                value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({ ...newAddressForm, ward_no_name: e.target.value })} />
                               <input type="tel" placeholder="Phone Number" required
                                 className="w-full border border-stone-200 focus:border-brand-500 p-2.5 rounded-xl bg-white text-stone-900 outline-none transition"
-                                value={newAddressForm?.phone || ''} onChange={e => setNewAddressForm({ ...newAddressForm, phone: e.target.value })} />
+                                value={newAddressForm.phone} onChange={e => setNewAddressForm({ ...newAddressForm, phone: e.target.value })} />
                               <button type="submit" className="w-full bg-brand-700 hover:bg-brand-800 text-white py-2.5 rounded-xl font-black cursor-pointer transition btn-press">
                                 Save Address
                               </button>
@@ -321,7 +327,7 @@ export default function CartDrawer({
                                 <input
                                   type="text" placeholder="Enter coupon code"
                                   className="flex-1 border border-stone-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 p-2.5 rounded-xl text-xs font-black uppercase outline-none bg-stone-50 text-stone-900 transition"
-                                  value={couponInput || ''} onChange={e => setCouponInput(e.target.value)}
+                                  value={couponInput} onChange={e => setCouponInput(e.target.value)}
                                 />
                                 <button onClick={handleApplyCoupon}
                                   className="bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 rounded-xl text-xs font-black cursor-pointer transition btn-press">

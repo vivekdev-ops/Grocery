@@ -6,14 +6,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 /* ─────────────────────────────────────────────
    SHARED PRODUCT CARD
 ───────────────────────────────────────────── */
-function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, addToCart, onSelectProduct, compact = false }) {
+function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, addToCart, onSelectProduct, compact = false }) {
   const [addedFlash, setAddedFlash] = useState(false);
 
   const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-  const currentVariantKey = selectedVariants?.[product.id];
-  const activeVariant = product.variants?.find(
+  const variants = product.variants || [];
+  const hasVariants = variants.length > 0;
+
+  const currentVariantKey = selectedVariants?.[product.id] || (hasVariants ? (variants[0].id || variants[0].label || variants[0].unit_label) : null);
+  const activeVariant = variants.find(
     v => v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey
-  );
+  ) || variants[0];
 
   const price      = Number(activeVariant ? activeVariant.price : product.price || 0);
   const mrp        = Number(activeVariant?.mrp || product.mrp || 0);
@@ -22,6 +25,15 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, a
   const stock      = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
   const isWishlisted = wishlistIds?.includes(product.id);
+
+  const handleVariantChange = (e) => {
+    e.stopPropagation();
+    const val = e.target.value;
+    setSelectedVariants(prev => ({
+      ...prev,
+      [product.id]: val
+    }));
+  };
 
   const handleAdd = (e) => {
     e.stopPropagation();
@@ -95,9 +107,32 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, a
       {/* Info */}
       <div className="p-2.5 flex flex-col flex-1 gap-1.5">
         <p className="font-bold text-stone-900 text-[11px] line-clamp-2 leading-snug flex-1">{product.name}</p>
-        <p className="text-[9px] text-stone-400 font-medium">
-          {activeVariant?.unit_label || activeVariant?.label || product.unit || '1 pc'}
-        </p>
+        
+        {/* Variant Dropdown Selector */}
+        {hasVariants ? (
+          <div onClick={e => e.stopPropagation()} className="my-0.5">
+            <select
+              value={currentVariantKey || ''}
+              onChange={handleVariantChange}
+              className="w-full bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 text-[10px] font-black rounded-lg px-1.5 py-1 outline-none transition cursor-pointer"
+            >
+              {variants.map((v, idx) => {
+                const vKey = v.id || v.label || v.unit_label || idx;
+                const vLabel = v.unit_label || v.label || `Option ${idx + 1}`;
+                const vPrice = v.price ? ` - ₹${v.price}` : '';
+                return (
+                  <option key={vKey} value={vKey}>
+                    {vLabel}{vPrice}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        ) : (
+          <p className="text-[9px] text-stone-400 font-medium">
+            {product.unit || '1 pc'}
+          </p>
+        )}
 
         {/* Price row */}
         <div className="flex items-end justify-between mt-auto pt-1.5 border-t border-stone-50" onClick={e => e.stopPropagation()}>
@@ -141,7 +176,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, a
 /* ─────────────────────────────────────────────
    HORIZONTAL SHELF WITH SCROLL ARROWS
 ───────────────────────────────────────────── */
-function HorizontalShelf({ items, wishlistIds, toggleWishlist, selectedVariants, addToCart, onSelectProduct }) {
+function HorizontalShelf({ items, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, addToCart, onSelectProduct }) {
   const ref = useRef(null);
   const scroll = (dir) => {
     ref.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
@@ -174,6 +209,7 @@ function HorizontalShelf({ items, wishlistIds, toggleWishlist, selectedVariants,
               wishlistIds={wishlistIds}
               toggleWishlist={toggleWishlist}
               selectedVariants={selectedVariants}
+              setSelectedVariants={setSelectedVariants}
               addToCart={addToCart}
               onSelectProduct={onSelectProduct}
               compact
@@ -443,6 +479,7 @@ export default function ProductGrid({
                   wishlistIds={wishlistIds}
                   toggleWishlist={toggleWishlist}
                   selectedVariants={selectedVariants}
+                  setSelectedVariants={setSelectedVariants}
                   addToCart={addToCart}
                   onSelectProduct={onSelectProduct}
                 />
@@ -480,6 +517,7 @@ export default function ProductGrid({
                     wishlistIds={wishlistIds}
                     toggleWishlist={toggleWishlist}
                     selectedVariants={selectedVariants}
+                    setSelectedVariants={setSelectedVariants}
                     addToCart={addToCart}
                     onSelectProduct={onSelectProduct}
                   />

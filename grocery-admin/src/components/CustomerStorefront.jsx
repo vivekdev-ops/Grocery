@@ -745,7 +745,7 @@ export default function CustomerStorefront() {
     }
   };
 
-  const handleReorder = (order) => {
+ const handleReorder = (order) => {
     if (!order.order_items || order.order_items.length === 0) return;
 
     let addedCount = 0;
@@ -756,7 +756,16 @@ export default function CustomerStorefront() {
       if (prod && Number(prod.stock || 0) > 0) {
         const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
         const itemImage = pImages[0] || '';
-        const cartItemId = prod.id;
+
+        // Match variant if stored or fallback to base product price/variant
+        const variantKey = item.variant_id;
+        const matchedVariant = prod.variants?.find(v => v.id === variantKey || v.label === variantKey || v.unit_label === variantKey) || (prod.variants && prod.variants[0]) || null;
+
+        // Strictly determine single unit price (never use multiplied line total directly)
+        const unitPrice = Number(matchedVariant ? matchedVariant.price : prod.price) || (Number(item.price) / Number(item.quantity || 1));
+
+        const cartItemId = matchedVariant ? `${prod.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` : prod.id;
+        const itemTitle = matchedVariant ? `${prod.name} (${matchedVariant.unit_label || matchedVariant.label})` : prod.name;
 
         const existingIndex = updatedCart.findIndex(ci => ci.cartItemId === cartItemId);
         if (existingIndex > -1) {
@@ -768,11 +777,11 @@ export default function CustomerStorefront() {
           updatedCart.push({
             cartItemId,
             product: prod,
-            variant: null,
+            variant: matchedVariant,
             id: prod.id,
             product_id: prod.id,
-            title: prod.name,
-            price: Number(item.price),
+            title: itemTitle,
+            price: unitPrice, // Stored strictly as single unit price
             quantity: item.quantity,
             stock: Number(prod.stock || 10),
             image: itemImage
@@ -795,6 +804,24 @@ export default function CustomerStorefront() {
     }
   };
 
+  const updateQuantity = (cartItemId, delta) => {
+    setCart(prev => {
+      const updatedCart = prev.map(item => {
+        const currentKey = item?.cartItemId || item?.id || item?.product_id;
+        if (currentKey === cartItemId) {
+          const newQty = (item.quantity || 1) + delta;
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      }).filter(Boolean);
+
+      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+      window.dispatchEvent(new Event('storage'));
+      return updatedCart;
+    });
+  };
+  
   const handleCancelOrder = async (orderId) => {
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
 
@@ -954,6 +981,7 @@ export default function CustomerStorefront() {
     const cartItemId = variant ? `${product.id}-${variant.id || variant.label || variant.unit_label}` : product.id;
     const itemTitle = variant ? `${product.name} (${variant.unit_label || variant.label})` : product.name;
     
+    // Ensure we always take the single unit price
     const itemPrice = Number(variant ? variant.price : product.price || 0);
     const itemStock = stockCheck;
     
@@ -977,30 +1005,12 @@ export default function CustomerStorefront() {
           id: product.id, 
           product_id: product.id, 
           title: itemTitle, 
-          price: itemPrice, 
+          price: itemPrice, // Correct single unit price
           quantity: 1, 
           stock: itemStock, 
           image: itemImage 
         }];
       }
-
-      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-      window.dispatchEvent(new Event('storage'));
-      return updatedCart;
-    });
-  };
-
-  const updateQuantity = (cartItemId, delta) => {
-    setCart(prev => {
-      const updatedCart = prev.map(item => {
-        const currentKey = item.cartItemId || item.id || item.product_id;
-        if (currentKey === cartItemId) {
-          const newQty = item.quantity + delta;
-          return newQty > 0 ? { ...item, quantity: newQty } : null;
-        }
-        return item;
-      }).filter(Boolean);
 
       localStorage.setItem('cart_items', JSON.stringify(updatedCart));
       window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
