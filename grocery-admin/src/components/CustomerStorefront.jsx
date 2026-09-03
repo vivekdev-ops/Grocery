@@ -90,10 +90,43 @@ export default function CustomerStorefront() {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // Cart & Checkout State
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+
+  useEffect(() => {
+    const handleCartUpdate = (e) => {
+      if (e.detail) {
+        setCart(e.detail);
+      } else {
+        const saved = localStorage.getItem('cart_items');
+        setCart(saved ? JSON.parse(saved) : []);
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('storage', handleCartUpdate);
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('storage', handleCartUpdate);
+    };
+  }, []);
+
+  const removeFromCart = (productId) => {
+    const updatedCart = cart.filter(item => item.id !== productId && item.product_id !== productId);
+    setCart(updatedCart);
+    localStorage.setItem('cart_items', JSON.stringify(updatedCart));
+    window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
+    window.dispatchEvent(new Event('storage'));
+  };
 
   // Invoice Modal State
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);

@@ -166,7 +166,7 @@ export default function StoreHeader({
                 placeholder='Search "Fresh Milk", "Tomatoes", "Snacks"…'
                 className="w-full pl-10 pr-12 py-2.5 bg-stone-50 focus:bg-white rounded-xl text-xs font-medium text-stone-900 outline-none border border-stone-200 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 transition-all shadow-sm"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
               />
               <button
                 type="button"
@@ -208,12 +208,12 @@ export default function StoreHeader({
                       className="absolute right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-stone-100 py-3 z-50 overflow-hidden font-sans text-xs"
                     >
                       {/* User Identity Header */}
-<div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
-  <p className="font-black text-stone-900 text-sm">
-    {customerProfile?.full_name || 'My Account'}
-  </p>
-  <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
-</div>
+                      <div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
+                        <p className="font-black text-stone-900 text-sm">
+                          {customerProfile?.full_name || 'My Account'}
+                        </p>
+                        <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
+                      </div>
 
                       {/* Menu Items List matching reference */}
                       <div className="py-1">
@@ -339,7 +339,7 @@ export default function StoreHeader({
               type="text"
               placeholder="Search groceries, essentials…"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
               className="w-full bg-stone-50 border border-stone-200 pl-10 pr-11 py-2.5 rounded-xl text-xs font-medium text-stone-900 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/10 transition-all"
             />
             <button
@@ -360,7 +360,7 @@ export default function StoreHeader({
         <div className="flex items-center justify-around px-4 py-2.5">
 
           <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className="flex flex-col items-center gap-0.5 cursor-pointer group"
           >
             <div className="w-9 h-9 bg-brand-50 group-active:bg-brand-100 rounded-xl flex items-center justify-center transition-colors">
@@ -384,6 +384,16 @@ export default function StoreHeader({
             {totalItemsCount > 0 && (
               <span className="absolute -top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-badge-pop" />
             )}
+          </button>
+
+          <button
+            onClick={() => { navigate('/account/orders'); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <Package size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Orders</span>
           </button>
 
           <button

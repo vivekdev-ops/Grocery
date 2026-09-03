@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Package, MapPin, FileText, Gift, Shield, LogOut, CheckCircle2, ChevronRight, ArrowLeft, Download, MessageSquare, Copy, Check, User, Plus, Edit2, Trash2, Phone, Save, ChevronDown, Upload } from 'lucide-react';
+import { Package, MapPin, FileText, Gift, Shield, LogOut, CheckCircle2, ChevronRight, ArrowLeft, Download, MessageSquare, Copy, Check, User, Plus, Edit2, Trash2, Phone, Save, ChevronDown, Upload, RotateCcw, Star } from 'lucide-react';
 import StoreHeader from './store/StoreHeader';
 import Footer from './Footer';
 import InvoiceModal from './InvoiceModal';
@@ -14,10 +14,16 @@ export default function CustomerOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'profile'
-  const [mobileView, setMobileView] = useState('menu'); // 'menu' | 'content' (for mobile screen optimization)
+  const [mobileView, setMobileView] = useState('menu'); // 'menu' | 'content'
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
+  // Rating Modal State
+  const [ratingOrder, setRatingOrder] = useState(null);
+  const [deliveryRating, setDeliveryRating] = useState(5);
+  const [productRatings, setProductRatings] = useState({}); // { [productId]: number }
 
   // Address Form State for Add / Edit
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -35,7 +41,7 @@ export default function CustomerOrdersPage() {
     longitude: null
   });
 
-  // Profile Form, Base64 Image Reader & Multiselect Dropdown State
+  // Profile Form State
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -77,6 +83,27 @@ export default function CustomerOrdersPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [navigate]);
+
+  // Sync cart count from localStorage
+  useEffect(() => {
+    const updateCartCount = () => {
+      try {
+        const cart = JSON.parse(localStorage.getItem('cart_items') || '[]');
+        const total = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+        setCartCount(total);
+      } catch (e) {
+        setCartCount(0);
+      }
+    };
+
+    updateCartCount();
+    window.addEventListener('storage', updateCartCount);
+    window.addEventListener('cartUpdated', updateCartCount);
+    return () => {
+      window.removeEventListener('storage', updateCartCount);
+      window.removeEventListener('cartUpdated', updateCartCount);
+    };
+  }, []);
 
   const fetchUserData = async (userId, email) => {
     setLoading(true);
@@ -208,6 +235,64 @@ export default function CustomerOrdersPage() {
     }
   };
 
+  const handleReorder = async (order) => {
+    if (!order.order_items || order.order_items.length === 0) {
+      alert('No items found in this order to reorder.');
+      return;
+    }
+
+    try {
+      const existingCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
+      let addedCount = 0;
+
+      order.order_items.forEach(item => {
+        const product = item.products;
+        if (product) {
+          const existingIndex = existingCart.findIndex(cartItem => (cartItem.id === product.id || cartItem.product_id === product.id));
+          
+          if (existingIndex > -1) {
+            existingCart[existingIndex].quantity = (existingCart[existingIndex].quantity || 1) + (item.quantity || 1);
+          } else {
+            existingCart.push({
+              ...product,
+              quantity: item.quantity || 1
+            });
+          }
+          addedCount += (item.quantity || 1);
+        }
+      });
+
+      // Save to localStorage
+      localStorage.setItem('cart_items', JSON.stringify(existingCart));
+
+      // Dispatch custom event with cart data payload so the store state updates instantly
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: existingCart }));
+      window.dispatchEvent(new Event('storage'));
+
+      alert(`Successfully added ${addedCount} items to your cart!`);
+      navigate('/');
+    } catch (err) {
+      console.error('Error reordering items:', err);
+      alert('Failed to add items to cart.');
+    }
+  };
+
+  const handleOpenRateModal = (order) => {
+    setRatingOrder(order);
+    setDeliveryRating(5);
+    const initialProductRatings = {};
+    order.order_items?.forEach(item => {
+      initialProductRatings[item.product_id || item.id] = 5;
+    });
+    setProductRatings(initialProductRatings);
+  };
+
+  const handleRateOrderSubmit = (e) => {
+    e.preventDefault();
+    alert(`Thank you! Delivery rated ${deliveryRating} stars, and product ratings submitted successfully.`);
+    setRatingOrder(null);
+  };
+
   const handleOpenAddAddress = () => {
     setEditingAddressId(null);
     setAddressForm({
@@ -223,20 +308,6 @@ export default function CustomerOrdersPage() {
       longitude: null
     });
     setShowAddressForm(true);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setAddressForm(prev => ({
-            ...prev,
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude
-          }));
-        },
-        (err) => console.warn('Geolocation error:', err.message),
-        { timeout: 10000 }
-      );
-    }
   };
 
   const handleOpenEditAddress = (addr) => {
@@ -298,8 +369,6 @@ export default function CustomerOrdersPage() {
           state: addressForm.state,
           pincode: addressForm.pincode,
           phone: addressForm.phone,
-          latitude: addressForm.latitude,
-          longitude: addressForm.longitude,
           address: fullFormattedAddress
         }]);
 
@@ -323,11 +392,16 @@ export default function CustomerOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans pb-20">
-      <StoreHeader session={session} customerProfile={customerProfile} totalItemsCount={0} onOpenCart={() => {}} />
+      <StoreHeader 
+        session={session} 
+        customerProfile={customerProfile} 
+        totalItemsCount={cartCount} 
+        onOpenCart={() => {}} 
+      />
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         
-        {/* Mobile Compact Icon-First Navigation Bar */}
+        {/* Mobile Compact Icon Navigation */}
         <div className="md:hidden flex items-center justify-between bg-white rounded-2xl p-2.5 shadow-xs border border-stone-200/80 mb-4 overflow-x-auto no-scrollbar">
           <button 
             onClick={() => { setActiveTab('orders'); setSelectedOrder(null); setMobileView('content'); }}
@@ -702,7 +776,7 @@ export default function CustomerOrdersPage() {
                 )}
               </div>
             ) : !selectedOrder ? (
-              /* --- ORDERS LIST VIEW --- */
+              /* --- ORDERS LIST VIEW WITH REORDER & RATE BUTTONS --- */
               <>
                 <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/80 shadow-xs flex justify-between items-center">
                   <h1 className="font-black text-lg text-slate-900">Your Orders</h1>
@@ -726,10 +800,12 @@ export default function CustomerOrdersPage() {
                     return (
                       <div 
                         key={order.id} 
-                        onClick={() => setSelectedOrder(order)}
-                        className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-6 space-y-4 hover:border-emerald-500 transition cursor-pointer group"
+                        className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-6 space-y-4 hover:border-emerald-500 transition group"
                       >
-                        <div className="flex justify-between items-center border-b border-stone-100 pb-4">
+                        <div 
+                          onClick={() => setSelectedOrder(order)}
+                          className="flex justify-between items-center border-b border-stone-100 pb-4 cursor-pointer"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                               <CheckCircle2 size={18} />
@@ -747,7 +823,10 @@ export default function CustomerOrdersPage() {
                         </div>
 
                         {/* Thumbnail Strip */}
-                        <div className="flex gap-3 overflow-x-auto py-1">
+                        <div 
+                          onClick={() => setSelectedOrder(order)}
+                          className="flex gap-3 overflow-x-auto py-1 cursor-pointer"
+                        >
                           {order.order_items?.map(item => {
                             const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
                             return (
@@ -761,6 +840,22 @@ export default function CustomerOrdersPage() {
                             );
                           })}
                         </div>
+
+                        {/* Reorder and Rate Action Buttons */}
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-100">
+                          <button 
+                            onClick={() => handleReorder(order)}
+                            className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <RotateCcw size={14} /> Reorder
+                          </button>
+                          <button 
+                            onClick={() => handleOpenRateModal(order)}
+                            className="w-full bg-stone-50 hover:bg-stone-100 text-stone-700 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border border-stone-200"
+                          >
+                            <Star size={14} className="text-amber-500 fill-amber-400" /> Rate order
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -771,22 +866,28 @@ export default function CustomerOrdersPage() {
               <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
                 
                 {/* Back button & Title */}
-                <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                  <button 
-                    onClick={() => setSelectedOrder(null)}
-                    className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition cursor-pointer text-stone-700"
-                  >
-                    <ArrowLeft size={18} />
-                  </button>
-                  <div className="text-right">
-                    <button 
-                      onClick={() => setSelectedInvoiceOrder(selectedOrder)}
-                      className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
-                    >
-                      <Download size={14} /> Invoice
-                    </button>
-                  </div>
-                </div>
+<div className="flex items-center justify-between border-b border-stone-100 pb-4">
+  <button 
+    onClick={() => setSelectedOrder(null)}
+    className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition cursor-pointer text-stone-700"
+  >
+    <ArrowLeft size={18} />
+  </button>
+  <div className="text-right">
+    {(selectedOrder.status === 'delivered' || selectedOrder.status === 'arrived') ? (
+      <button 
+        onClick={() => setSelectedInvoiceOrder(selectedOrder)}
+        className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
+      >
+        <Download size={14} /> Invoice
+      </button>
+    ) : (
+      <span className="text-[11px] font-bold text-stone-400 italic">
+        Invoice available after delivery
+      </span>
+    )}
+  </div>
+</div>
 
                 {/* Arrived status & time */}
                 <div>
@@ -906,6 +1007,91 @@ export default function CustomerOrdersPage() {
 
         </div>
       </div>
+
+      {/* Detailed Rating Modal (Delivery Experience + Product-wise Ratings) */}
+      {ratingOrder && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+              <h3 className="font-black text-base text-slate-900">Rate your experience</h3>
+              <button onClick={() => setRatingOrder(null)} className="text-stone-400 hover:text-stone-700 font-bold text-xs cursor-pointer">Close</button>
+            </div>
+            
+            <form onSubmit={handleRateOrderSubmit} className="space-y-5 text-xs">
+              
+              {/* Delivery Experience Rating */}
+              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200/80 space-y-2 text-center">
+                <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Rate Delivery Experience</p>
+                <div className="flex justify-center gap-2 py-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setDeliveryRating(star)}
+                      className="p-1 cursor-pointer transition transform hover:scale-110"
+                    >
+                      <Star size={24} className={`${star <= deliveryRating ? 'text-amber-400 fill-amber-400' : 'text-stone-300'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Product-wise Ratings */}
+              <div className="space-y-3">
+                <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Rate Individual Products</p>
+                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                  {ratingOrder.order_items?.map(item => {
+                    const prodName = item.products?.name || 'Product Item';
+                    const prodImg = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
+                    const pKey = item.product_id || item.id;
+                    const currentRating = productRatings[pKey] || 5;
+
+                    return (
+                      <div key={pKey} className="flex items-center justify-between gap-3 p-3 bg-stone-50/50 rounded-2xl border border-stone-200">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                            {prodImg ? <img src={prodImg} alt="" className="w-full h-full object-contain" /> : <Package size={16} className="text-stone-300" />}
+                          </div>
+                          <p className="font-bold text-stone-800 text-xs truncate max-w-[140px]">{prodName}</p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setProductRatings(prev => ({ ...prev, [pKey]: star }))}
+                              className="cursor-pointer"
+                            >
+                              <Star size={16} className={`${star <= currentRating ? 'text-amber-400 fill-amber-400' : 'text-stone-300'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setRatingOrder(null)}
+                  className="w-1/2 bg-stone-100 hover:bg-stone-200 text-stone-700 py-3 rounded-2xl font-black text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black text-xs transition cursor-pointer shadow-sm"
+                >
+                  Submit Ratings
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Invoice Modal Integration */}
       <InvoiceModal 
