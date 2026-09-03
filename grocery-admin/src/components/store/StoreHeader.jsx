@@ -1,8 +1,9 @@
 // src/components/store/StoreHeader.jsx
-import { useState, useEffect } from 'react';
-import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Home, Heart } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Home, Heart, Package, Gift, HelpCircle, Shield, LogOut, FileText } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../../supabaseClient';
 
 export default function StoreHeader({
   session, customerProfile, searchQuery, setSearchQuery,
@@ -14,9 +15,25 @@ export default function StoreHeader({
   const [scrolled, setScrolled] = useState(false);
   const [prevCount, setPrevCount] = useState(totalItemsCount);
   const [cartBounce, setCartBounce] = useState(false);
+  
+  // Blinkit style account dropdown menu state
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef(null);
+
   const navigate = useNavigate();
 
   useEffect(() => { fetchCurrentLocation(); }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Detect scroll for header shadow
   useEffect(() => {
@@ -34,7 +51,13 @@ export default function StoreHeader({
     setPrevCount(totalItemsCount);
   }, [totalItemsCount]);
 
-  const handleProfileClick = () => session ? onOpenProfile() : navigate('/login');
+  const handleProfileClick = () => {
+    if (!session) {
+      navigate('/login');
+    } else {
+      setIsAccountMenuOpen(prev => !prev);
+    }
+  };
 
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) { setLocationName('New Delhi, India'); return; }
@@ -74,6 +97,7 @@ export default function StoreHeader({
     ? customerProfile.full_name.split(' ')[0]
     : session?.user?.email?.split('@')[0];
   const avatarUrl = customerProfile?.avatar_url;
+  const userPhone = customerProfile?.phone || session?.user?.email || '8955782853';
 
   return (
     <>
@@ -160,21 +184,104 @@ export default function StoreHeader({
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Profile / Login */}
+          <div className="flex items-center gap-2 ml-auto relative">
+            {/* Profile / Account Dropdown Trigger */}
             {session ? (
-              <button
-                onClick={handleProfileClick}
-                className="hidden sm:flex items-center gap-2 h-9 px-3 bg-stone-50 hover:bg-brand-50 border border-stone-200 hover:border-brand-300 rounded-xl transition-all duration-200 cursor-pointer btn-press group"
-                title="My Profile"
-              >
-                <div className="w-6 h-6 rounded-full bg-brand-100 overflow-hidden flex items-center justify-center shrink-0 border border-brand-200 group-hover:ring-2 group-hover:ring-brand-400/40 transition-all">
-                  {avatarUrl
-                    ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    : <User size={12} className="text-brand-700" />}
-                </div>
-                <span className="text-[11px] font-black text-stone-800 truncate max-w-[90px]">{displayName}</span>
-              </button>
+              <div className="relative" ref={accountMenuRef}>
+                <button
+                  onClick={handleProfileClick}
+                  className="hidden sm:flex items-center gap-2 h-9 px-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl transition-all duration-200 cursor-pointer btn-press group"
+                  title="Account Menu"
+                >
+                  <span className="text-xs font-bold text-stone-800">Account</span>
+                  <ChevronDown size={13} className={`text-stone-500 transition-transform duration-200 ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Blinkit Style Account Dropdown Menu */}
+                <AnimatePresence>
+                  {isAccountMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className="absolute right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-stone-100 py-3 z-50 overflow-hidden font-sans text-xs"
+                    >
+                      {/* User Identity Header */}
+<div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
+  <p className="font-black text-stone-900 text-sm">
+    {customerProfile?.full_name || 'My Account'}
+  </p>
+  <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
+</div>
+
+                      {/* Menu Items List matching reference */}
+                      <div className="py-1">
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <Package size={15} className="text-stone-400" /> My Orders
+                        </button>
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/profile'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <MapPin size={15} className="text-stone-400" /> Saved Addresses
+                        </button>
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/profile'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <FileText size={15} className="text-stone-400" /> My Prescriptions
+                        </button>
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); alert('E-Gift Cards feature coming soon!'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <Gift size={15} className="text-stone-400" /> E-Gift Cards
+                        </button>
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); alert('FAQ section'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <HelpCircle size={15} className="text-stone-400" /> FAQ's
+                        </button>
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy-policy'); }}
+                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <Shield size={15} className="text-stone-400" /> Account Privacy
+                        </button>
+                      </div>
+
+                      {/* Logout option */}
+                      <div className="border-t border-stone-100 pt-1 mt-1">
+                        <button
+                          onClick={() => { setIsAccountMenuOpen(false); supabase.auth.signOut(); }}
+                          className="w-full text-left px-5 py-2.5 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-3 transition cursor-pointer"
+                        >
+                          <LogOut size={15} /> Log Out
+                        </button>
+                      </div>
+
+                      {/* App Download QR footer widget matching Blinkit style reference */}
+                      <div className="mx-3 mt-2 p-3 bg-stone-50 rounded-2xl border border-stone-100 flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white p-1 rounded-xl shadow-xs shrink-0 flex items-center justify-center border border-stone-200">
+                          <div className="w-full h-full bg-stone-900 rounded-lg flex items-center justify-center text-[8px] text-white font-mono">
+                            QR
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-stone-900 text-[11px] leading-tight">Simple way to get groceries</p>
+                          <p className="text-brand-600 font-black text-[11px] leading-tight mt-0.5">at your doorstep</p>
+                          <p className="text-[9px] text-stone-400 truncate mt-0.5">Scan QR code & download app</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             ) : (
               <Link
                 to="/login"

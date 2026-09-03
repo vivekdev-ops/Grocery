@@ -37,6 +37,8 @@ import AdminFeedbacks from './components/AdminFeedbacks';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
 import AdminReports from './components/AdminReports';
+import CustomerOrdersPage from './components/CustomerOrdersPage';
+
 
 /* ─────────────────────────────────────────────
    GROUP ICON COLOURS  (sidebar section accents)
@@ -213,7 +215,7 @@ function AdminLayout() {
                   <Sparkles size={14} className="text-white" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black text-stone-900 truncate leading-none">Harraiya Market</p>
+                  <p className="text-[11px] font-black text-stone-900 truncate leading-none">KD Store</p>
                   <p className="text-[9px] text-stone-400 truncate mt-0.5 font-medium">{session.user.email}</p>
                 </div>
               </motion.div>
@@ -415,6 +417,7 @@ function AnimatedRoutes() {
         <Route path="/forgot-password" element={<PageWrap><ForgotPassword /></PageWrap>} />
         <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
         <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />
+        <Route path="/account/orders" element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
       </Routes>
     </AnimatePresence>
   );
