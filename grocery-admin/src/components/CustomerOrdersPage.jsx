@@ -14,6 +14,7 @@ export default function CustomerOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'profile'
+  const [mobileView, setMobileView] = useState('menu'); // 'menu' | 'content' (for mobile screen optimization)
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
@@ -149,7 +150,6 @@ export default function CustomerOrdersPage() {
     });
   };
 
-  // Base64 Reader approach to bypass bucket-not-found issues and save reliably locally/in DB
   const handleAvatarFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file || !session?.user) return;
@@ -174,15 +174,10 @@ export default function CustomerOrdersPage() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    console.log("Save Profile button clicked! Current form state:", profileForm);
+    if (!session?.user) return;
 
-    if (!session?.user) {
-      alert("No active session found. Please log in again.");
-      return;
-    }
-
-    if (!profileForm.phone || profileForm.phone.length !== 10) {
-      alert('Mobile number must be exactly 10 numeric digits.');
+    if (profileForm.phone.length !== 10) {
+      alert('Mobile number must be exactly 10 digits.');
       return;
     }
 
@@ -203,15 +198,11 @@ export default function CustomerOrdersPage() {
         .from('customer_profiles')
         .upsert(updates, { onConflict: 'user_id' });
 
-      if (error) {
-        console.error('Supabase save error details:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       setCustomerProfile(updates);
       alert('Profile settings saved successfully!');
     } catch (err) {
-      alert('Error saving profile: ' + (err.message || JSON.stringify(err)));
+      alert('Error saving profile: ' + err.message);
     } finally {
       setSavingProfile(false);
     }
@@ -331,14 +322,58 @@ export default function CustomerOrdersPage() {
   const userPhone = profileForm.phone || session?.user?.email || '8955782853';
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans">
+    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans pb-20">
       <StoreHeader session={session} customerProfile={customerProfile} totalItemsCount={0} onOpenCart={() => {}} />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        
+        {/* Mobile Compact Icon-First Navigation Bar */}
+        <div className="md:hidden flex items-center justify-between bg-white rounded-2xl p-2.5 shadow-xs border border-stone-200/80 mb-4 overflow-x-auto no-scrollbar">
+          <button 
+            onClick={() => { setActiveTab('orders'); setSelectedOrder(null); setMobileView('content'); }}
+            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'orders' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
+          >
+            <Package size={18} className={activeTab === 'orders' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
+            <span className="text-[10px] mt-1 font-bold">Orders</span>
+          </button>
+          
+          <button 
+            onClick={() => { setActiveTab('addresses'); setShowAddressForm(false); setMobileView('content'); }}
+            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'addresses' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
+          >
+            <MapPin size={18} className={activeTab === 'addresses' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
+            <span className="text-[10px] mt-1 font-bold">Addresses</span>
+          </button>
+
+          <button 
+            onClick={() => { setActiveTab('profile'); setMobileView('content'); }}
+            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'profile' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
+          >
+            <User size={18} className={activeTab === 'profile' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
+            <span className="text-[10px] mt-1 font-bold">Profile</span>
+          </button>
+
+          <button 
+            onClick={() => alert('Prescriptions feature')}
+            className="flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl text-stone-500 transition cursor-pointer"
+          >
+            <FileText size={18} className="text-stone-400" />
+            <span className="text-[10px] mt-1 font-bold">Rx</span>
+          </button>
+
+          <button 
+            onClick={() => { supabase.auth.signOut(); navigate('/'); }}
+            className="flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl text-rose-600 transition cursor-pointer"
+          >
+            <LogOut size={18} />
+            <span className="text-[10px] mt-1 font-bold">Logout</span>
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
           
-          {/* Left Sidebar Navigation */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden md:col-span-1">
+          {/* Desktop Sidebar Navigation */}
+          <div className="hidden md:block bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden md:col-span-1">
             <div 
               onClick={() => setActiveTab('profile')} 
               className="p-5 border-b border-stone-100 bg-stone-50/50 hover:bg-emerald-50/40 transition cursor-pointer group"
@@ -358,28 +393,28 @@ export default function CustomerOrdersPage() {
                 onClick={() => { setActiveTab('addresses'); setShowAddressForm(false); }} 
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'addresses' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
               >
-                <MapPin size={16} className={activeTab === 'addresses' ? 'text-emerald-600' : 'text-stone-400'} /> My Addresses
+                <MapPin size={16} className={activeTab === 'addresses' ? 'text-emerald-600' : 'text-stone-400'} /> Addresses
               </button>
               <button 
                 onClick={() => { setActiveTab('orders'); setSelectedOrder(null); }} 
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
               >
-                <Package size={16} className={activeTab === 'orders' ? 'text-emerald-600' : 'text-stone-400'} /> My Orders
+                <Package size={16} className={activeTab === 'orders' ? 'text-emerald-600' : 'text-stone-400'} /> Orders
               </button>
               <button 
                 onClick={() => setActiveTab('profile')} 
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'profile' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
               >
-                <User size={16} className={activeTab === 'profile' ? 'text-emerald-600' : 'text-stone-400'} /> Profile Settings
+                <User size={16} className={activeTab === 'profile' ? 'text-emerald-600' : 'text-stone-400'} /> Profile
               </button>
               <button onClick={() => alert('Prescriptions feature')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <FileText size={16} className="text-stone-400" /> My Prescriptions
+                <FileText size={16} className="text-stone-400" /> Prescriptions
               </button>
               <button onClick={() => alert('Gift cards')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <Gift size={16} className="text-stone-400" /> E-Gift Cards
+                <Gift size={16} className="text-stone-400" /> Gift Cards
               </button>
               <button onClick={() => navigate('/privacy-policy')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <Shield size={16} className="text-stone-400" /> Account privacy
+                <Shield size={16} className="text-stone-400" /> Privacy
               </button>
               <div className="pt-2 border-t border-stone-100 mt-2">
                 <button onClick={() => { supabase.auth.signOut(); navigate('/'); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-rose-600 hover:bg-rose-50 transition cursor-pointer">
@@ -393,11 +428,11 @@ export default function CustomerOrdersPage() {
           <div className="md:col-span-3 space-y-4">
             
             {activeTab === 'profile' ? (
-              /* --- PROFILE SETTINGS VIEW WITH LOCAL FILE UPLOAD & MULTISELECT --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+              /* --- PROFILE SETTINGS VIEW --- */
+              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
                 <div className="border-b border-stone-100 pb-4">
                   <h2 className="font-black text-lg text-slate-900">Profile Settings</h2>
-                  <p className="text-xs text-stone-500 font-medium mt-0.5">Manage your personal information and preferences</p>
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">Manage personal info & preferences</p>
                 </div>
 
                 <form onSubmit={handleSaveProfile} className="space-y-5 text-xs">
@@ -415,7 +450,7 @@ export default function CustomerOrdersPage() {
                       <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Profile Picture</label>
                       <label className="inline-flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold cursor-pointer transition">
                         <Upload size={14} />
-                        <span>{uploadingImage ? 'Loading...' : 'Browse Local File'}</span>
+                        <span>{uploadingImage ? 'Loading...' : 'Browse Image'}</span>
                         <input 
                           type="file" 
                           accept="image/*" 
@@ -434,7 +469,7 @@ export default function CustomerOrdersPage() {
                       <input 
                         type="text"
                         required
-                        placeholder="Enter your full name"
+                        placeholder="Enter full name"
                         value={profileForm.full_name}
                         onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
                         className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl outline-none font-medium focus:border-emerald-600 focus:bg-white transition"
@@ -456,13 +491,13 @@ export default function CustomerOrdersPage() {
                         className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl outline-none font-mono font-bold tracking-widest focus:border-emerald-600 focus:bg-white transition"
                       />
                     </div>
-                    <p className="text-[10px] text-stone-400">Must be exactly 10 numeric digits.</p>
+                    <p className="text-[10px] text-stone-400">Must be exactly 10 digits.</p>
                   </div>
 
                   {/* Interests & Preferences Multiselect Dropdown */}
                   <div className="space-y-1.5 relative" ref={dropdownRef}>
-                    <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Interests & Preferences (Multiselect)</label>
-                    <p className="text-[11px] text-stone-500">Choose categories to tailor your recommendations:</p>
+                    <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Interests & Preferences</label>
+                    <p className="text-[11px] text-stone-500">Select categories for smart recommendations:</p>
                     
                     <div 
                       onClick={() => setIsDropdownOpen(prev => !prev)}
@@ -510,7 +545,7 @@ export default function CustomerOrdersPage() {
                       disabled={savingProfile || profileForm.phone.length !== 10}
                       className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black uppercase tracking-wider transition shadow-lg shadow-emerald-700/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <Save size={16} /> {savingProfile ? 'Saving Changes...' : 'Save Profile Settings'}
+                      <Save size={16} /> {savingProfile ? 'Saving...' : 'Save Profile'}
                     </button>
                   </div>
 
@@ -518,7 +553,7 @@ export default function CustomerOrdersPage() {
               </div>
             ) : activeTab === 'addresses' ? (
               /* --- SAVED ADDRESSES VIEW --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
                 <div className="flex justify-between items-center border-b border-stone-100 pb-4">
                   <h1 className="font-black text-lg text-slate-900">Saved Addresses</h1>
                   {!showAddressForm && (
@@ -526,15 +561,15 @@ export default function CustomerOrdersPage() {
                       onClick={handleOpenAddAddress}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 transition cursor-pointer"
                     >
-                      <Plus size={14} /> Add Address
+                      <Plus size={14} /> Add
                     </button>
                   )}
                 </div>
 
                 {showAddressForm ? (
-                  <form onSubmit={handleSaveAddress} className="bg-emerald-50/40 p-5 rounded-2xl border border-emerald-200 space-y-3.5 text-xs">
+                  <form onSubmit={handleSaveAddress} className="bg-emerald-50/40 p-4 sm:p-5 rounded-2xl border border-emerald-200 space-y-3.5 text-xs">
                     <div className="flex justify-between items-center mb-1">
-                      <p className="font-black text-emerald-900 text-sm">{editingAddressId ? 'Edit Address' : 'Add New Address'}</p>
+                      <p className="font-black text-emerald-900 text-sm">{editingAddressId ? 'Edit Address' : 'New Address'}</p>
                       <button 
                         type="button" 
                         onClick={() => setShowAddressForm(false)}
@@ -545,7 +580,7 @@ export default function CustomerOrdersPage() {
                     </div>
 
                     <div>
-                      <label className="block font-bold text-stone-700 mb-1">Address Title (Home / Work)</label>
+                      <label className="block font-bold text-stone-700 mb-1">Title (Home / Work)</label>
                       <input 
                         type="text" 
                         required 
@@ -561,14 +596,14 @@ export default function CustomerOrdersPage() {
                         <input 
                           type="text" 
                           required 
-                          placeholder="e.g. Flat 402, Block B"
+                          placeholder="e.g. Flat 402"
                           className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
                           value={addressForm.house_no}
                           onChange={e => setAddressForm({...addressForm, house_no: e.target.value})}
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-stone-700 mb-1">Ward / Colony / Street</label>
+                        <label className="block font-bold text-stone-700 mb-1">Colony / Street</label>
                         <input 
                           type="text" 
                           required 
@@ -614,11 +649,11 @@ export default function CustomerOrdersPage() {
                     </div>
 
                     <div>
-                      <label className="block font-bold text-stone-700 mb-1">Contact Phone Number</label>
+                      <label className="block font-bold text-stone-700 mb-1">Phone Number</label>
                       <input 
                         type="tel" 
                         required 
-                        placeholder="10-digit mobile number"
+                        placeholder="10-digit number"
                         className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
                         value={addressForm.phone}
                         onChange={e => setAddressForm({...addressForm, phone: e.target.value})}
@@ -635,7 +670,7 @@ export default function CustomerOrdersPage() {
                 ) : (
                   <div className="space-y-3">
                     {savedAddresses.length === 0 ? (
-                      <p className="text-stone-400 italic py-8 text-center">No saved addresses found. Click "Add Address" above to create one.</p>
+                      <p className="text-stone-400 italic py-8 text-center">No saved addresses found.</p>
                     ) : (
                       savedAddresses.map(addr => (
                         <div key={addr.id} className="p-4 bg-stone-50/70 rounded-2xl border border-stone-200/80 flex justify-between items-start">
@@ -648,14 +683,14 @@ export default function CustomerOrdersPage() {
                             <button 
                               onClick={() => handleOpenEditAddress(addr)}
                               className="p-2 text-stone-500 hover:text-emerald-700 rounded-lg transition cursor-pointer"
-                              title="Edit Address"
+                              title="Edit"
                             >
                               <Edit2 size={14} />
                             </button>
                             <button 
                               onClick={() => handleDeleteAddress(addr.id)}
                               className="p-2 text-rose-500 hover:text-rose-700 rounded-lg transition cursor-pointer"
-                              title="Delete Address"
+                              title="Delete"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -669,9 +704,9 @@ export default function CustomerOrdersPage() {
             ) : !selectedOrder ? (
               /* --- ORDERS LIST VIEW --- */
               <>
-                <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-xs flex justify-between items-center">
+                <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/80 shadow-xs flex justify-between items-center">
                   <h1 className="font-black text-lg text-slate-900">Your Orders</h1>
-                  <span className="text-xs font-bold text-stone-500">{myOrders.length} Total Orders</span>
+                  <span className="text-xs font-bold text-stone-500">{myOrders.length} Orders</span>
                 </div>
 
                 {loading ? (
@@ -692,7 +727,7 @@ export default function CustomerOrdersPage() {
                       <div 
                         key={order.id} 
                         onClick={() => setSelectedOrder(order)}
-                        className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 space-y-4 hover:border-emerald-500 transition cursor-pointer group"
+                        className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-6 space-y-4 hover:border-emerald-500 transition cursor-pointer group"
                       >
                         <div className="flex justify-between items-center border-b border-stone-100 pb-4">
                           <div className="flex items-center gap-3">
@@ -733,7 +768,7 @@ export default function CustomerOrdersPage() {
               </>
             ) : (
               /* --- ORDER DETAILS SCREEN --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
                 
                 {/* Back button & Title */}
                 <div className="flex items-center justify-between border-b border-stone-100 pb-4">
@@ -748,7 +783,7 @@ export default function CustomerOrdersPage() {
                       onClick={() => setSelectedInvoiceOrder(selectedOrder)}
                       className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
                     >
-                      <Download size={14} /> Download Invoice
+                      <Download size={14} /> Invoice
                     </button>
                   </div>
                 </div>
@@ -818,7 +853,7 @@ export default function CustomerOrdersPage() {
                     <button 
                       onClick={() => copyOrderId(selectedOrder.id)}
                       className="p-2 text-stone-500 hover:text-emerald-700 transition cursor-pointer"
-                      title="Copy Order ID"
+                      title="Copy"
                     >
                       {copiedId ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
                     </button>
@@ -846,7 +881,7 @@ export default function CustomerOrdersPage() {
 
                 {/* Need help with your order banner */}
                 <div className="pt-2 border-t border-stone-100">
-                  <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-3">Need help with your order?</p>
+                  <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-3">Need help?</p>
                   <button 
                     onClick={() => alert('Opening customer support chat...')}
                     className="w-full bg-stone-50 hover:bg-stone-100 p-4 rounded-2xl border border-stone-200 flex items-center justify-between transition cursor-pointer"
@@ -856,8 +891,8 @@ export default function CustomerOrdersPage() {
                         <MessageSquare size={18} />
                       </div>
                       <div className="text-left">
-                        <p className="font-bold text-stone-900 text-xs">Chat with us</p>
-                        <p className="text-[11px] text-stone-500 font-medium">About any issues related to your order</p>
+                        <p className="font-bold text-stone-900 text-xs">Chat with support</p>
+                        <p className="text-[11px] text-stone-500 font-medium">Get help with this order</p>
                       </div>
                     </div>
                     <ChevronRight size={18} className="text-stone-400" />
