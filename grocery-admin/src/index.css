@@ -1,1 +1,212 @@
 @import "tailwindcss";
+
+/* ============================================================
+   DESIGN TOKENS — KD Store / Harraiya Market
+   ============================================================ */
+@theme {
+  /* Brand palette — Emerald */
+  --color-brand-50:  #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+  --color-brand-950: #022c22;
+
+  /* Accent — Amber */
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+
+  /* Custom easing */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+/* ============================================================
+   KEYFRAME ANIMATIONS
+   ============================================================ */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+  50%       { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+}
+
+@keyframes badge-pop {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  70%  { transform: scale(1.2) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ============================================================
+   ANIMATION UTILITY CLASSES
+   ============================================================ */
+.animate-fade-up        { animation: fade-up 0.45s var(--ease-out-expo) both; }
+.animate-fade-in        { animation: fade-in 0.3s ease both; }
+.animate-slide-in-right { animation: slide-in-right 0.38s var(--ease-out-expo) both; }
+.animate-slide-in-left  { animation: slide-in-left 0.38s var(--ease-out-expo) both; }
+.animate-scale-in       { animation: scale-in 0.3s var(--ease-spring) both; }
+.animate-float          { animation: float 3s ease-in-out infinite; }
+.animate-glow-pulse     { animation: glow-pulse 2s ease-in-out infinite; }
+.animate-badge-pop      { animation: badge-pop 0.4s var(--ease-spring) both; }
+.animate-spin-slow      { animation: spin-slow 8s linear infinite; }
+.animate-ticker         { animation: ticker 22s linear infinite; }
+
+/* Staggered fade-up delays */
+.delay-75  { animation-delay: 75ms;  }
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* ============================================================
+   SKELETON / SHIMMER LOADER
+   ============================================================ */
+.skeleton {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+
+/* ============================================================
+   GLASS MORPHISM HELPERS
+   ============================================================ */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-dark {
+  background: rgba(4, 120, 87, 0.12);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* ============================================================
+   SCROLLBAR HIDING
+   ============================================================ */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   CARD INTERACTIVE EFFECTS
+   ============================================================ */
+.card-hover {
+  transition: transform 0.22s var(--ease-spring), box-shadow 0.22s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 12px 32px -6px rgba(4, 120, 87, 0.18), 0 4px 12px -3px rgba(0,0,0,0.08);
+}
+
+.btn-press {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-press:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* ============================================================
+   GRADIENT TEXT
+   ============================================================ */
+.gradient-text {
+  background: linear-gradient(135deg, #047857, #10b981, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-amber {
+  background: linear-gradient(135deg, #d97706, #f59e0b, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   PAGE TRANSITION WRAPPER
+   ============================================================ */
+.page-enter {
+  animation: fade-up 0.4s var(--ease-out-expo) both;
+}
+
+/* ============================================================
+   MOBILE BOTTOM NAV SAFE AREA
+   ============================================================ */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
+   CUSTOM FOCUS RING
+   ============================================================ */
+.focus-ring:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   PRINT UTILITIES
+   ============================================================ */
+@media print {
+  .print-hidden { display: none !important; }
+}
