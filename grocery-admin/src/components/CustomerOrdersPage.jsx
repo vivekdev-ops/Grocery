@@ -265,17 +265,12 @@ export default function CustomerOrdersPage() {
         }
         // 3. Fallback: match by comparing unit price with variant prices
         if (!matchedVariant && variants.length > 0) {
-          const itemUnitPrice = Number(item.price) / Number(item.quantity || 1);
+          const itemUnitPrice = Number(item.price);
           matchedVariant = variants.find(v => Math.abs(Number(v.price) - itemUnitPrice) < 0.01) || variants[0] || null;
-        } else if (!matchedVariant && variants.length === 0 && item.variant_label) {
-          // If variants array is missing/empty on product but label exists, create a dynamic variant object
-          matchedVariant = {
-            id: item.variant_id || 'dyn-var',
-            unit_label: item.variant_label,
-            label: item.variant_label,
-            price: Number(item.price) / Number(item.quantity || 1)
-          };
         }
+
+        // Determine correct unit price strictly: prioritize variant price, then item's stored unit price, then product base price
+        const unitPrice = Number(matchedVariant?.price ?? item.price ?? prod.price ?? 0);
 
         // Construct unique cartItemId so different variants remain strictly separated
         const cartItemId = matchedVariant 
@@ -286,7 +281,6 @@ export default function CustomerOrdersPage() {
           ? `${prod.name} (${matchedVariant.unit_label || matchedVariant.label})` 
           : prod.name;
         
-        const unitPrice = Number(matchedVariant ? matchedVariant.price : prod.price) || (Number(item.price) / Number(item.quantity || 1));
         const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
         const itemImage = pImages[0] || '';
 
@@ -305,7 +299,7 @@ export default function CustomerOrdersPage() {
             id: prod.id,
             product_id: prod.id,
             title: itemTitle,
-            price: unitPrice,
+            price: unitPrice, // Strictly the correct single unit price
             quantity: item.quantity || 1,
             stock: Number(matchedVariant ? matchedVariant.stock : (prod.stock || 10)),
             image: itemImage
