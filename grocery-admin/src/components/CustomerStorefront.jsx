@@ -192,7 +192,7 @@ export default function CustomerStorefront() {
           const pId = item?.product?.id || item?.id || item?.product_id;
           const currentStock = Number(item?.product?.stock || item?.stock || 0);
           if (pId) {
-            await supabase.from('products').update({ stock: currentStock - item.quantity }).eq('id', pId);
+          /*  await supabase.from('products').update({ stock: currentStock - item.quantity }).eq('id', pId);*/
           }
         }
       }
@@ -746,63 +746,207 @@ export default function CustomerStorefront() {
   };
 
  const handleReorder = (order) => {
-    if (!order.order_items || order.order_items.length === 0) return;
+  if (!order?.order_items?.length) {
+    alert('No items found in this order.');
+    return;
+  }
 
-    let addedCount = 0;
-    let updatedCart = [...cart];
+  let updatedCart = [...cart];
+  let addedCount = 0;
+  let skippedCount = 0;
 
-    order.order_items.forEach(item => {
-      const prod = item.products;
-      if (prod && Number(prod.stock || 0) > 0) {
-        const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-        const itemImage = pImages[0] || '';
+  order.order_items.forEach((item) => {
+    const prod = item?.products;
 
-        // Match variant if stored or fallback to base product price/variant
-        const variantKey = item.variant_id;
-        const matchedVariant = prod.variants?.find(v => v.id === variantKey || v.label === variantKey || v.unit_label === variantKey) || (prod.variants && prod.variants[0]) || null;
-
-        // Strictly determine single unit price (never use multiplied line total directly)
-        const unitPrice = Number(matchedVariant ? matchedVariant.price : prod.price) || (Number(item.price) / Number(item.quantity || 1));
-
-        const cartItemId = matchedVariant ? `${prod.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` : prod.id;
-        const itemTitle = matchedVariant ? `${prod.name} (${matchedVariant.unit_label || matchedVariant.label})` : prod.name;
-
-        const existingIndex = updatedCart.findIndex(ci => ci.cartItemId === cartItemId);
-        if (existingIndex > -1) {
-          updatedCart[existingIndex] = {
-            ...updatedCart[existingIndex],
-            quantity: updatedCart[existingIndex].quantity + item.quantity
-          };
-        } else {
-          updatedCart.push({
-            cartItemId,
-            product: prod,
-            variant: matchedVariant,
-            id: prod.id,
-            product_id: prod.id,
-            title: itemTitle,
-            price: unitPrice, // Stored strictly as single unit price
-            quantity: item.quantity,
-            stock: Number(prod.stock || 10),
-            image: itemImage
-          });
-        }
-        addedCount++;
-      }
-    });
-
-    if (addedCount > 0) {
-      setCart(updatedCart);
-      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-      window.dispatchEvent(new Event('storage'));
-
-      alert("Items from past order successfully added to your cart!");
-      setIsCartOpen(true);
-    } else {
-      alert("Sorry, items in this order are currently out of stock.");
+    if (!prod) {
+      skippedCount++;
+      return;
     }
-  };
+
+    // Prefer relational product_variants
+    const relationalVariants = Array.isArray(prod.product_variants)
+      ? prod.product_variants
+      : [];
+
+    // Fallback only if relational variants are unavailable
+    const jsonVariants = Array.isArray(prod.variants)
+      ? prod.variants
+      : [];
+
+    const variants =
+      relationalVariants.length > 0
+        ? relationalVariants
+        : jsonVariants;
+
+    let matchedVariant = null;
+
+    // 1. Match exact variant ID
+    if (item.variant_id) {
+      matchedVariant = variants.find(
+        (v) => String(v.id) === String(item.variant_id)
+      );
+    }
+
+    // 2. Match variant label
+    if (!matchedVariant && item.variant_label) {
+      const orderVariantLabel =
+        String(item.variant_label).trim().toLowerCase();
+
+      matchedVariant = variants.find((v) => {
+        const label = String(
+          v.unit_label ||
+          v.label ||
+          v.unit ||
+          ''
+        ).trim().toLowerCase();
+
+        return label === orderVariantLabel;
+      });
+    }
+
+    // 3. Last-resort historical price matching
+    if (!matchedVariant && item.price != null) {
+      matchedVariant = variants.find(
+        (v) => Number(v.price) === Number(item.price)
+      );
+    }
+
+    // If product has variants but we cannot identify
+    // the original one, do NOT silently select another variant.
+    if (variants.length > 0 && !matchedVariant) {
+      console.warn(
+        'Unable to identify original variant for reorder',
+        {
+          product: prod.name,
+          variant_id: item.variant_id,
+          variant_label: item.variant_label,
+          order_price: item.price
+        }
+      );
+
+      skippedCount++;
+      return;
+    }
+
+    const itemPrice = matchedVariant
+      ? Number(matchedVariant.price || 0)
+      : Number(item.price || 0);
+
+    const itemStock = matchedVariant
+      ? Number(matchedVariant.stock || 0)
+      : 0;
+
+    if (itemStock <= 0) {
+      skippedCount++;
+      return;
+    }
+
+    const variantLabel = matchedVariant
+      ? (
+          matchedVariant.unit_label ||
+          matchedVariant.label ||
+          matchedVariant.unit ||
+          ''
+        )
+      : '';
+
+    const cartItemId = matchedVariant
+      ? `${prod.id}-${matchedVariant.id || variantLabel}`
+      : prod.id;
+
+    const productImages =
+      Array.isArray(prod.images) && prod.images.length
+        ? prod.images
+        : Array.isArray(prod.gallery) && prod.gallery.length
+          ? prod.gallery
+          : [prod.image_url].filter(Boolean);
+
+    const requestedQuantity = Math.max(
+      1,
+      Number(item.quantity || 1)
+    );
+
+    const existingIndex = updatedCart.findIndex(
+      (cartItem) =>
+        cartItem.cartItemId === cartItemId
+    );
+
+    if (existingIndex >= 0) {
+      const existingItem = updatedCart[existingIndex];
+
+      updatedCart[existingIndex] = {
+        ...existingItem,
+        quantity: Math.min(
+          itemStock,
+          Number(existingItem.quantity || 0) +
+            requestedQuantity
+        ),
+        stock: itemStock,
+        price: itemPrice,
+        variant: matchedVariant
+      };
+    } else {
+      updatedCart.push({
+        cartItemId,
+        product: prod,
+        variant: matchedVariant,
+
+        id: prod.id,
+        product_id: prod.id,
+
+        title: variantLabel
+          ? `${prod.name} (${variantLabel})`
+          : prod.name,
+
+        price: itemPrice,
+
+        quantity: Math.min(
+          requestedQuantity,
+          itemStock
+        ),
+
+        stock: itemStock,
+
+        image: productImages[0] || ''
+      });
+    }
+
+    addedCount++;
+  });
+
+  if (addedCount === 0) {
+    alert(
+      'Sorry, none of the items from this order are currently available.'
+    );
+    return;
+  }
+
+  setCart(updatedCart);
+
+  localStorage.setItem(
+    'cart_items',
+    JSON.stringify(updatedCart)
+  );
+
+  window.dispatchEvent(
+    new CustomEvent('cartUpdated', {
+      detail: updatedCart
+    })
+  );
+
+  setIsCartOpen(true);
+
+  if (skippedCount > 0) {
+    alert(
+      `${addedCount} item(s) added to your cart. ` +
+      `${skippedCount} item(s) unavailable and skipped.`
+    );
+  } else {
+    alert(
+      'Items from your previous order have been added to your cart!'
+    );
+  }
+};
 
   const updateQuantity = (cartItemId, delta) => {
     setCart(prev => {

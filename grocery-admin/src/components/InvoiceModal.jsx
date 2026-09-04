@@ -1,252 +1,162 @@
 // src/components/InvoiceModal.jsx
-import { X, Printer, ShieldCheck, Tag } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 
-export default function InvoiceModal({ order, isOpen, onClose }) {
-  if (!isOpen || !order) return null;
+export default function InvoiceModal({ order, onClose }) {
+  if (!order) return null;
 
-  /* ─── helpers ─────────────────────────────────────────────────────────── */
+  const items = Array.isArray(order.order_items) ? order.order_items : [];
+  const subtotal = items.reduce((acc, item) => acc + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+  const delivery = Number(order.delivery_fee || order.delivery_charge || 0);
+  const discount = Number(order.discount || order.discount_amount || 0);
+  const tax = Number(order.tax || order.tax_amount || 0);
+  const total = Number(order.total_amount || order.grand_total || (subtotal + delivery + tax - discount));
 
-  /**
-   * Resolve the MRP for one order_item row.
-   * Priority:
-   *  1. Matching product_variant row (joined as products.product_variants[])
-   *  2. product-level mrp column
-   *  3. Fall back to the stored offer price (0 % discount shown)
-   */
-  function resolveItemMrp(item) {
-    const offerPrice = Number(item.price || 0);
+  const formattedDate = order.created_at 
+    ? new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : new Date().toLocaleDateString('en-IN');
 
-    // Try to find the matching variant via variant_id or variant_label
-    const variants = item.products?.product_variants || [];
-    let variant = null;
-    if (item.variant_id) {
-      variant = variants.find(v => v.id === item.variant_id);
-    }
-    if (!variant && item.variant_label) {
-      variant = variants.find(
-        v => v.unit_label === item.variant_label || v.label === item.variant_label
-      );
-    }
+  const invoiceNo = `INV-${String(order.id || '0000').slice(0, 8).toUpperCase()}`;
 
-    if (variant && Number(variant.mrp || 0) > 0) return Number(variant.mrp);
-    if (Number(item.products?.mrp || 0) > 0)     return Number(item.products.mrp);
-    return offerPrice; // no MRP data → treat as 0 % off
-  }
-
-  /* ─── per-item calculations ────────────────────────────────────────────── */
-  const lineItems = (order.order_items || []).map(item => {
-    const qty        = Number(item.quantity || 1);
-    const offerPrice = Number(item.price    || 0);
-    const mrp        = resolveItemMrp(item);
-    const discPct    = mrp > offerPrice ? Math.round(((mrp - offerPrice) / mrp) * 100) : 0;
-    const variantLabel =
-      item.variant_label ||
-      (item.products?.product_variants || []).find(v => v.id === item.variant_id)?.unit_label ||
-      '';
-
-    return { item, qty, offerPrice, mrp, discPct, variantLabel };
-  });
-
-  /* ─── bill totals ──────────────────────────────────────────────────────── */
-  const itemSubtotal   = lineItems.reduce((s, r) => s + r.offerPrice * r.qty, 0);
-  const totalMrpSum    = lineItems.reduce((s, r) => s + r.mrp        * r.qty, 0);
-  const productSavings = Math.max(0, totalMrpSum - itemSubtotal);
-
-  // Prefer persisted columns; fall back to derivation for old orders
-  const couponCode     = order.coupon_code || null;
-  const deliveryFee    = Number(order.delivery_fee ?? 0);
-
-  // discount_amount: use persisted value if available, else derive from total
-  let discountAmount = Number(order.discount_amount ?? 0);
-  if (!discountAmount && couponCode) {
-    // old order: back-calculate coupon discount
-    // total_amount = itemSubtotal - discount + deliveryFee
-    const derived = itemSubtotal + deliveryFee - Number(order.total_amount || 0);
-    if (derived > 0) discountAmount = derived;
-  }
-
-  const grandTotal     = Number(order.total_amount || 0);
-  const totalSavings   = productSavings + discountAmount;
-
-  /* ─── display helpers ──────────────────────────────────────────────────── */
-  const formattedId = order.id
-    ? `ORD${order.id.replace(/-/g, '').slice(0, 12).toUpperCase()}`
-    : 'N/A';
-
-  /* ─── render ───────────────────────────────────────────────────────────── */
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-[1100] animate-fadeIn font-sans">
-      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-emerald-100 pb-4 print:hidden">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden font-sans border border-stone-100 my-8">
+        
+        {/* Modal Header Actions (Hidden during print) */}
+        <div className="bg-stone-900 text-white px-6 py-4 flex justify-between items-center print:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-emerald-700 text-white rounded-xl font-black flex items-center justify-center shadow-sm text-sm">
-              KD
-            </div>
-            <div>
-              <span className="font-black text-slate-900 text-sm block leading-none">KD Store</span>
-              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Tax Invoice</span>
-            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold tracking-wide uppercase text-stone-300">Tax Invoice Preview</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer border border-emerald-200"
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => window.print()} 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
             >
-              <Printer size={14} /> Print
+              <Printer size={14} /> Print / Save PDF
             </button>
-            <button onClick={onClose} className="p-2 bg-stone-100 rounded-full hover:bg-stone-200 text-stone-600 transition cursor-pointer">
+            <button 
+              onClick={onClose} 
+              className="p-1.5 bg-stone-800 hover:bg-stone-700 rounded-xl text-stone-300 hover:text-white transition cursor-pointer"
+            >
               <X size={16} />
             </button>
           </div>
         </div>
 
-        <div className="space-y-6 text-xs text-slate-700 font-sans">
-
-          {/* Title */}
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">KD Store Invoice</h2>
-            <p className="text-[11px] text-emerald-700 font-bold">Lightning-Fast 10-Minute Grocery Delivery</p>
-          </div>
-
-          {/* Order meta */}
-          <div className="bg-emerald-50/40 p-4 rounded-2xl border border-emerald-100 space-y-2">
-            {[
-              ['Order ID',       formattedId],
-              ['Date & Time',    new Date(order.created_at).toLocaleString()],
-              ['Customer Email', order.customer_email],
-              ['Contact Phone',  order.phone || 'N/A'],
-              ['Status',         (order.status || 'pending').toUpperCase()],
-            ].map(([label, val]) => (
-              <div key={label} className="flex justify-between">
-                <span className="text-stone-400 font-bold uppercase text-[10px]">{label}</span>
-                <span className="font-medium text-slate-800 text-right max-w-[60%] break-words">{val}</span>
+        {/* Printable Invoice Container */}
+        <div className="p-8 sm:p-10 bg-white text-stone-800 space-y-8 print:p-0">
+          
+          {/* Company & Invoice Top Meta */}
+          <div className="flex justify-between items-start border-b border-stone-200 pb-6">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center font-black text-white text-base shadow-md">
+                  KD
+                </div>
+                <div>
+                  <h1 className="text-lg font-black text-stone-900 tracking-tight leading-none">KD Store Quick Commerce</h1>
+                  <p className="text-[11px] text-stone-500 mt-1 font-medium">10-Minute Grocery Delivery Service</p>
+                </div>
               </div>
-            ))}
-
-            {couponCode && (
-              <div className="flex justify-between items-center mt-1 pt-2 border-t border-emerald-200">
-                <span className="text-stone-400 font-bold uppercase text-[10px]">Applied Coupon</span>
-                <span className="inline-flex items-center gap-1 font-mono font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
-                  <Tag size={10} /> {couponCode}
-                </span>
+              <div className="text-xs text-stone-500 mt-4 space-y-0.5">
+                <p><strong className="text-stone-700">GSTIN:</strong> 07AAAAA0000A1Z5</p>
+                <p><strong className="text-stone-700">Support:</strong> support@kdstore.com | +91 98765 43210</p>
               </div>
-            )}
+            </div>
+
+            <div className="text-right">
+              <h2 className="text-xl font-black text-stone-900">{invoiceNo}</h2>
+              <p className="text-xs text-stone-500 mt-1"><strong className="text-stone-700">Date:</strong> {formattedDate}</p>
+            </div>
           </div>
 
-          {/* Delivery address */}
-          <div className="space-y-1.5">
-            <span className="font-black text-slate-900 uppercase text-[10px] tracking-wider">Delivery Address</span>
-            <p className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-stone-600 leading-snug">
-              {order.delivery_address || 'N/A'}
-            </p>
+          {/* Billing & Shipping Grid */}
+          <div className="grid grid-cols-2 gap-6 bg-stone-50/70 border border-stone-100 p-5 rounded-2xl text-xs">
+            <div>
+              <span className="font-extrabold text-stone-400 uppercase tracking-wider block mb-1.5 text-[10px]">Billed To / Customer</span>
+              <p className="font-bold text-stone-900 text-sm">{order.customer_email || 'Valued Customer'}</p>
+              <p className="text-stone-600 mt-0.5">Phone: {order.phone || 'N/A'}</p>
+            </div>
+            <div>
+              <span className="font-extrabold text-stone-400 uppercase tracking-wider block mb-1.5 text-[10px]">Delivery Address</span>
+              <p className="font-medium text-stone-700 leading-relaxed">
+                {order.delivery_address || order.address || 'Address info registered with order profile.'}
+              </p>
+            </div>
           </div>
 
-          {/* Item table */}
-          <div className="space-y-2">
-            <span className="font-black text-slate-900 uppercase text-[10px] tracking-wider">Itemized Breakdown</span>
+          {/* Itemized Table */}
+          <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-stone-200 text-[10px] uppercase text-stone-400 font-black">
-                  <th className="py-2">Item</th>
-                  <th className="py-2 text-center">Qty</th>
-                  <th className="py-2 text-right">MRP</th>
-                  <th className="py-2 text-right">Price</th>
-                  <th className="py-2 text-center">Disc</th>
-                  <th className="py-2 text-right">Total</th>
+                <tr className="border-b-2 border-stone-200 text-[10px] uppercase tracking-wider text-stone-500 font-black">
+                  <th className="py-3 px-2">Item Description</th>
+                  <th className="py-3 px-2 text-center">Unit / Variant</th>
+                  <th className="py-3 px-2 text-center">Qty</th>
+                  <th className="py-3 px-2 text-right">Price</th>
+                  <th className="py-3 px-2 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100 font-medium">
-                {lineItems.map(({ item, qty, offerPrice, mrp, discPct, variantLabel }, idx) => (
-                  <tr key={idx}>
-                    <td className="py-2.5 font-bold text-slate-900">
-                      {item.products?.name || 'Item'}
-                      {variantLabel && (
-                        <span className="block mt-0.5 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 rounded-md w-max">
-                          {variantLabel}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 text-center font-mono">{qty}</td>
-                    <td className="py-2.5 text-right text-stone-500">
-                      {mrp > offerPrice
-                        ? <span className="line-through">₹{mrp.toFixed(2)}</span>
-                        : <span className="text-stone-400">—</span>}
-                    </td>
-                    <td className="py-2.5 text-right font-bold text-emerald-700">₹{offerPrice.toFixed(2)}</td>
-                    <td className="py-2.5 text-center">
-                      {discPct > 0 ? (
-                        <span className="bg-rose-50 text-rose-700 font-black text-[10px] px-2 py-0.5 rounded-lg border border-rose-200">
-                          {discPct}% OFF
-                        </span>
-                      ) : (
-                        <span className="text-stone-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 text-right font-bold text-slate-900">
-                      ₹{(offerPrice * qty).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-800">
+                {items.map((item, idx) => {
+                  const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
+                  return (
+                    <tr key={idx} className="hover:bg-stone-50/50">
+                      <td className="py-3.5 px-2 font-bold text-stone-900">{item.products?.name || item.title || 'Product Item'}</td>
+                      <td className="py-3.5 px-2 text-center text-stone-500">{item.variant_label || 'Standard'}</td>
+                      <td className="py-3.5 px-2 text-center font-bold">{item.quantity}</td>
+                      <td className="py-3.5 px-2 text-right">₹{Number(item.price || 0).toFixed(2)}</td>
+                      <td className="py-3.5 px-2 text-right font-black text-stone-900">₹{itemTotal.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Bill summary */}
-          <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-2">
-            <div className="flex justify-between text-stone-600">
-              <span>Item Total</span>
-              <span className="font-bold text-stone-900">₹{itemSubtotal.toFixed(2)}</span>
-            </div>
-
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-emerald-700 font-bold">
-                <span className="flex items-center gap-1">
-                  <Tag size={11} />
-                  Coupon Discount{couponCode ? ` (${couponCode})` : ''}
-                </span>
-                <span>−₹{discountAmount.toFixed(2)}</span>
+          {/* Totals Calculation Summary */}
+          <div className="flex justify-end pt-2 border-t border-stone-200">
+            <div className="w-full sm:w-72 space-y-2 text-xs">
+              <div className="flex justify-between text-stone-600">
+                <span>Item Subtotal</span>
+                <span className="font-bold">₹{subtotal.toFixed(2)}</span>
               </div>
-            )}
-
-            <div className="flex justify-between text-stone-600">
-              <span>Delivery Charges</span>
-              <span className={`font-bold ${deliveryFee === 0 ? 'text-emerald-600' : 'text-stone-900'}`}>
-                {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee.toFixed(2)}`}
-              </span>
-            </div>
-
-            <div className="flex justify-between pt-3 border-t border-stone-200 font-black text-slate-900 text-sm">
-              <span>Grand Total Paid</span>
-              <span className="text-emerald-700">₹{grandTotal.toFixed(2)}</span>
-            </div>
-
-            {totalSavings > 0 && (
-              <div className="mt-2 pt-3 border-t border-emerald-200 bg-emerald-50/70 p-3 rounded-xl flex items-center justify-between text-emerald-900 font-black">
-                <span>🎉 Total Savings on this Order</span>
-                <span className="text-emerald-700 text-sm">₹{totalSavings.toFixed(2)}</span>
+              {discount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>Discount Savings</span>
+                  <span>−₹{discount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-stone-600">
+                <span>Delivery Charge</span>
+                <span>{delivery === 0 ? <strong className="text-emerald-600">FREE</strong> : `₹${delivery.toFixed(2)}`}</span>
               </div>
-            )}
+              {tax > 0 && (
+                <div className="flex justify-between text-stone-600">
+                  <span>Taxes (GST)</span>
+                  <span>₹{tax.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-stone-900 font-black text-sm pt-3 border-t-2 border-stone-900">
+                <span>Grand Total</span>
+                <span className="text-emerald-700 text-base">₹{total.toFixed(2)}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="text-center pt-2 border-t border-stone-100 text-[10px] text-stone-400 space-y-1">
-            <p className="flex items-center justify-center gap-1 font-bold text-emerald-700">
-              <ShieldCheck size={14} /> Verified Secure Transaction
-            </p>
-            <p>Thank you for shopping with KD Store!</p>
+          {/* Footer Notes & Signature */}
+          <div className="pt-8 border-t border-stone-200 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 text-[11px] text-stone-500">
+            <div>
+              <p className="font-bold text-stone-700">Terms & Conditions:</p>
+              <p className="mt-0.5">1. Goods once sold will only be taken back as per return policy guidelines.</p>
+              <p>2. This is a computer-generated tax invoice and requires no physical signature.</p>
+            </div>
+            <div className="text-right sm:text-right w-full sm:w-auto">
+              <div className="font-serif italic font-bold text-stone-800 text-sm mb-1">KD Store Auth.</div>
+              <div className="border-t border-stone-300 pt-1 font-bold text-stone-600 uppercase tracking-wider text-[10px]">Authorized Signatory</div>
+            </div>
           </div>
 
-        </div>
-
-        <div className="print:hidden pt-2">
-          <button
-            onClick={onClose}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
-          >
-            Close Invoice
-          </button>
         </div>
 
       </div>

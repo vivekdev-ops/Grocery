@@ -1,276 +1,195 @@
+// src/pages/CustomerOrdersPage.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  User,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Edit,
+  FileText,
+  Home,
+  Loader2,
   MapPin,
   Package,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Truck,
-  ChevronRight,
-  Edit3,
-  Trash2,
+  Phone,
   Plus,
-  Heart,
-  Star,
-  Camera,
-  ShoppingBag,
-  ArrowLeft,
   RefreshCw,
   Search,
-  Phone,
-  Mail,
-  Calendar,
-  CreditCard,
-  Receipt,
-  CircleAlert,
-  Navigation,
-  Loader2,
+  Star,
+  Trash2,
+  User,
   X,
+  ShoppingBag,
+  Truck,
+  CreditCard,
 } from 'lucide-react';
-
 import { useNavigate } from 'react-router-dom';
+
 import { supabase } from '../supabaseClient';
+import StoreHeader from '../components/store/StoreHeader';
+import Footer from '../components/Footer';
+import InvoiceModal from '../components/InvoiceModal';
 
-import StoreHeader from './store/StoreHeader';
-import Footer from './Footer';
-import InvoiceModal from './InvoiceModal';
 
-
-/* ============================================================
+/* =========================================================
    HELPERS
-============================================================ */
+========================================================= */
 
 const formatCurrency = (value) => {
-  const amount = Number(value);
+  const amount = Number(value) || 0;
 
-  if (!Number.isFinite(amount)) {
-    return '₹0.00';
-  }
-
-  return `₹${amount.toFixed(2)}`;
+  return `₹${amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
+const formatDate = (value) => {
+  if (!value) return '-';
 
-const formatDate = (dateValue) => {
-  if (!dateValue) return 'N/A';
-
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
+  try {
+    return new Date(value).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return '-';
   }
-
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
 };
 
+const formatDateTime = (value) => {
+  if (!value) return '-';
 
-const formatDateTime = (dateValue) => {
-  if (!dateValue) return 'N/A';
-
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
+  try {
+    return new Date(value).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '-';
   }
-
-  return date.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 };
 
+const formatStatus = (status) => {
+  if (!status) return 'Order Placed';
 
-const formatStatus = (value) => {
-  if (!value) return 'Placed';
-
-  return String(value)
+  return String(status)
     .replace(/_/g, ' ')
+    .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-
-/* ============================================================
-   ORDER ID
-============================================================ */
-
 const getOrderId = (order) => {
-  if (!order) return '';
-
-  return (
-    order.order_number ||
-    order.order_id ||
-    order.id ||
-    ''
-  );
+  return order?.id || order?.order_id || null;
 };
-
 
 const getDisplayOrderId = (order) => {
   const id = getOrderId(order);
 
-  if (!id) {
-    return 'N/A';
-  }
+  if (!id) return '-';
 
-  const stringId = String(id);
+  if (order?.order_number) return order.order_number;
+  if (order?.order_no) return order.order_no;
+  if (order?.display_order_id) return order.display_order_id;
 
-  /*
-   * If database already has a business order number such as:
-   * ORD-20260904-0001
-   * ORD123456
-   * then display it directly.
-   */
-  if (
-    stringId.toUpperCase().startsWith('ORD')
-  ) {
-    return stringId.toUpperCase();
-  }
-
-  /*
-   * If order_number exists, use it directly.
-   */
-  if (order.order_number) {
-    return String(order.order_number);
-  }
-
-  /*
-   * UUID fallback.
-   */
-  return `ORD${stringId
-    .replace(/-/g, '')
-    .slice(0, 12)
-    .toUpperCase()}`;
+  return `#${String(id).slice(0, 8).toUpperCase()}`;
 };
-
-
-/* ============================================================
-   ORDER STATUS / TRACKING
-============================================================ */
 
 const getOrderStatus = (order) => {
-  if (!order) {
-    return 'PLACED';
-  }
-
-  return String(
-    order.tracking_status ||
-    order.status ||
+  return (
+    order?.status ||
+    order?.order_status ||
+    order?.payment_status ||
     'PLACED'
-  ).toUpperCase();
+  );
 };
 
+/* =========================================================
+   TRACKING HELPERS
+========================================================= */
 
-const getTrackingSteps = (order) => {
-  const status = getOrderStatus(order);
-  const normalizedStatus = status
-    .toLowerCase()
-    .replace(/\s+/g, '_');
+const normalizeOrderStatus = (status) => {
+  if (!status) return 'PLACED';
+  const lower = String(status).toLowerCase().trim();
+
+  if (lower === 'pending') return 'PLACED';
+  if (lower === 'processing') return 'PREPARING';
+  if (lower === 'shipped') return 'OUT_FOR_DELIVERY';
+  if (lower === 'delivered') return 'DELIVERED';
+  if (lower === 'cancelled') return 'CANCELLED';
+
+  return 'PLACED';
+};
+
+const getTrackingSteps = (orderOrStatus) => {
+  const order = typeof orderOrStatus === 'object' && orderOrStatus !== null ? orderOrStatus : { status: orderOrStatus };
+  const status = order?.status || order?.order_status || 'pending';
+  const currentStatus = normalizeOrderStatus(status);
+  const createdAt = order?.created_at;
 
   const steps = [
-    {
-      key: 'placed',
-      label: 'Order Placed',
-      description: 'Your order has been placed',
-      icon: Package,
+    { 
+      key: 'PLACED', 
+      label: 'Order Placed', 
+      icon: ShoppingBag, 
+      time: createdAt ? formatDateTime(createdAt) : null 
     },
-    {
-      key: 'confirmed',
-      label: 'Order Confirmed',
-      description: 'Your order has been confirmed',
-      icon: CheckCircle2,
+    { 
+      key: 'CONFIRMED', 
+      label: 'Confirmed', 
+      icon: Check, 
+      time: order?.confirmed_at ? formatDateTime(order.confirmed_at) : (currentStatus !== 'PLACED' && createdAt ? formatDateTime(createdAt) : null)
     },
-    {
-      key: 'preparing',
-      label: 'Preparing',
-      description: 'Your items are being prepared',
-      icon: ShoppingBag,
+    { 
+      key: 'PREPARING', 
+      label: 'Preparing', 
+      icon: Package, 
+      time: order?.preparing_at ? formatDateTime(order.preparing_at) : null
     },
-    {
-      key: 'ready_for_pickup',
-      label: 'Ready for Pickup',
-      description: 'Order is ready for delivery',
-      icon: Package,
+    { 
+      key: 'OUT_FOR_DELIVERY', 
+      label: 'Out for Delivery', 
+      icon: Truck, 
+      time: order?.shipped_at ? formatDateTime(order.shipped_at) : null
     },
-    {
-      key: 'out_for_delivery',
-      label: 'Out for Delivery',
-      description: 'Delivery partner is on the way',
-      icon: Truck,
-    },
-    {
-      key: 'delivered',
-      label: 'Delivered',
-      description: 'Order delivered successfully',
-      icon: CheckCircle2,
+    { 
+      key: 'DELIVERED', 
+      label: 'Delivered', 
+      icon: Check, 
+      time: order?.delivered_at ? formatDateTime(order.delivered_at) : null
     },
   ];
 
-  const statusIndexMap = {
-    placed: 0,
-    pending: 0,
-
-    confirmed: 1,
-
-    preparing: 2,
-
-    ready: 3,
-    ready_for_pickup: 3,
-
-    out_for_delivery: 4,
-    outfordelivery: 4,
-    shipped: 4,
-    dispatched: 4,
-
-    delivered: 5,
-    completed: 5,
-  };
-
-  if (
-    normalizedStatus === 'cancelled' ||
-    normalizedStatus === 'canceled'
-  ) {
-    return {
-      cancelled: true,
-      currentIndex: -1,
-      steps,
-    };
+  if (currentStatus === 'CANCELLED') {
+    return [
+      { key: 'PLACED', label: 'Order Placed', icon: ShoppingBag, time: createdAt ? formatDateTime(createdAt) : null },
+      { key: 'CANCELLED', label: 'Cancelled', icon: X, time: order?.updated_at ? formatDateTime(order.updated_at) : null },
+    ];
   }
 
-  let currentIndex = statusIndexMap[normalizedStatus];
+  const stepKeys = steps.map(s => s.key);
+  const statusIndex = stepKeys.indexOf(currentStatus);
 
-  if (currentIndex === undefined) {
-    currentIndex = 0;
-  }
-
-  return {
-    cancelled: false,
-    currentIndex,
-    steps,
-  };
+  return steps.map((step, index) => ({
+    ...step,
+    completed: statusIndex >= 0 ? index <= statusIndex : index === 0,
+    active: step.key === currentStatus,
+  }));
 };
 
-
-/* ============================================================
+/* =========================================================
    VARIANT HELPERS
-============================================================ */
+========================================================= */
 
 const getProductVariants = (product) => {
-  if (!product) {
-    return [];
-  }
+  if (!product) return [];
 
-  /*
-   * Preferred:
-   * relational product_variants table
-   */
   if (
     Array.isArray(product.product_variants) &&
     product.product_variants.length > 0
@@ -278,17 +197,22 @@ const getProductVariants = (product) => {
     return product.product_variants;
   }
 
-  /*
-   * Backward compatibility:
-   * JSONB variants field
-   */
   if (Array.isArray(product.variants)) {
     return product.variants;
   }
 
+  if (typeof product.variants === 'string') {
+    try {
+      const parsed = JSON.parse(product.variants);
+
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
   return [];
 };
-
 
 const getVariantLabel = (variant) => {
   if (!variant) return '';
@@ -297,495 +221,343 @@ const getVariantLabel = (variant) => {
     variant.unit_label ||
     variant.label ||
     variant.unit ||
+    variant.name ||
     ''
   );
 };
 
-
 const getVariantPrice = (variant) => {
-  if (!variant) return 0;
-
-  const price = Number(variant.price);
-
-  return Number.isFinite(price) ? price : 0;
+  return Number(variant?.price) || 0;
 };
-
 
 const getVariantMRP = (variant) => {
-  if (!variant) return 0;
-
-  const mrp = Number(variant.mrp);
-
-  return Number.isFinite(mrp) ? mrp : 0;
+  return Number(variant?.mrp) || 0;
 };
-
 
 const getVariantStock = (variant) => {
-  if (!variant) return 0;
-
-  const stock = Number(variant.stock);
-
-  return Number.isFinite(stock) ? stock : 0;
+  return Math.max(0, Number(variant?.stock) || 0);
 };
 
+const findOrderItemVariant = (orderItem, product) => {
+  const variants = getProductVariants(product);
 
-/* ============================================================
-   FIND ORDER ITEM VARIANT
-============================================================ */
+  if (!variants.length) return null;
 
-const findOrderItemVariant = (item) => {
-  if (!item?.products) {
-    return null;
-  }
-
-  const variants = getProductVariants(item.products);
-
-  if (!variants.length) {
-    return null;
-  }
-
-  /*
-   * First priority:
-   * variant_id stored in order_items
-   */
-  if (item.variant_id) {
-    const matchedById = variants.find(
+  if (orderItem?.variant_id) {
+    const byId = variants.find(
       (variant) =>
-        String(variant.id) === String(item.variant_id)
+        String(variant?.id) === String(orderItem.variant_id)
     );
 
-    if (matchedById) {
-      return matchedById;
-    }
+    if (byId) return byId;
   }
 
-  /*
-   * Second priority:
-   * variant label
-   */
-  if (item.variant_label) {
-    const matchedByLabel = variants.find(
-      (variant) =>
-        String(getVariantLabel(variant)).toLowerCase() ===
-        String(item.variant_label).toLowerCase()
-    );
+  if (orderItem?.variant_label) {
+    const targetLabel = String(
+      orderItem.variant_label
+    ).trim().toLowerCase();
 
-    if (matchedByLabel) {
-      return matchedByLabel;
-    }
+    const byLabel = variants.find((variant) => {
+      const label = String(
+        getVariantLabel(variant)
+      )
+        .trim()
+        .toLowerCase();
+
+      return label === targetLabel;
+    });
+
+    if (byLabel) return byLabel;
   }
 
-  /*
-   * Third priority:
-   * Match historical price against current variant.
-   *
-   * This is only for finding the variant.
-   * We NEVER replace the historical order price.
-   */
-  if (item.price !== null && item.price !== undefined) {
-    const historicalPrice = Number(item.price);
-
-    const matchedByPrice = variants.find(
-      (variant) =>
-        Number(variant.price) === historicalPrice
-    );
-
-    if (matchedByPrice) {
-      return matchedByPrice;
-    }
+  if (variants.length === 1) {
+    return variants[0];
   }
 
   return null;
 };
 
 
-/* ============================================================
-   CHARGES
-============================================================ */
+/* =========================================================
+   ORDER CALCULATIONS
+========================================================= */
 
 const getDeliveryCharge = (order) => {
-  if (!order) {
-    return 0;
-  }
-
-  const possibleFields = [
-    order.delivery_charge,
-    order.delivery_fee,
-    order.delivery_charges,
-    order.shipping_charge,
-    order.shipping_fee,
-  ];
-
-  const value = possibleFields.find(
-    (item) =>
-      item !== null &&
-      item !== undefined &&
-      item !== ''
-  );
-
-  const charge = Number(value);
-
-  return Number.isFinite(charge) ? charge : 0;
+  return Number(
+    order?.delivery_charge ??
+      order?.delivery_fee ??
+      order?.shipping_charge ??
+      0
+  ) || 0;
 };
-
 
 const getHandlingCharge = (order) => {
-  if (!order) {
-    return 0;
-  }
-
-  const possibleFields = [
-    order.handling_charge,
-    order.handling_fee,
-    order.platform_fee,
-  ];
-
-  const value = possibleFields.find(
-    (item) =>
-      item !== null &&
-      item !== undefined &&
-      item !== ''
-  );
-
-  const charge = Number(value);
-
-  return Number.isFinite(charge) ? charge : 0;
+  return Number(
+    order?.handling_charge ??
+      order?.handling_fee ??
+      0
+  ) || 0;
 };
-
 
 const getDiscount = (order) => {
-  if (!order) {
-    return 0;
-  }
-
-  const possibleFields = [
-    order.discount_amount,
-    order.discount,
-    order.coupon_discount,
-  ];
-
-  const value = possibleFields.find(
-    (item) =>
-      item !== null &&
-      item !== undefined &&
-      item !== ''
-  );
-
-  const discount = Number(value);
-
-  return Number.isFinite(discount) ? discount : 0;
+  return Number(
+    order?.discount ??
+      order?.discount_amount ??
+      0
+  ) || 0;
 };
-
 
 const getTax = (order) => {
-  if (!order) {
-    return 0;
-  }
-
-  const possibleFields = [
-    order.tax_amount,
-    order.tax,
-    order.gst_amount,
-  ];
-
-  const value = possibleFields.find(
-    (item) =>
-      item !== null &&
-      item !== undefined &&
-      item !== ''
-  );
-
-  const tax = Number(value);
-
-  return Number.isFinite(tax) ? tax : 0;
+  return Number(
+    order?.tax ??
+      order?.tax_amount ??
+      0
+  ) || 0;
 };
 
+const getItemSubtotal = (item) => {
+  const quantity = Number(item?.quantity) || 0;
+  const price = Number(item?.price) || 0;
 
-/* ============================================================
-   ITEM SUBTOTAL
-============================================================ */
+  return quantity * price;
+};
 
-const getItemSubtotal = (order) => {
-  if (!order?.order_items) {
-    return 0;
-  }
+const getOrderItemsSubtotal = (order) => {
+  const items = Array.isArray(order?.order_items)
+    ? order.order_items
+    : [];
 
-  return order.order_items.reduce(
-    (total, item) => {
-      const price = Number(item.price) || 0;
-      const quantity = Number(item.quantity) || 0;
-
-      return total + price * quantity;
-    },
+  return items.reduce(
+    (total, item) => total + getItemSubtotal(item),
     0
   );
 };
 
-
-/* ============================================================
-   ORDER TOTAL
-============================================================ */
-
 const getOrderTotal = (order) => {
-  if (!order) {
-    return 0;
+  if (
+    order?.total_amount !== undefined &&
+    order?.total_amount !== null
+  ) {
+    return Number(order.total_amount) || 0;
   }
 
-  /*
-   * total_amount is treated as authoritative.
-   */
-  const total = Number(order.total_amount);
-
-  if (Number.isFinite(total)) {
-    return total;
+  if (
+    order?.grand_total !== undefined &&
+    order?.grand_total !== null
+  ) {
+    return Number(order.grand_total) || 0;
   }
 
-  /*
-   * Fallback calculation.
-   */
-  const subtotal = getItemSubtotal(order);
+  const subtotal = getOrderItemsSubtotal(order);
   const delivery = getDeliveryCharge(order);
   const handling = getHandlingCharge(order);
   const discount = getDiscount(order);
   const tax = getTax(order);
 
-  return (
-    subtotal +
-    delivery +
-    handling +
-    tax -
-    discount
-  );
+  return subtotal + delivery + handling + tax - discount;
 };
 
 
-/* ============================================================
-   COMPONENT
-============================================================ */
+/* =========================================================
+   ADDRESS HELPERS
+========================================================= */
 
-export default function CustomerOrdersPage() {
+const emptyAddressForm = {
+  title: 'Home',
+  house_no: '',
+  ward_no_name: '',
+  city: '',
+  district: '',
+  state: '',
+  pincode: '',
+  phone: '',
+  address: '',
+  latitude: null,
+  longitude: null,
+  is_default: false,
+};
+
+
+/* =========================================================
+   COMPONENT
+========================================================= */
+
+const CustomerOrdersPage = () => {
   const navigate = useNavigate();
 
+  const [authUser, setAuthUser] = useState(null);
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-
-  const [orders, setOrders] = useState([]);
-  const [addresses, setAddresses] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(false);
 
+  const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const [activeTab, setActiveTab] = useState('orders');
+  const [expandedOrders, setExpandedOrders] = useState({});
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [showAddressModal, setShowAddressModal] =
+  const [addresses, setAddresses] = useState([]);
+
+  const [showAddressForm, setShowAddressForm] =
     useState(false);
 
   const [editingAddress, setEditingAddress] =
     useState(null);
 
-  const [showProfileEdit, setShowProfileEdit] =
+  const [addressForm, setAddressForm] =
+    useState(emptyAddressForm);
+
+  const [savingAddress, setSavingAddress] =
     useState(false);
 
-  const [showRatingModal, setShowRatingModal] =
+  const [deletingAddressId, setDeletingAddressId] =
+    useState(null);
+
+  const [editingProfile, setEditingProfile] =
+    useState(false);
+
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    phone: '',
+  });
+
+  const [savingProfile, setSavingProfile] =
     useState(false);
 
   const [ratingOrder, setRatingOrder] =
     useState(null);
 
-  const [rating, setRating] = useState(0);
+  const [ratingValue, setRatingValue] =
+    useState(0);
 
   const [ratingComment, setRatingComment] =
     useState('');
 
+  const [savingRating, setSavingRating] =
+    useState(false);
+
   const [invoiceOrder, setInvoiceOrder] =
     useState(null);
 
-  const [reordering, setReordering] =
-    useState(false);
+  const [reorderingOrderId, setReorderingOrderId] =
+    useState(null);
 
-  const [profileForm, setProfileForm] =
-    useState({
-      full_name: '',
-      phone: '',
-    });
 
-  const [addressForm, setAddressForm] =
-    useState({
-      address_line1: '',
-      address_line2: '',
-      city: '',
-      state: '',
-      pincode: '',
-      landmark: '',
-      address_type: 'HOME',
-    });
-
-  /* ============================================================
-     AUTH
-  ============================================================ */
+  /* =======================================================
+     AUTH INITIALIZATION
+  ======================================================= */
 
   useEffect(() => {
-    initialize();
-  }, []);
+    let mounted = true;
 
+    const initialize = async () => {
+      try {
+        setLoading(true);
 
-  const initialize = async () => {
-    try {
-      setLoading(true);
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      const {
-        data: { user: authUser },
-        error: authError,
-      } = await supabase.auth.getUser();
+        if (sessionError) throw sessionError;
 
-      if (authError) {
-        throw authError;
-      }
+        if (!mounted) return;
 
-      if (!authUser) {
-        navigate('/login');
-        return;
-      }
+        if (!session || !session.user) {
+          navigate('/login');
+          return;
+        }
 
-      setUser(authUser);
+        const currentUser = session.user;
+        setAuthUser(currentUser);
 
-      await Promise.all([
-        loadProfile(authUser),
-        loadOrders(authUser),
-        loadAddresses(authUser),
-      ]);
-    } catch (error) {
-      console.error(
-        'Customer page initialization error:',
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .maybeSingle();
 
+        if (!mounted) return;
 
-  /* ============================================================
-     PROFILE
-  ============================================================ */
+        const profile = profileData || {
+          id: currentUser.id,
+          email: currentUser.email,
+          full_name:
+            currentUser.user_metadata?.full_name || '',
+          phone:
+            currentUser.user_metadata?.phone || '',
+        };
 
-  const loadProfile = async (authUser) => {
-    try {
-      const email = authUser?.email;
+        setUser(profile);
 
-      if (!email) return;
+        setProfileForm({
+          full_name:
+            profile.full_name ||
+            currentUser.user_metadata?.full_name ||
+            '',
+          phone:
+            profile.phone ||
+            currentUser.user_metadata?.phone ||
+            '',
+        });
 
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error) {
+        await Promise.all([
+          loadOrders(currentUser.email),
+          loadAddresses(currentUser.id),
+        ]);
+      } catch (error) {
         console.error(
-          'Customer profile error:',
+          'Customer orders initialization error:',
           error
         );
-        return;
+        navigate('/login');
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
+    };
 
-      setProfile(data);
+    initialize();
 
-      setProfileForm({
-        full_name:
-          data?.full_name ||
-          data?.name ||
-          authUser?.user_metadata?.full_name ||
-          '',
-        phone:
-          data?.phone ||
-          authUser?.phone ||
-          '',
-      });
-    } catch (error) {
-      console.error(
-        'Load profile error:',
-        error
-      );
-    }
-  };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate('/login');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [navigate]);
 
 
-  const handleProfileSave = async () => {
+  /* =======================================================
+     LOAD ORDERS
+  ======================================================= */
+
+  const loadOrders = async (emailOverride = null) => {
+    const email =
+      emailOverride ||
+      authUser?.email ||
+      user?.email;
+
+    if (!email) return;
+
     try {
-      if (!user?.email) {
-        return;
-      }
+      setLoadingOrders(true);
 
-      const payload = {
-        full_name: profileForm.full_name,
-        phone: profileForm.phone,
-      };
-
-      const { data, error } = await supabase
-        .from('customers')
-        .update(payload)
-        .eq('email', user.email)
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      setProfile(data);
-      setShowProfileEdit(false);
-
-      alert('Profile updated successfully.');
-    } catch (error) {
-      console.error(
-        'Profile update error:',
-        error
-      );
-
-      alert(
-        error?.message ||
-        'Unable to update profile.'
-      );
-    }
-  };
-
-
-  /* ============================================================
-     ORDERS
-  ============================================================ */
-
-  const loadOrders = async (authUser = user) => {
-    try {
-      if (!authUser?.email) {
-        return;
-      }
-
-      setOrdersLoading(true);
-
-      const email = authUser.email;
-
-      /*
-       * IMPORTANT:
-       *
-       * We fetch:
-       * orders
-       *   -> order_items
-       *       -> products
-       *           -> product_variants
-       *
-       * Product-level price/mrp/stock are NOT used.
-       */
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
           order_items (
             *,
+            variant_id,
+            variant_label,
             products (
               *,
               product_variants (*)
@@ -797,118 +569,550 @@ export default function CustomerOrdersPage() {
           ascending: false,
         });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setOrders(data || []);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(
-        'Orders loading error:',
-        error
-      );
-
+      console.error('Error loading orders:', error);
       setOrders([]);
     } finally {
-      setOrdersLoading(false);
+      setLoadingOrders(false);
     }
   };
 
 
-  /* ============================================================
-     ADDRESSES
-  ============================================================ */
+  /* =======================================================
+     LOAD ADDRESSES
+  ======================================================= */
 
-  const loadAddresses = async (authUser = user) => {
+  const loadAddresses = async (overrideUserId = null) => {
+    const ownerUserId = overrideUserId || authUser?.id || user?.id;
+
+    if (!ownerUserId) {
+      setAddresses([]);
+      return;
+    }
+
     try {
-      if (!authUser?.email) {
-        return;
-      }
-
-      /*
-       * Change this table name if your address table has
-       * a different name.
-       */
       const { data, error } = await supabase
         .from('customer_addresses')
         .select('*')
-        .eq('customer_email', authUser.email)
-        .order('created_at', {
-          ascending: false,
-        });
+        .eq('user_id', ownerUserId)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error(
-          'Address loading error:',
-          error
-        );
+      if (error) throw error;
 
-        return;
-      }
-
-      setAddresses(data || []);
+      setAddresses(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error(
-        'Load addresses error:',
-        error
-      );
+      console.error('Error loading addresses:', error);
+      setAddresses([]);
     }
   };
 
 
-  const resetAddressForm = () => {
-    setAddressForm({
-      address_line1: '',
-      address_line2: '',
-      city: '',
-      state: '',
-      pincode: '',
-      landmark: '',
-      address_type: 'HOME',
-    });
+  /* =======================================================
+     SEARCHED ORDERS
+  ======================================================= */
 
-    setEditingAddress(null);
+  const filteredOrders = useMemo(() => {
+    const term = String(searchTerm || '')
+      .trim()
+      .toLowerCase();
+
+    if (!term) return orders;
+
+    return orders.filter((order) => {
+      const orderId =
+        getDisplayOrderId(order).toLowerCase();
+
+      const status =
+        formatStatus(
+          getOrderStatus(order)
+        ).toLowerCase();
+
+      const items = Array.isArray(
+        order?.order_items
+      )
+        ? order.order_items
+        : [];
+
+      const productText = items
+        .map(
+          (item) =>
+            item?.products?.name || ''
+        )
+        .join(' ')
+        .toLowerCase();
+
+      return (
+        orderId.includes(term) ||
+        status.includes(term) ||
+        productText.includes(term)
+      );
+    });
+  }, [orders, searchTerm]);
+
+
+  /* =======================================================
+     ORDER TOGGLE
+  ======================================================= */
+
+  const toggleOrder = (orderId) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
   };
 
 
-  const handleAddressSubmit = async (event) => {
-    event.preventDefault();
+  /* =======================================================
+     REORDER
+  ======================================================= */
+
+  const handleReorder = async (order) => {
+    if (!order) return;
+
+    const orderId = getOrderId(order);
 
     try {
-      if (!user?.email) {
+      setReorderingOrderId(orderId);
+
+      const existingCartRaw =
+        localStorage.getItem('cart_items');
+
+      let existingCart = [];
+
+      try {
+        existingCart = existingCartRaw
+          ? JSON.parse(existingCartRaw)
+          : [];
+      } catch {
+        existingCart = [];
+      }
+
+      if (!Array.isArray(existingCart)) {
+        existingCart = [];
+      }
+
+      const orderItems = Array.isArray(
+        order?.order_items
+      )
+        ? order.order_items
+        : [];
+
+      if (!orderItems.length) {
+        alert('No items found in this order.');
         return;
       }
 
-      const payload = {
-        ...addressForm,
-        customer_email: user.email,
-      };
+      const cart = [...existingCart];
 
-      if (editingAddress?.id) {
-        const { error } = await supabase
-          .from('customer_addresses')
-          .update(payload)
-          .eq('id', editingAddress.id);
+      let addedCount = 0;
+      let skippedCount = 0;
 
-        if (error) {
-          throw error;
+      for (const orderItem of orderItems) {
+        const product = orderItem?.products;
+
+        if (!product?.id) {
+          skippedCount += 1;
+          continue;
         }
 
-        alert('Address updated successfully.');
-      } else {
-        const { error } = await supabase
-          .from('customer_addresses')
-          .insert(payload);
+        const variants =
+          getProductVariants(product);
 
-        if (error) {
-          throw error;
+        let matchedVariant =
+          findOrderItemVariant(
+            orderItem,
+            product
+          );
+
+        if (!matchedVariant) {
+          skippedCount += 1;
+          continue;
         }
 
-        alert('Address added successfully.');
+        const currentStock =
+          getVariantStock(matchedVariant);
+
+        const currentPrice =
+          getVariantPrice(matchedVariant);
+
+        const currentMrp =
+          getVariantMRP(matchedVariant);
+
+        if (currentStock <= 0) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const requestedQuantity = Math.max(
+          1,
+          Number(orderItem?.quantity) || 1
+        );
+
+        const variantId =
+          matchedVariant?.id ||
+          orderItem?.variant_id ||
+          null;
+
+        const cartItemId =
+          `${product.id}-${variantId || 'default'}`;
+
+        const existingIndex =
+          cart.findIndex(
+            (item) =>
+              String(
+                item?.cartItemId
+              ) === String(cartItemId)
+          );
+
+        if (existingIndex >= 0) {
+          const existingItem =
+            cart[existingIndex];
+
+          const existingQuantity =
+            Number(
+              existingItem?.quantity
+            ) || 0;
+
+          const newQuantity = Math.min(
+            existingQuantity +
+              requestedQuantity,
+            currentStock
+          );
+
+          cart[existingIndex] = {
+            ...existingItem,
+            cartItemId,
+            id: product.id,
+            product_id: product.id,
+            product,
+            variant: matchedVariant,
+            title:
+              product?.name || 'Product',
+            price: currentPrice,
+            mrp: currentMrp,
+            stock: currentStock,
+            quantity: newQuantity,
+            image:
+              product?.image_url ||
+              product?.image ||
+              product?.images?.[0] ||
+              product?.gallery?.[0] ||
+              '',
+            image_url:
+              product?.image_url ||
+              product?.image ||
+              product?.images?.[0] ||
+              product?.gallery?.[0] ||
+              '',
+          };
+        } else {
+          cart.push({
+            cartItemId,
+            id: product.id,
+            product_id: product.id,
+            product,
+            variant: matchedVariant,
+            title:
+              product?.name || 'Product',
+            price: currentPrice,
+            mrp: currentMrp,
+            stock: currentStock,
+            quantity: Math.min(
+              requestedQuantity,
+              currentStock
+            ),
+            image:
+              product?.image_url ||
+              product?.image ||
+              product?.images?.[0] ||
+              product?.gallery?.[0] ||
+              '',
+            image_url:
+              product?.image_url ||
+              product?.image ||
+              product?.images?.[0] ||
+              product?.gallery?.[0] ||
+              '',
+          });
+        }
+
+        addedCount += 1;
       }
 
-      setShowAddressModal(false);
-      resetAddressForm();
+      localStorage.setItem(
+        'cart_items',
+        JSON.stringify(cart)
+      );
+
+      window.dispatchEvent(
+        new CustomEvent('cartUpdated', {
+          detail: cart,
+        })
+      );
+
+      window.dispatchEvent(
+        new Event('storage')
+      );
+
+      setSelectedOrder(null);
+
+      if (addedCount === 0) {
+        alert(
+          'None of the items from this order are currently available.'
+        );
+        return;
+      }
+
+      let message =
+        `${addedCount} item${addedCount !== 1 ? 's' : ''} added to your cart.`;
+
+      if (skippedCount > 0) {
+        message += ` ${skippedCount} unavailable item${skippedCount !== 1 ? 's were' : ' was'} skipped.`;
+      }
+
+      alert(message);
+
+      navigate('/');
+    } catch (error) {
+      console.error(
+        'Reorder error:',
+        error
+      );
+
+      alert(
+        `Unable to reorder: ${
+          error?.message ||
+          'Something went wrong.'
+        }`
+      );
+    } finally {
+      setReorderingOrderId(null);
+    }
+  };
+
+
+  /* =======================================================
+     ADDRESS - ADD
+  ======================================================= */
+
+  const handleAddAddress = () => {
+    setEditingAddress(null);
+
+    setAddressForm({
+      ...emptyAddressForm,
+      is_default:
+        addresses.length === 0,
+    });
+
+    setShowAddressForm(true);
+  };
+
+
+  /* =======================================================
+     ADDRESS - EDIT
+  ======================================================= */
+
+  const handleEditAddress = (address) => {
+    if (!address) return;
+
+    setEditingAddress(address);
+
+    setAddressForm({
+      title:
+        address.title || 'Home',
+      house_no:
+        address.house_no || '',
+      ward_no_name:
+        address.ward_no_name || '',
+      city:
+        address.city || '',
+      district:
+        address.district || '',
+      state:
+        address.state || '',
+      pincode:
+        address.pincode || '',
+      phone:
+        address.phone || '',
+      address:
+        address.address || '',
+      latitude:
+        address.latitude ?? null,
+      longitude:
+        address.longitude ?? null,
+      is_default:
+        Boolean(address.is_default),
+    });
+
+    setShowAddressForm(true);
+  };
+
+
+  /* =======================================================
+     ADDRESS - SUBMIT
+  ======================================================= */
+
+  const handleAddressSubmit = async (e) => {
+    e.preventDefault();
+
+    const ownerUserId = authUser?.id || user?.id;
+
+    if (!ownerUserId) {
+      alert(
+        'Please login again to manage your address.'
+      );
+      return;
+    }
+
+    if (
+      !addressForm.house_no?.trim() ||
+      !addressForm.city?.trim() ||
+      !addressForm.state?.trim() ||
+      !addressForm.pincode?.trim()
+    ) {
+      alert(
+        'Please fill House / Flat No., City, State and Pincode.'
+      );
+      return;
+    }
+
+    if (
+      !/^\d{6}$/.test(
+        String(addressForm.pincode).trim()
+      )
+    ) {
+      alert(
+        'Please enter a valid 6-digit pincode.'
+      );
+      return;
+    }
+
+    try {
+      setSavingAddress(true);
+
+      const payload = {
+        user_id: ownerUserId,
+        title: addressForm.title || 'Home',
+        house_no: addressForm.house_no?.trim() || null,
+        ward_no_name: addressForm.ward_no_name?.trim() || null,
+        city: addressForm.city?.trim() || null,
+        district: addressForm.district?.trim() || null,
+        state: addressForm.state?.trim() || null,
+        pincode: addressForm.pincode?.trim() || null,
+        phone: addressForm.phone?.trim() || null,
+        address: addressForm.address?.trim() || null,
+        latitude:
+          addressForm.latitude !== null &&
+          addressForm.latitude !== ''
+            ? Number(addressForm.latitude)
+            : null,
+        longitude:
+          addressForm.longitude !== null &&
+          addressForm.longitude !== ''
+            ? Number(addressForm.longitude)
+            : null,
+        is_default: Boolean(addressForm.is_default),
+      };
+
+      if (payload.is_default) {
+        const { error: resetError } =
+          await supabase
+            .from('customer_addresses')
+            .update({
+              is_default: false,
+            })
+            .eq(
+              'user_id',
+              ownerUserId
+            );
+
+        if (resetError) {
+          throw resetError;
+        }
+      }
+
+      if (editingAddress?.id) {
+        const {
+          data,
+          error,
+        } = await supabase
+          .from('customer_addresses')
+          .update(payload)
+          .eq(
+            'id',
+            editingAddress.id
+          )
+          .eq(
+            'user_id',
+            ownerUserId
+          )
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setAddresses((prev) =>
+          prev.map((item) => {
+            if (item.id === editingAddress.id) {
+              return data;
+            }
+            return payload.is_default ? { ...item, is_default: false } : item;
+          })
+        );
+
+        alert(
+          'Address updated successfully.'
+        );
+      } else {
+        const shouldBeDefault =
+          payload.is_default ||
+          addresses.length === 0;
+
+        const finalPayload = {
+          ...payload,
+          is_default:
+            shouldBeDefault,
+        };
+
+        if (shouldBeDefault && addresses.length > 0) {
+          await supabase
+            .from('customer_addresses')
+            .update({ is_default: false })
+            .eq('user_id', ownerUserId);
+        }
+
+        const {
+          data,
+          error,
+        } = await supabase
+          .from('customer_addresses')
+          .insert(finalPayload)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setAddresses((prev) => {
+          const updatedList = prev.map((item) =>
+            shouldBeDefault ? { ...item, is_default: false } : item
+          );
+          return [...updatedList, data];
+        });
+
+        alert(
+          'Address added successfully.'
+        );
+      }
+
+      setShowAddressForm(false);
+      setEditingAddress(null);
+      setAddressForm({
+        ...emptyAddressForm,
+      });
 
       await loadAddresses();
     } catch (error) {
@@ -918,57 +1122,100 @@ export default function CustomerOrdersPage() {
       );
 
       alert(
-        error?.message ||
-        'Unable to save address.'
+        `Unable to save address: ${
+          error?.message ||
+          'Unknown error'
+        }`
       );
+    } finally {
+      setSavingAddress(false);
     }
   };
 
 
-  const handleEditAddress = (address) => {
-    setEditingAddress(address);
+  /* =======================================================
+     ADDRESS - DELETE
+  ======================================================= */
 
-    setAddressForm({
-      address_line1:
-        address.address_line1 || '',
-      address_line2:
-        address.address_line2 || '',
-      city:
-        address.city || '',
-      state:
-        address.state || '',
-      pincode:
-        address.pincode || '',
-      landmark:
-        address.landmark || '',
-      address_type:
-        address.address_type || 'HOME',
-    });
+  const handleDeleteAddress = async (address) => {
+    if (!address?.id) return;
 
-    setShowAddressModal(true);
-  };
+    const confirmed =
+      window.confirm(
+        'Are you sure you want to delete this address?'
+      );
 
+    if (!confirmed) return;
 
-  const handleDeleteAddress = async (addressId) => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this address?'
-    );
-
-    if (!confirmed) {
-      return;
-    }
+    const ownerUserId = authUser?.id || user?.id;
 
     try {
-      const { error } = await supabase
-        .from('customer_addresses')
-        .delete()
-        .eq('id', addressId);
+      setDeletingAddressId(
+        address.id
+      );
 
-      if (error) {
-        throw error;
+      const wasDefault =
+        Boolean(address.is_default);
+
+      const { error } =
+        await supabase
+          .from('customer_addresses')
+          .delete()
+          .eq(
+            'id',
+            address.id
+          )
+          .eq(
+            'user_id',
+            ownerUserId
+          );
+
+      if (error) throw error;
+
+      let remaining =
+        addresses.filter(
+          (item) =>
+            item.id !== address.id
+        );
+
+      if (
+        wasDefault &&
+        remaining.length > 0
+      ) {
+        const nextDefaultId =
+          remaining[0].id;
+
+        const {
+          data,
+          error: defaultError,
+        } = await supabase
+          .from('customer_addresses')
+          .update({
+            is_default: true,
+          })
+          .eq(
+            'id',
+            nextDefaultId
+          )
+          .eq(
+            'user_id',
+            ownerUserId
+          )
+          .select()
+          .single();
+
+        if (!defaultError && data) {
+          remaining = remaining.map((item) =>
+            item.id === nextDefaultId ? data : { ...item, is_default: false }
+          );
+        }
       }
 
-      await loadAddresses();
+      setAddresses(remaining);
+
+      alert(
+        'Address deleted successfully.'
+      );
     } catch (error) {
       console.error(
         'Delete address error:',
@@ -976,328 +1223,222 @@ export default function CustomerOrdersPage() {
       );
 
       alert(
-        error?.message ||
-        'Unable to delete address.'
+        `Unable to delete address: ${
+          error?.message ||
+          'Something went wrong.'
+        }`
       );
+    } finally {
+      setDeletingAddressId(null);
     }
   };
 
 
-  /* ============================================================
-     REORDER
-  ============================================================ */
+  /* =======================================================
+     ADDRESS - SET DEFAULT
+  ======================================================= */
 
-  const handleReorder = async (order) => {
+  const handleSetDefaultAddress = async (
+    address
+  ) => {
+    if (
+      !address?.id ||
+      address.is_default
+    ) {
+      return;
+    }
+
+    const ownerUserId = authUser?.id || user?.id;
+
     try {
-      if (!order?.order_items?.length) {
-        alert(
-          'There are no items available to reorder.'
+      const {
+        error: resetError,
+      } = await supabase
+        .from('customer_addresses')
+        .update({
+          is_default: false,
+        })
+        .eq(
+          'user_id',
+          ownerUserId
         );
-        return;
+
+      if (resetError) {
+        throw resetError;
       }
 
-      setReordering(true);
+      const {
+        data,
+        error,
+      } = await supabase
+        .from('customer_addresses')
+        .update({
+          is_default: true,
+        })
+        .eq(
+          'id',
+          address.id
+        )
+        .eq(
+          'user_id',
+          ownerUserId
+        )
+        .select()
+        .single();
 
-      let cart = [];
+      if (error) throw error;
 
-      try {
-        const existingCart =
-          localStorage.getItem('cart');
-
-        cart = existingCart
-          ? JSON.parse(existingCart)
-          : [];
-      } catch {
-        cart = [];
-      }
-
-      if (!Array.isArray(cart)) {
-        cart = [];
-      }
-
-      let addedCount = 0;
-      let skippedCount = 0;
-
-      for (const item of order.order_items) {
-        const product = item.products;
-
-        if (!product) {
-          skippedCount++;
-          continue;
-        }
-
-        /*
-         * IMPORTANT:
-         *
-         * Only variant-level pricing and stock.
-         *
-         * We do NOT use:
-         * product.price
-         * product.mrp
-         * product.stock
-         */
-        const variants =
-          getProductVariants(product);
-
-        if (!variants.length) {
-          skippedCount++;
-          continue;
-        }
-
-        const matchedVariant =
-          findOrderItemVariant(item);
-
-        if (!matchedVariant) {
-          skippedCount++;
-          continue;
-        }
-
-        const variantId =
-          matchedVariant.id ||
-          item.variant_id;
-
-        if (!variantId) {
-          skippedCount++;
-          continue;
-        }
-
-        const variantStock =
-          getVariantStock(matchedVariant);
-
-        const currentPrice =
-          getVariantPrice(matchedVariant);
-
-        const variantLabel =
-          getVariantLabel(matchedVariant);
-
-        /*
-         * Don't add unavailable variants.
-         */
-        if (variantStock <= 0) {
-          skippedCount++;
-          continue;
-        }
-
-        if (currentPrice < 0) {
-          skippedCount++;
-          continue;
-        }
-
-        /*
-         * Cart item gets a unique product + variant key.
-         */
-        const cartItemId =
-          `${product.id}-${variantId}`;
-
-        const existingIndex =
-          cart.findIndex(
-            (cartItem) =>
-              String(
-                cartItem.cartItemId ||
-                cartItem.id
-              ) ===
-              String(cartItemId)
-          );
-
-        const requestedQuantity =
-          Number(item.quantity) || 1;
-
-        if (existingIndex >= 0) {
-          const existingQuantity =
-            Number(
-              cart[existingIndex].quantity
-            ) || 0;
-
-          const newQuantity =
-            Math.min(
-              existingQuantity +
-                requestedQuantity,
-              variantStock
-            );
-
-          cart[existingIndex] = {
-            ...cart[existingIndex],
-            quantity: newQuantity,
-            price: currentPrice,
-            unit_price: currentPrice,
-            stock: variantStock,
-            variant_id: variantId,
-            variant_label: variantLabel,
-          };
-        } else {
-          cart.push({
-            cartItemId,
-            id: product.id,
-            product_id: product.id,
-
-            name: product.name,
-
-            image_url:
-              product.image_url ||
-              product.image ||
-              '',
-
-            price: currentPrice,
-            unit_price: currentPrice,
-
-            quantity: Math.min(
-              requestedQuantity,
-              variantStock
-            ),
-
-            stock: variantStock,
-
-            variant_id: variantId,
-            variant_label: variantLabel,
-
-            /*
-             * Keep MRP at variant level.
-             */
-            mrp: getVariantMRP(
-              matchedVariant
-            ),
-          });
-        }
-
-        addedCount++;
-      }
-
-      localStorage.setItem(
-        'cart',
-        JSON.stringify(cart)
+      setAddresses((prev) =>
+        prev.map((item) => ({
+          ...item,
+          is_default:
+            item.id === data.id,
+        }))
       );
-
-      if (addedCount > 0) {
-        if (skippedCount > 0) {
-          alert(
-            `${addedCount} item(s) added to cart. ${skippedCount} item(s) were skipped because their variant is unavailable.`
-          );
-        } else {
-          alert(
-            'All available items have been added to your cart.'
-          );
-        }
-
-        navigate('/');
-      } else {
-        alert(
-          'None of the ordered variants are currently available.'
-        );
-      }
     } catch (error) {
       console.error(
-        'Reorder error:',
+        'Set default address error:',
         error
       );
 
       alert(
-        error?.message ||
-        'Unable to reorder this order.'
+        `Unable to set default address: ${
+          error?.message ||
+          'Something went wrong.'
+        }`
       );
-    } finally {
-      setReordering(false);
     }
   };
 
 
-  /* ============================================================
+ /* =======================================================
+     PROFILE - SAVE
+  ======================================================= */
+
+  const handleProfileSave = async () => {
+    if (!authUser?.id) return;
+
+    try {
+      setSavingProfile(true);
+
+      const payload = {
+        id: authUser.id,
+        email: authUser.email,
+        full_name: profileForm.full_name?.trim() || null,
+        phone: profileForm.phone?.trim() || null,
+      };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setUser((prev) => ({
+        ...prev,
+        ...data,
+      }));
+
+      setEditingProfile(false);
+
+      alert('Profile updated successfully.');
+    } catch (error) {
+      console.error('Profile update error:', error);
+      alert(`Unable to update profile: ${error?.message || 'Something went wrong.'}`);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+
+  /* =======================================================
      RATING
-  ============================================================ */
+  ======================================================= */
 
   const openRatingModal = (order) => {
     setRatingOrder(order);
-    setRating(0);
-    setRatingComment('');
-    setShowRatingModal(true);
-  };
-
-
-  const handleRateOrderSubmit = async () => {
-    if (!ratingOrder) {
-      return;
-    }
-
-    if (!rating) {
-      alert('Please select a rating.');
-      return;
-    }
-
-    /*
-     * Existing implementation only displayed an alert.
-     *
-     * Keeping this safe because exact review table schema
-     * was not provided.
-     *
-     * Once your review table columns are confirmed, this
-     * can be connected directly.
-     */
-    alert(
-      'Thank you for rating your order!'
-    );
-
-    setShowRatingModal(false);
-    setRatingOrder(null);
-    setRating(0);
+    setRatingValue(0);
     setRatingComment('');
   };
 
+  const handleSubmitRating = async () => {
+    if (!ratingOrder) return;
 
-  /* ============================================================
-     FILTERED ORDERS
-  ============================================================ */
-
-  const filteredOrders = useMemo(() => {
-    const query =
-      searchQuery.trim().toLowerCase();
-
-    if (!query) {
-      return orders;
-    }
-
-    return orders.filter((order) => {
-      const orderId =
-        getDisplayOrderId(order)
-          .toLowerCase();
-
-      const status =
-        getOrderStatus(order)
-          .toLowerCase();
-
-      const itemNames =
-        (order.order_items || [])
-          .map(
-            (item) =>
-              item.products?.name || ''
-          )
-          .join(' ')
-          .toLowerCase();
-
-      return (
-        orderId.includes(query) ||
-        status.includes(query) ||
-        itemNames.includes(query)
+    if (
+      !ratingValue ||
+      ratingValue < 1
+    ) {
+      alert(
+        'Please select a rating.'
       );
-    });
-  }, [orders, searchQuery]);
+      return;
+    }
+
+    try {
+      setSavingRating(true);
+
+      const orderId =
+        getOrderId(ratingOrder);
+
+      const {
+        error,
+      } = await supabase
+        .from('order_ratings')
+        .insert({
+          order_id: orderId,
+          customer_email:
+            authUser?.email ||
+            user?.email ||
+            null,
+          rating: ratingValue,
+          comment:
+            ratingComment?.trim() ||
+            null,
+        });
+
+      if (error) throw error;
+
+      alert(
+        'Thank you for your feedback!'
+      );
+
+      setRatingOrder(null);
+      setRatingValue(0);
+      setRatingComment('');
+    } catch (error) {
+      console.error(
+        'Rating submission error:',
+        error
+      );
+
+      alert(
+        `Unable to submit rating: ${
+          error?.message ||
+          'Something went wrong.'
+        }`
+      );
+    } finally {
+      setSavingRating(false);
+    }
+  };
 
 
-  /* ============================================================
-     RENDER LOADING
-  ============================================================ */
+  /* =======================================================
+     LOADING
+  ======================================================= */
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-50">
-        <StoreHeader />
+      <div className="min-h-screen bg-gray-50">
+        <StoreHeader session={authUser} customerProfile={user} />
 
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center">
-            <Loader2
-              className="animate-spin mx-auto text-emerald-600"
-              size={36}
-            />
+            <Loader2 className="w-10 h-10 animate-spin text-green-600 mx-auto mb-3" />
 
-            <p className="mt-4 text-stone-500 text-sm">
+            <p className="text-gray-600">
               Loading your account...
             </p>
           </div>
@@ -1309,310 +1450,631 @@ export default function CustomerOrdersPage() {
   }
 
 
-  /* ============================================================
+  /* =======================================================
      MAIN UI
-  ============================================================ */
+  ======================================================= */
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900">
-      <StoreHeader />
+    <div className="min-h-screen bg-gray-50">
+      <StoreHeader session={authUser} customerProfile={user} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        {/* =====================================================
-            PAGE HEADER
-        ===================================================== */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900 mb-5"
-          >
-            <ArrowLeft size={16} />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
-            Continue Shopping
-          </button>
+          <div>
+            <button
+              onClick={() => navigate('/')}
+              className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 mb-3"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Store
+            </button>
 
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 mb-2">
-                My Account
-              </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              My Account
+            </h1>
 
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                Hello,{' '}
-                {profile?.full_name ||
-                  profile?.name ||
-                  user?.user_metadata?.full_name ||
-                  'Customer'}
-              </h1>
-
-              <p className="text-stone-500 mt-2">
-                Manage your orders, profile and saved addresses.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadOrders()}
-                disabled={ordersLoading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold hover:border-stone-300 disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={15}
-                  className={
-                    ordersLoading
-                      ? 'animate-spin'
-                      : ''
-                  }
-                />
-
-                Refresh
-              </button>
-            </div>
+            <p className="text-gray-500 mt-1">
+              Manage your orders, profile and addresses.
+            </p>
           </div>
+
+          <button
+            onClick={() =>
+              loadOrders()
+            }
+            disabled={loadingOrders}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${
+                loadingOrders
+                  ? 'animate-spin'
+                  : ''
+              }`}
+            />
+
+            Refresh
+          </button>
+
         </div>
 
 
-        {/* =====================================================
-            TABS
-        ===================================================== */}
+        {/* =================================================
+            PROFILE
+        ================================================= */}
 
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
-              activeTab === 'orders'
-                ? 'bg-stone-900 text-white'
-                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <Package
-              size={16}
-              className="inline mr-2"
-            />
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6">
 
-            My Orders
-          </button>
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
 
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
-              activeTab === 'profile'
-                ? 'bg-stone-900 text-white'
-                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <User
-              size={16}
-              className="inline mr-2"
-            />
-
-            Profile
-          </button>
-
-          <button
-            onClick={() => setActiveTab('addresses')}
-            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
-              activeTab === 'addresses'
-                ? 'bg-stone-900 text-white'
-                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <MapPin
-              size={16}
-              className="inline mr-2"
-            />
-
-            Addresses
-          </button>
-        </div>
-
-
-        {/* =====================================================
-            ORDERS TAB
-        ===================================================== */}
-
-        {activeTab === 'orders' && (
-          <section>
-
-            {/* Search */}
-
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 mb-6">
-              <div className="relative">
-                <Search
-                  size={18}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
-                />
-
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) =>
-                    setSearchQuery(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Search by order ID, status or product..."
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                />
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center">
+                <User className="w-5 h-5 text-green-600" />
               </div>
-            </div>
 
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  Profile
+                </h2>
 
-            {ordersLoading ? (
-              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
-                <Loader2
-                  className="animate-spin mx-auto text-emerald-600"
-                  size={32}
-                />
-
-                <p className="mt-4 text-stone-500">
-                  Loading orders...
+                <p className="text-sm text-gray-500">
+                  Your account information
                 </p>
               </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto">
-                  <ShoppingBag
-                    size={28}
-                    className="text-stone-400"
+            </div>
+
+            {!editingProfile && (
+              <button
+                onClick={() =>
+                  setEditingProfile(true)
+                }
+                className="inline-flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                <Edit className="w-4 h-4" />
+                Edit
+              </button>
+            )}
+
+          </div>
+
+
+          <div className="p-5">
+
+            {editingProfile ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      profileForm.full_name
+                    }
+                    onChange={(e) =>
+                      setProfileForm(
+                        (prev) => ({
+                          ...prev,
+                          full_name:
+                            e.target.value,
+                        })
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
 
-                <h3 className="font-black text-lg mt-5">
-                  No orders found
-                </h3>
 
-                <p className="text-stone-500 text-sm mt-2">
-                  {searchQuery
-                    ? 'Try another search.'
-                    : 'You have not placed any orders yet.'}
-                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mobile Number
+                  </label>
 
-                {!searchQuery && (
+                  <input
+                    type="tel"
+                    value={
+                      profileForm.phone
+                    }
+                    onChange={(e) =>
+                      setProfileForm(
+                        (prev) => ({
+                          ...prev,
+                          phone:
+                            e.target.value.replace(
+                              /\D/g,
+                              ''
+                            ),
+                        })
+                      )
+                    }
+                    maxLength={10}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    value={
+                      authUser?.email ||
+                      user?.email ||
+                      ''
+                    }
+                    disabled
+                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2.5 text-gray-500"
+                  />
+                </div>
+
+
+                <div className="md:col-span-2 flex justify-end gap-3">
+
                   <button
-                    onClick={() => navigate('/')}
-                    className="mt-5 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700"
+                    onClick={() =>
+                      setEditingProfile(false)
+                    }
+                    className="px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
                   >
-                    Start Shopping
+                    Cancel
                   </button>
-                )}
+
+                  <button
+                    onClick={
+                      handleProfileSave
+                    }
+                    disabled={
+                      savingProfile
+                    }
+                    className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
+                  >
+                    {savingProfile && (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    )}
+
+                    Save Changes
+                  </button>
+
+                </div>
+
               </div>
             ) : (
-              <div className="space-y-5">
-                {filteredOrders.map((order) => {
-                  const orderStatus =
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Name
+                  </p>
+
+                  <p className="font-medium text-gray-900">
+                    {user?.full_name ||
+                      'Not provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Email
+                  </p>
+
+                  <p className="font-medium text-gray-900 break-all">
+                    {authUser?.email ||
+                      user?.email ||
+                      '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Phone
+                  </p>
+
+                  <p className="font-medium text-gray-900">
+                    {user?.phone ||
+                      'Not provided'}
+                  </p>
+                </div>
+
+              </div>
+
+            )}
+
+          </div>
+
+        </section>
+
+
+        {/* =================================================
+            ADDRESSES
+        ================================================= */}
+
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6">
+
+          <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-blue-600" />
+              </div>
+
+              <div>
+                <h2 className="font-semibold text-gray-900">
+                  My Addresses
+                </h2>
+
+                <p className="text-sm text-gray-500">
+                  Manage your delivery addresses
+                </p>
+              </div>
+
+            </div>
+
+
+            <button
+              onClick={
+                handleAddAddress
+              }
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
+            >
+              <Plus className="w-4 h-4" />
+              Add Address
+            </button>
+
+          </div>
+
+
+          <div className="p-5">
+
+            {addresses.length === 0 ? (
+
+              <div className="text-center py-8">
+
+                <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+
+                <p className="text-gray-600 font-medium">
+                  No addresses saved
+                </p>
+
+                <p className="text-sm text-gray-400 mt-1">
+                  Add an address for faster checkout.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {addresses.map(
+                  (address) => (
+
+                    <div
+                      key={address.id}
+                      className={`border rounded-xl p-4 ${
+                        address.is_default
+                          ? 'border-green-500 bg-green-50/40'
+                          : 'border-gray-200'
+                      }`}
+                    >
+
+                      <div className="flex items-start justify-between gap-3">
+
+                        <div className="flex items-start gap-3 min-w-0">
+
+                          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Home className="w-4 h-4 text-gray-600" />
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <div className="flex items-center gap-2 flex-wrap">
+
+                              <span className="font-semibold text-gray-900">
+                                {address.title ||
+                                  'Address'}
+                              </span>
+
+                              {address.is_default && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                                  Default
+                                </span>
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        </div>
+
+
+                        <div className="flex items-center gap-1">
+
+                          <button
+                            onClick={() =>
+                              handleEditAddress(
+                                address
+                              )
+                            }
+                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                            title="Edit address"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleDeleteAddress(
+                                address
+                              )
+                            }
+                            disabled={
+                              deletingAddressId ===
+                              address.id
+                            }
+                            className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 disabled:opacity-50"
+                            title="Delete address"
+                          >
+                            {deletingAddressId ===
+                            address.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+
+                        </div>
+
+                      </div>
+
+
+                      <div className="mt-3 space-y-1">
+
+                        <p className="text-sm text-gray-700 leading-6">
+                          {[
+                            address.house_no,
+                            address.ward_no_name,
+                            address.address,
+                          ]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </p>
+
+                        <p className="text-sm text-gray-600">
+                          {[
+                            address.city,
+                            address.district,
+                            address.state,
+                          ]
+                            .filter(Boolean)
+                            .join(', ')}
+
+                          {address.pincode
+                            ? ` - ${address.pincode}`
+                            : ''}
+                        </p>
+
+                        {address.phone && (
+                          <p className="text-sm text-gray-500 flex items-center gap-2 pt-1">
+                            <Phone className="w-3.5 h-3.5" />
+                            {address.phone}
+                          </p>
+                        )}
+
+                      </div>
+
+
+                      {!address.is_default && (
+                        <button
+                          onClick={() =>
+                            handleSetDefaultAddress(
+                              address
+                            )
+                          }
+                          className="mt-4 text-sm text-green-600 hover:text-green-700 font-medium"
+                        >
+                          Make Default
+                        </button>
+                      )}
+
+                    </div>
+
+                  )
+                )}
+
+              </div>
+
+            )}
+
+          </div>
+
+        </section>
+
+
+        {/* =================================================
+            ORDERS
+        ================================================= */}
+
+        <section>
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                My Orders
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                {orders.length}{' '}
+                {orders.length === 1
+                  ? 'order'
+                  : 'orders'}{' '}
+                found
+              </p>
+            </div>
+
+
+            <div className="relative w-full md:w-80">
+
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) =>
+                  setSearchTerm(
+                    e.target.value
+                  )
+                }
+                placeholder="Search orders..."
+                className="w-full bg-white border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+            </div>
+
+          </div>
+
+
+          {loadingOrders ? (
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+
+              <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-3" />
+
+              <p className="text-gray-500">
+                Loading orders...
+              </p>
+
+            </div>
+
+          ) : filteredOrders.length === 0 ? (
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+
+              <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+
+              <h3 className="font-semibold text-gray-900">
+                {searchTerm
+                  ? 'No matching orders'
+                  : 'No orders yet'}
+              </h3>
+
+              <p className="text-sm text-gray-500 mt-1">
+                {searchTerm
+                  ? 'Try a different search term.'
+                  : 'Your completed orders will appear here.'}
+              </p>
+
+              {!searchTerm && (
+                <button
+                  onClick={() =>
+                    navigate('/')
+                  }
+                  className="mt-5 px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                >
+                  Start Shopping
+                </button>
+              )}
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-4">
+
+              {filteredOrders.map(
+                (order) => {
+
+                  const orderId =
+                    getOrderId(order);
+
+                  const status =
                     getOrderStatus(order);
 
-                  const orderTotal =
+                  const items =
+                    Array.isArray(
+                      order?.order_items
+                    )
+                      ? order.order_items
+                      : [];
+
+                  const subtotal =
+                    getOrderItemsSubtotal(
+                      order
+                    );
+
+                  const total =
                     getOrderTotal(order);
 
-                  const itemCount =
-                    (order.order_items || [])
-                      .reduce(
-                        (total, item) =>
-                          total +
-                          (Number(
-                            item.quantity
-                          ) || 0),
-                        0
-                      );
-
-                  const isCancelled =
-                    orderStatus ===
-                      'CANCELLED' ||
-                    orderStatus ===
-                      'CANCELED';
+                  const expanded =
+                    Boolean(
+                      expandedOrders[
+                        orderId
+                      ]
+                    );
 
                   return (
                     <div
-                      key={order.id}
-                      className="bg-white border border-stone-200 rounded-2xl overflow-hidden"
+                      key={orderId}
+                      className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
                     >
 
-                      {/* Order Header */}
+                      {/* --------------------------------
+                          ORDER HEADER
+                      --------------------------------- */}
 
-                      <div className="p-5 border-b border-stone-100">
+                      <div className="p-5">
+
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 
                           <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
-                              <Package
-                                size={22}
-                                className="text-stone-700"
-                              />
+
+                            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                              <Package className="w-6 h-6 text-green-600" />
                             </div>
 
                             <div>
+
                               <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="font-black text-stone-900">
+
+                                <h3 className="font-bold text-gray-900">
                                   {getDisplayOrderId(
                                     order
                                   )}
                                 </h3>
 
-                                <span
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                    isCancelled
-                                      ? 'bg-rose-50 text-rose-600'
-                                      : orderStatus ===
-                                          'DELIVERED'
-                                        ? 'bg-emerald-50 text-emerald-700'
-                                        : 'bg-amber-50 text-amber-700'
-                                  }`}
-                                >
+                                <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">
                                   {formatStatus(
-                                    orderStatus
+                                    status
                                   )}
                                 </span>
+
                               </div>
 
-                              <p className="text-xs text-stone-400 font-mono mt-1">
-                                Order ID:{' '}
-                                {getDisplayOrderId(
-                                  order
+                              <p className="text-sm text-gray-500 mt-1">
+                                {formatDateTime(
+                                  order?.created_at
                                 )}
                               </p>
 
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-stone-500">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Calendar
-                                    size={13}
-                                  />
-
-                                  {formatDate(
-                                    order.created_at
-                                  )}
-                                </span>
-
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Package
-                                    size={13}
-                                  />
-
-                                  {itemCount}{' '}
-                                  {itemCount === 1
-                                    ? 'item'
-                                    : 'items'}
-                                </span>
-                              </div>
                             </div>
+
                           </div>
 
 
-                          <div className="flex items-center justify-between lg:justify-end gap-5">
-                            <div className="text-left lg:text-right">
-                              <p className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">
-                                Order Total
-                              </p>
-
-                              <p className="font-black text-lg mt-0.5">
-                                {formatCurrency(
-                                  orderTotal
-                                )}
-                              </p>
-                            </div>
+                          <div className="flex flex-wrap items-center gap-2">
 
                             <button
                               onClick={() =>
@@ -1620,1318 +2082,285 @@ export default function CustomerOrdersPage() {
                                   order
                                 )
                               }
-                              className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center hover:bg-stone-900 hover:text-white transition"
+                              className="px-3.5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
                             >
-                              <ChevronRight
-                                size={18}
-                              />
+                              View Details
                             </button>
+
+                            <button
+                              onClick={() =>
+                                handleReorder(
+                                  order
+                                )
+                              }
+                              disabled={
+                                reorderingOrderId ===
+                                orderId
+                              }
+                              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                            >
+                              {reorderingOrderId ===
+                              orderId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+
+                              Reorder
+                            </button>
+
                           </div>
+
                         </div>
+
+
+                        {/* --------------------------------
+                            ORDER SUMMARY
+                        --------------------------------- */}
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-4 border-t border-gray-100">
+
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Items
+                            </p>
+
+                            <p className="font-semibold text-gray-900 mt-1">
+                              {items.length}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Subtotal
+                            </p>
+
+                            <p className="font-semibold text-gray-900 mt-1">
+                              {formatCurrency(
+                                subtotal
+                              )}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Delivery
+                            </p>
+
+                            <p className="font-semibold text-gray-900 mt-1">
+                              {getDeliveryCharge(
+                                order
+                              ) > 0
+                                ? formatCurrency(
+                                    getDeliveryCharge(
+                                      order
+                                    )
+                                  )
+                                : 'FREE'}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Total
+                            </p>
+
+                            <p className="font-bold text-green-600 mt-1">
+                              {formatCurrency(
+                                total
+                              )}
+                            </p>
+                          </div>
+
+                        </div>
+
+
+                        {/* --------------------------------
+                            COLLAPSE BUTTON
+                        --------------------------------- */}
+
+                        <button
+                          onClick={() =>
+                            toggleOrder(
+                              orderId
+                            )
+                          }
+                          className="mt-4 text-sm text-gray-600 hover:text-green-600 inline-flex items-center gap-1"
+                        >
+                          {expanded
+                            ? 'Hide Items'
+                            : 'Show Items'}
+
+                          {expanded ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
+
                       </div>
 
 
-                      {/* Order Items */}
+                      {/* --------------------------------
+                          EXPANDED ITEMS
+                      --------------------------------- */}
 
-                      <div className="p-5">
-                        <div className="flex gap-3 overflow-x-auto pb-1">
-                          {(order.order_items || [])
-                            .slice(0, 5)
-                            .map((item) => {
-                              const product =
-                                item.products;
+                      {expanded && (
+                        <div className="border-t border-gray-100 bg-gray-50 p-5">
 
-                              const matchedVariant =
-                                findOrderItemVariant(
-                                  item
-                                );
+                          <div className="space-y-3">
 
-                              const variantLabel =
-                                item.variant_label ||
-                                getVariantLabel(
-                                  matchedVariant
-                                );
+                            {items.map(
+                              (item, index) => {
 
-                              return (
-                                <div
-                                  key={
-                                    item.id
-                                  }
-                                  className="flex-shrink-0 w-56 bg-stone-50 rounded-xl p-3"
-                                >
-                                  <div className="flex gap-3">
-                                    <div className="w-14 h-14 rounded-lg bg-white overflow-hidden flex-shrink-0">
-                                      {product?.image_url ? (
+                                const product =
+                                  item?.products;
+
+                                const variant =
+                                  findOrderItemVariant(
+                                    item,
+                                    product
+                                  );
+
+                                const image =
+                                  product?.image_url ||
+                                  product?.image ||
+                                  product?.images?.[0] ||
+                                  product?.gallery?.[0] ||
+                                  '';
+
+                                return (
+                                  <div
+                                    key={
+                                      item?.id ||
+                                      index
+                                    }
+                                    className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3"
+                                  >
+
+                                    <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+
+                                      {image ? (
                                         <img
-                                          src={
-                                            product.image_url
-                                          }
+                                          src={image}
                                           alt={
                                             product?.name ||
                                             'Product'
                                           }
-                                          className="w-full h-full object-cover"
+                                          className="w-full h-full object-contain"
                                         />
                                       ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                          <Package
-                                            size={
-                                              20
-                                            }
-                                            className="text-stone-300"
-                                          />
-                                        </div>
+                                        <Package className="w-6 h-6 text-gray-300" />
                                       )}
+
                                     </div>
 
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-bold text-xs truncate">
+                                    <div className="flex-1 min-w-0">
+
+                                      <p className="font-medium text-gray-900 truncate">
                                         {product?.name ||
                                           'Product'}
                                       </p>
 
-                                      {variantLabel && (
-                                        <p className="text-[10px] text-stone-500 mt-0.5">
-                                          {variantLabel}
+                                      {variant && (
+                                        <p className="text-sm text-gray-500">
+                                          {getVariantLabel(
+                                            variant
+                                          )}
                                         </p>
                                       )}
 
-                                      <p className="text-[10px] text-stone-400 mt-1">
+                                      <p className="text-sm text-gray-500">
                                         Qty:{' '}
-                                        {item.quantity}
+                                        {Number(
+                                          item?.quantity
+                                        ) || 1}
                                       </p>
 
-                                      <p className="font-black text-xs mt-1">
+                                    </div>
+
+                                    <div className="text-right">
+
+                                      <p className="font-semibold text-gray-900">
                                         {formatCurrency(
-                                          Number(
-                                            item.price
-                                          ) *
-                                            Number(
-                                              item.quantity
-                                            )
+                                          item?.price
                                         )}
                                       </p>
+
+                                      <p className="text-xs text-gray-500">
+                                        {formatCurrency(
+                                          getItemSubtotal(
+                                            item
+                                          )
+                                        )}
+                                      </p>
+
                                     </div>
+
                                   </div>
-                                </div>
-                              );
-                            })}
-
-                          {order.order_items?.length >
-                            5 && (
-                            <div className="flex-shrink-0 w-20 rounded-xl bg-stone-100 flex items-center justify-center text-xs font-bold text-stone-500">
-                              +
-                              {order.order_items.length -
-                                5}{' '}
-                              more
-                            </div>
-                          )}
-                        </div>
-
-
-                        {/* Actions */}
-
-                        <div className="flex flex-wrap gap-2 mt-5">
-                          <button
-                            onClick={() =>
-                              setSelectedOrder(
-                                order
-                              )
-                            }
-                            className="px-4 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800"
-                          >
-                            View Details
-                          </button>
-
-                          {!isCancelled && (
-                            <button
-                              onClick={() =>
-                                setSelectedOrder(
-                                  order
-                                )
+                                );
                               }
-                              className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
-                            >
-                              <Navigation
-                                size={14}
-                              />
+                            )}
 
-                              Track Order
-                            </button>
-                          )}
+                          </div>
 
-                          <button
-                            onClick={() =>
-                              handleReorder(order)
-                            }
-                            disabled={reordering}
-                            className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2 disabled:opacity-50"
-                          >
-                            <RefreshCw
-                              size={14}
-                            />
-
-                            Reorder
-                          </button>
-
-                          {orderStatus ===
-                            'DELIVERED' && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  openRatingModal(
-                                    order
-                                  )
-                                }
-                                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
-                              >
-                                <Star
-                                  size={14}
-                                />
-
-                                Rate Order
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  setInvoiceOrder(
-                                    order
-                                  )
-                                }
-                                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
-                              >
-                                <Receipt
-                                  size={14}
-                                />
-
-                                Invoice
-                              </button>
-                            </>
-                          )}
                         </div>
-                      </div>
+                      )}
+
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </section>
-        )}
+                }
+              )}
 
-
-        {/* =====================================================
-            PROFILE TAB
-        ===================================================== */}
-
-        {activeTab === 'profile' && (
-          <section>
-            <div className="grid lg:grid-cols-3 gap-6">
-
-              {/* Profile Card */}
-
-              <div className="bg-white border border-stone-200 rounded-2xl p-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-24 h-24 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={
-                          profile.avatar_url
-                        }
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User
-                        size={38}
-                        className="text-stone-400"
-                      />
-                    )}
-                  </div>
-
-                  <h2 className="font-black text-xl mt-4">
-                    {profile?.full_name ||
-                      profile?.name ||
-                      user?.user_metadata
-                        ?.full_name ||
-                      'Customer'}
-                  </h2>
-
-                  <p className="text-sm text-stone-500 mt-1">
-                    {user?.email}
-                  </p>
-
-                  <button
-                    onClick={() =>
-                      setShowProfileEdit(true)
-                    }
-                    className="mt-5 px-4 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold inline-flex items-center gap-2"
-                  >
-                    <Edit3 size={14} />
-
-                    Edit Profile
-                  </button>
-                </div>
-              </div>
-
-
-              {/* Profile Details */}
-
-              <div className="lg:col-span-2 bg-white border border-stone-200 rounded-2xl p-6">
-                <h3 className="font-black text-lg">
-                  Personal Information
-                </h3>
-
-                <div className="grid md:grid-cols-2 gap-5 mt-6">
-                  <div>
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Full Name
-                    </p>
-
-                    <p className="font-medium mt-1">
-                      {profile?.full_name ||
-                        profile?.name ||
-                        'Not provided'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Email
-                    </p>
-
-                    <p className="font-medium mt-1 break-all">
-                      {user?.email ||
-                        'Not provided'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Phone
-                    </p>
-
-                    <p className="font-medium mt-1">
-                      {profile?.phone ||
-                        user?.phone ||
-                        'Not provided'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Total Orders
-                    </p>
-
-                    <p className="font-medium mt-1">
-                      {orders.length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-
-        {/* =====================================================
-            ADDRESSES TAB
-        ===================================================== */}
-
-        {activeTab === 'addresses' && (
-          <section>
-
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-xl font-black">
-                  Saved Addresses
-                </h2>
-
-                <p className="text-sm text-stone-500 mt-1">
-                  Manage your delivery addresses.
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  resetAddressForm();
-                  setShowAddressModal(true);
-                }}
-                className="px-4 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold inline-flex items-center gap-2"
-              >
-                <Plus size={16} />
-
-                Add Address
-              </button>
             </div>
 
+          )}
 
-            {addresses.length === 0 ? (
-              <div className="bg-white border border-stone-200 rounded-2xl p-12 text-center">
-                <MapPin
-                  size={34}
-                  className="mx-auto text-stone-300"
-                />
+        </section>
 
-                <h3 className="font-black mt-4">
-                  No saved addresses
-                </h3>
-
-                <p className="text-sm text-stone-500 mt-1">
-                  Add an address for faster checkout.
-                </p>
-
-                <button
-                  onClick={() => {
-                    resetAddressForm();
-                    setShowAddressModal(true);
-                  }}
-                  className="mt-5 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm"
-                >
-                  Add Address
-                </button>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {addresses.map((address) => (
-                  <div
-                    key={address.id}
-                    className="bg-white border border-stone-200 rounded-2xl p-5"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                          <MapPin
-                            size={17}
-                            className="text-emerald-600"
-                          />
-                        </div>
-
-                        <div>
-                          <p className="font-black text-sm">
-                            {address.address_type ||
-                              'Address'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() =>
-                            handleEditAddress(
-                              address
-                            )
-                          }
-                          className="w-8 h-8 rounded-lg hover:bg-stone-100 flex items-center justify-center"
-                        >
-                          <Edit3
-                            size={14}
-                          />
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            handleDeleteAddress(
-                              address.id
-                            )
-                          }
-                          className="w-8 h-8 rounded-lg hover:bg-rose-50 text-rose-500 flex items-center justify-center"
-                        >
-                          <Trash2
-                            size={14}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 text-sm text-stone-600 leading-relaxed">
-                      <p>
-                        {address.address_line1}
-                      </p>
-
-                      {address.address_line2 && (
-                        <p>
-                          {address.address_line2}
-                        </p>
-                      )}
-
-                      {address.landmark && (
-                        <p>
-                          Landmark:{' '}
-                          {address.landmark}
-                        </p>
-                      )}
-
-                      <p>
-                        {address.city},{' '}
-                        {address.state}
-                      </p>
-
-                      <p>
-                        {address.pincode}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
       </main>
 
 
-      {/* =======================================================
-          ORDER DETAIL MODAL
-      ======================================================= */}
+      <Footer />
 
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-6">
-          <div className="bg-white w-full md:max-w-4xl md:rounded-3xl rounded-t-3xl max-h-[95vh] overflow-hidden flex flex-col">
 
-            {/* Modal Header */}
-
-            <div className="p-5 md:p-6 border-b border-stone-100 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest font-black text-stone-400">
-                  Order Details
-                </p>
-
-                <h2 className="text-xl md:text-2xl font-black mt-1">
-                  {getDisplayOrderId(
-                    selectedOrder
-                  )}
-                </h2>
-
-                <p className="text-xs text-stone-400 font-mono mt-1">
-                  Order ID:{' '}
-                  {getDisplayOrderId(
-                    selectedOrder
-                  )}
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  setSelectedOrder(null)
-                }
-                className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center hover:bg-stone-200"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-
-            {/* Modal Body */}
-
-            <div className="overflow-y-auto p-5 md:p-6 space-y-6">
-
-              {/* Order Summary */}
-
-              <div className="grid md:grid-cols-3 gap-4">
-
-                <div className="bg-stone-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 text-stone-400">
-                    <Calendar size={15} />
-
-                    <span className="text-[10px] uppercase font-black tracking-wider">
-                      Ordered
-                    </span>
-                  </div>
-
-                  <p className="font-bold text-sm mt-2">
-                    {formatDateTime(
-                      selectedOrder.created_at
-                    )}
-                  </p>
-                </div>
-
-
-                <div className="bg-stone-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 text-stone-400">
-                    <Package size={15} />
-
-                    <span className="text-[10px] uppercase font-black tracking-wider">
-                      Status
-                    </span>
-                  </div>
-
-                  <p className="font-bold text-sm mt-2">
-                    {formatStatus(
-                      getOrderStatus(
-                        selectedOrder
-                      )
-                    )}
-                  </p>
-                </div>
-
-
-                <div className="bg-stone-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 text-stone-400">
-                    <CreditCard size={15} />
-
-                    <span className="text-[10px] uppercase font-black tracking-wider">
-                      Payment
-                    </span>
-                  </div>
-
-                  <p className="font-bold text-sm mt-2">
-                    {selectedOrder.payment_method ||
-                      selectedOrder.payment_type ||
-                      (
-                        selectedOrder.payment_status
-                          ? formatStatus(
-                              selectedOrder.payment_status
-                            )
-                          : 'Payment information unavailable'
-                      )}
-                  </p>
-
-                  {selectedOrder.payment_status && (
-                    <p className="text-[10px] text-stone-400 mt-1">
-                      Status:{' '}
-                      {formatStatus(
-                        selectedOrder.payment_status
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-
-              {/* =================================================
-                  ORDER TRACKING
-              ================================================= */}
-
-              {(() => {
-                const tracking =
-                  getTrackingSteps(
-                    selectedOrder
-                  );
-
-                return (
-                  <div className="bg-white border border-stone-200 rounded-2xl p-5">
-
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-6">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider font-black text-stone-400">
-                          Order Tracking
-                        </p>
-
-                        <h3 className="font-black text-lg mt-1">
-                          {getDisplayOrderId(
-                            selectedOrder
-                          )}
-                        </h3>
-                      </div>
-
-                      <span
-                        className={`self-start px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          tracking.cancelled
-                            ? 'bg-rose-50 text-rose-600'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}
-                      >
-                        {formatStatus(
-                          getOrderStatus(
-                            selectedOrder
-                          )
-                        )}
-                      </span>
-                    </div>
-
-
-                    {tracking.cancelled ? (
-                      <div className="rounded-xl bg-rose-50 border border-rose-100 p-4 flex gap-3">
-                        <XCircle
-                          size={22}
-                          className="text-rose-500 flex-shrink-0"
-                        />
-
-                        <div>
-                          <p className="font-black text-sm text-rose-700">
-                            Order Cancelled
-                          </p>
-
-                          <p className="text-xs text-rose-600 mt-1">
-                            This order has been cancelled.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        {tracking.steps.map(
-                          (
-                            step,
-                            index
-                          ) => {
-                            const StepIcon =
-                              step.icon;
-
-                            const completed =
-                              index <
-                              tracking.currentIndex;
-
-                            const current =
-                              index ===
-                              tracking.currentIndex;
-
-                            const upcoming =
-                              index >
-                              tracking.currentIndex;
-
-                            return (
-                              <div
-                                key={
-                                  step.key
-                                }
-                                className="relative flex gap-4"
-                              >
-
-                                {/* Vertical Line */}
-
-                                {index <
-                                  tracking
-                                    .steps
-                                    .length -
-                                    1 && (
-                                  <div
-                                    className={`absolute left-[15px] top-8 w-0.5 h-[calc(100%-8px)] ${
-                                      index <
-                                      tracking.currentIndex
-                                        ? 'bg-emerald-500'
-                                        : 'bg-stone-200'
-                                    }`}
-                                  />
-                                )}
-
-
-                                {/* Icon */}
-
-                                <div
-                                  className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                    completed ||
-                                    current
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-stone-100 text-stone-400'
-                                  } ${
-                                    current
-                                      ? 'ring-4 ring-emerald-50'
-                                      : ''
-                                  }`}
-                                >
-                                  <StepIcon
-                                    size={
-                                      15
-                                    }
-                                  />
-                                </div>
-
-
-                                {/* Content */}
-
-                                <div className="pb-7">
-                                  <p
-                                    className={`text-sm font-black ${
-                                      upcoming
-                                        ? 'text-stone-400'
-                                        : 'text-stone-900'
-                                    }`}
-                                  >
-                                    {
-                                      step.label
-                                    }
-
-                                    {current && (
-                                      <span className="ml-2 text-[9px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">
-                                        Current
-                                      </span>
-                                    )}
-                                  </p>
-
-                                  <p
-                                    className={`text-xs mt-1 ${
-                                      upcoming
-                                        ? 'text-stone-300'
-                                        : 'text-stone-500'
-                                    }`}
-                                  >
-                                    {
-                                      step.description
-                                    }
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          }
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-
-              {/* =================================================
-                  ITEMS
-              ================================================= */}
-
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-black">
-                    Ordered Items
-                  </h3>
-
-                  <span className="text-xs text-stone-400">
-                    {
-                      selectedOrder
-                        .order_items?.length ||
-                      0
-                    }{' '}
-                    items
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {(
-                    selectedOrder.order_items ||
-                    []
-                  ).map((item) => {
-                    const product =
-                      item.products;
-
-                    const matchedVariant =
-                      findOrderItemVariant(
-                        item
-                      );
-
-                    const variantLabel =
-                      item.variant_label ||
-                      getVariantLabel(
-                        matchedVariant
-                      );
-
-                    const itemPrice =
-                      Number(item.price) || 0;
-
-                    const quantity =
-                      Number(
-                        item.quantity
-                      ) || 0;
-
-                    const itemTotal =
-                      itemPrice *
-                      quantity;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex gap-4 p-4 bg-stone-50 rounded-2xl"
-                      >
-                        <div className="w-16 h-16 rounded-xl bg-white overflow-hidden flex-shrink-0">
-                          {product?.image_url ? (
-                            <img
-                              src={
-                                product.image_url
-                              }
-                              alt={
-                                product.name ||
-                                'Product'
-                              }
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Package
-                                size={
-                                  22
-                                }
-                                className="text-stone-300"
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="font-black text-sm">
-                                {product?.name ||
-                                  'Product'}
-                              </p>
-
-                              {variantLabel && (
-                                <p className="text-xs text-stone-500 mt-1">
-                                  Variant:{' '}
-                                  <span className="font-bold">
-                                    {
-                                      variantLabel
-                                    }
-                                  </span>
-                                </p>
-                              )}
-
-                              <p className="text-xs text-stone-400 mt-1">
-                                Qty:{' '}
-                                {quantity}
-                              </p>
-                            </div>
-
-                            <div className="text-right flex-shrink-0">
-                              <p className="font-black text-sm">
-                                {formatCurrency(
-                                  itemTotal
-                                )}
-                              </p>
-
-                              <p className="text-[10px] text-stone-400 mt-1">
-                                {formatCurrency(
-                                  itemPrice
-                                )}{' '}
-                                / unit
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-
-              {/* =================================================
-                  DELIVERY ADDRESS
-              ================================================= */}
-
-              {(selectedOrder.shipping_address ||
-                selectedOrder.delivery_address ||
-                selectedOrder.address) && (
-                <div className="bg-stone-50 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MapPin
-                      size={16}
-                      className="text-emerald-600"
-                    />
-
-                    <h3 className="font-black text-sm">
-                      Delivery Address
-                    </h3>
-                  </div>
-
-                  <p className="text-sm text-stone-600 whitespace-pre-line">
-                    {typeof (
-                      selectedOrder.shipping_address ||
-                      selectedOrder.delivery_address ||
-                      selectedOrder.address
-                    ) === 'string'
-                      ? selectedOrder.shipping_address ||
-                        selectedOrder.delivery_address ||
-                        selectedOrder.address
-                      : JSON.stringify(
-                          selectedOrder.shipping_address ||
-                            selectedOrder.delivery_address ||
-                            selectedOrder.address,
-                          null,
-                          2
-                        )}
-                  </p>
-                </div>
-              )}
-
-
-              {/* =================================================
-                  BILL DETAILS
-              ================================================= */}
-
-              {(() => {
-                const itemSubtotal =
-                  getItemSubtotal(
-                    selectedOrder
-                  );
-
-                const deliveryCharge =
-                  getDeliveryCharge(
-                    selectedOrder
-                  );
-
-                const handlingCharge =
-                  getHandlingCharge(
-                    selectedOrder
-                  );
-
-                const discount =
-                  getDiscount(
-                    selectedOrder
-                  );
-
-                const tax =
-                  getTax(
-                    selectedOrder
-                  );
-
-                const billTotal =
-                  getOrderTotal(
-                    selectedOrder
-                  );
-
-                return (
-                  <div className="bg-stone-50/70 p-5 rounded-2xl border border-stone-200/60 space-y-3">
-
-                    <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-4">
-                      Bill Details
-                    </p>
-
-
-                    {/* Item Total */}
-
-                    <div className="flex justify-between text-stone-600 text-sm">
-                      <span>
-                        Item total
-                      </span>
-
-                      <span className="font-bold text-stone-900">
-                        {formatCurrency(
-                          itemSubtotal
-                        )}
-                      </span>
-                    </div>
-
-
-                    {/* Delivery Charge */}
-
-                    <div className="flex justify-between text-stone-600 text-sm">
-                      <span>
-                        Delivery charges
-                      </span>
-
-                      {deliveryCharge >
-                      0 ? (
-                        <span className="font-bold text-stone-900">
-                          +
-                          {formatCurrency(
-                            deliveryCharge
-                          )}
-                        </span>
-                      ) : (
-                        <span className="font-bold text-emerald-600">
-                          FREE
-                        </span>
-                      )}
-                    </div>
-
-
-                    {/* Handling Charge */}
-
-                    {handlingCharge >
-                      0 && (
-                      <div className="flex justify-between text-stone-600 text-sm">
-                        <span>
-                          Handling charge
-                        </span>
-
-                        <span className="font-bold text-stone-900">
-                          +
-                          {formatCurrency(
-                            handlingCharge
-                          )}
-                        </span>
-                      </div>
-                    )}
-
-
-                    {/* Tax */}
-
-                    {tax > 0 && (
-                      <div className="flex justify-between text-stone-600 text-sm">
-                        <span>
-                          Tax / GST
-                        </span>
-
-                        <span className="font-bold text-stone-900">
-                          +
-                          {formatCurrency(
-                            tax
-                          )}
-                        </span>
-                      </div>
-                    )}
-
-
-                    {/* Discount */}
-
-                    {discount > 0 && (
-                      <div className="flex justify-between text-emerald-600 text-sm">
-                        <span>
-                          Discount
-                        </span>
-
-                        <span className="font-bold">
-                          -
-                          {formatCurrency(
-                            discount
-                          )}
-                        </span>
-                      </div>
-                    )}
-
-
-                    {/* Total */}
-
-                    <div className="flex justify-between pt-4 border-t border-stone-200 font-black text-slate-900 text-base">
-                      <span>
-                        Bill total
-                      </span>
-
-                      <span>
-                        {formatCurrency(
-                          billTotal
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-
-              {/* =================================================
-                  ORDER META
-              ================================================= */}
-
-              <div className="grid md:grid-cols-2 gap-4">
-
-                <div className="bg-stone-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Mail
-                      size={15}
-                      className="text-stone-400"
-                    />
-
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Customer Email
-                    </p>
-                  </div>
-
-                  <p className="text-sm font-medium break-all">
-                    {selectedOrder.customer_email ||
-                      user?.email ||
-                      'N/A'}
-                  </p>
-                </div>
-
-
-                <div className="bg-stone-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Phone
-                      size={15}
-                      className="text-stone-400"
-                    />
-
-                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
-                      Customer Phone
-                    </p>
-                  </div>
-
-                  <p className="text-sm font-medium">
-                    {selectedOrder.customer_phone ||
-                      selectedOrder.phone ||
-                      profile?.phone ||
-                      'N/A'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Modal Footer */}
-
-            <div className="p-5 border-t border-stone-100 flex flex-wrap gap-2 justify-end">
-              <button
-                onClick={() =>
-                  handleReorder(
-                    selectedOrder
-                  )
-                }
-                disabled={reordering}
-                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold inline-flex items-center gap-2 hover:bg-stone-50 disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={15}
-                  className={
-                    reordering
-                      ? 'animate-spin'
-                      : ''
-                  }
-                />
-
-                Reorder
-              </button>
-
-              {getOrderStatus(
-                selectedOrder
-              ) === 'DELIVERED' && (
-                <button
-                  onClick={() => {
-                    setSelectedOrder(
-                      null
-                    );
-
-                    setTimeout(() => {
-                      openRatingModal(
-                        selectedOrder
-                      );
-                    }, 100);
-                  }}
-                  className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold inline-flex items-center gap-2 hover:bg-stone-50"
-                >
-                  <Star size={15} />
-
-                  Rate Order
-                </button>
-              )}
-
-              <button
-                onClick={() =>
-                  setSelectedOrder(null)
-                }
-                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* =======================================================
-          PROFILE EDIT MODAL
-      ======================================================= */}
-
-      {showProfileEdit && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
-
-            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
-              <h3 className="font-black text-lg">
-                Edit Profile
-              </h3>
-
-              <button
-                onClick={() =>
-                  setShowProfileEdit(false)
-                }
-                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-5">
-
-              <div>
-                <label className="text-xs font-bold text-stone-600">
-                  Full Name
-                </label>
-
-                <input
-                  value={
-                    profileForm.full_name
-                  }
-                  onChange={(event) =>
-                    setProfileForm(
-                      (prev) => ({
-                        ...prev,
-                        full_name:
-                          event.target
-                            .value,
-                      })
-                    )
-                  }
-                  className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                  placeholder="Your full name"
-                />
-              </div>
-
-
-              <div>
-                <label className="text-xs font-bold text-stone-600">
-                  Phone Number
-                </label>
-
-                <input
-                  value={
-                    profileForm.phone
-                  }
-                  onChange={(event) =>
-                    setProfileForm(
-                      (prev) => ({
-                        ...prev,
-                        phone:
-                          event.target
-                            .value,
-                      })
-                    )
-                  }
-                  className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                  placeholder="Phone number"
-                />
-              </div>
-
-            </div>
-
-            <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
-              <button
-                onClick={() =>
-                  setShowProfileEdit(false)
-                }
-                className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleProfileSave}
-                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* =======================================================
+      {/* ===================================================
           ADDRESS MODAL
-      ======================================================= */}
+      =================================================== */}
 
-      {showAddressModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden">
+      {showAddressForm && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
 
-            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+
               <div>
-                <h3 className="font-black text-lg">
+                <h2 className="text-lg font-bold text-gray-900">
                   {editingAddress
                     ? 'Edit Address'
-                    : 'Add Address'}
-                </h3>
+                    : 'Add New Address'}
+                </h2>
 
-                <p className="text-xs text-stone-400 mt-1">
-                  Enter your delivery address.
+                <p className="text-sm text-gray-500">
+                  Enter your delivery address details.
                 </p>
               </div>
 
               <button
                 onClick={() => {
-                  setShowAddressModal(
+                  setShowAddressForm(
                     false
                   );
-                  resetAddressForm();
+                  setEditingAddress(
+                    null
+                  );
                 }}
-                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
+                className="p-2 rounded-lg hover:bg-gray-100"
               >
-                <X size={17} />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
+
             </div>
 
 
@@ -2939,341 +2368,946 @@ export default function CustomerOrdersPage() {
               onSubmit={
                 handleAddressSubmit
               }
+              className="p-5 space-y-4"
             >
-              <div className="p-5 space-y-4">
 
-                <div>
-                  <label className="text-xs font-bold text-stone-600">
-                    Address Line 1
-                  </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Type
+                </label>
 
-                  <input
-                    required
-                    value={
-                      addressForm.address_line1
-                    }
-                    onChange={(event) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          address_line1:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                    placeholder="House / Flat / Building"
-                  />
-                </div>
+                <select
+                  value={
+                    addressForm.title
+                  }
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        title:
+                          e.target.value,
+                      })
+                    )
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="Home">
+                    Home
+                  </option>
 
+                  <option value="Work">
+                    Work
+                  </option>
 
-                <div>
-                  <label className="text-xs font-bold text-stone-600">
-                    Address Line 2
-                  </label>
-
-                  <input
-                    value={
-                      addressForm.address_line2
-                    }
-                    onChange={(event) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          address_line2:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                    placeholder="Street / Area"
-                  />
-                </div>
-
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-stone-600">
-                      City
-                    </label>
-
-                    <input
-                      required
-                      value={
-                        addressForm.city
-                      }
-                      onChange={(event) =>
-                        setAddressForm(
-                          (prev) => ({
-                            ...prev,
-                            city:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-stone-600">
-                      State
-                    </label>
-
-                    <input
-                      required
-                      value={
-                        addressForm.state
-                      }
-                      onChange={(event) =>
-                        setAddressForm(
-                          (prev) => ({
-                            ...prev,
-                            state:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-stone-600">
-                      PIN Code
-                    </label>
-
-                    <input
-                      required
-                      value={
-                        addressForm.pincode
-                      }
-                      onChange={(event) =>
-                        setAddressForm(
-                          (prev) => ({
-                            ...prev,
-                            pincode:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                      maxLength={6}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-stone-600">
-                      Address Type
-                    </label>
-
-                    <select
-                      value={
-                        addressForm.address_type
-                      }
-                      onChange={(event) =>
-                        setAddressForm(
-                          (prev) => ({
-                            ...prev,
-                            address_type:
-                              event.target
-                                .value,
-                          })
-                        )
-                      }
-                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500 bg-white"
-                    >
-                      <option value="HOME">
-                        Home
-                      </option>
-
-                      <option value="WORK">
-                        Work
-                      </option>
-
-                      <option value="OTHER">
-                        Other
-                      </option>
-                    </select>
-                  </div>
-                </div>
-
-
-                <div>
-                  <label className="text-xs font-bold text-stone-600">
-                    Landmark
-                  </label>
-
-                  <input
-                    value={
-                      addressForm.landmark
-                    }
-                    onChange={(event) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          landmark:
-                            event.target
-                              .value,
-                        })
-                      )
-                    }
-                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
-                    placeholder="Nearby landmark"
-                  />
-                </div>
+                  <option value="Other">
+                    Other
+                  </option>
+                </select>
               </div>
 
 
-              <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  House / Flat / Shop No. *
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    addressForm.house_no
+                  }
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        house_no:
+                          e.target.value,
+                      })
+                    )
+                  }
+                  placeholder="e.g. House No. 123"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ward / Area / Locality
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    addressForm.ward_no_name
+                  }
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        ward_no_name:
+                          e.target.value,
+                      })
+                    )
+                  }
+                  placeholder="e.g. Sector 45"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Complete Address
+                </label>
+
+                <textarea
+                  value={
+                    addressForm.address
+                  }
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        address:
+                          e.target.value,
+                      })
+                    )
+                  }
+                  placeholder="Building, street, landmark, etc."
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    City *
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      addressForm.city
+                    }
+                    onChange={(e) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          city:
+                            e.target.value,
+                        })
+                      )
+                    }
+                    required
+                    placeholder="City"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    District
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      addressForm.district
+                    }
+                    onChange={(e) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          district:
+                            e.target.value,
+                        })
+                      )
+                    }
+                    placeholder="District"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+              </div>
+
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    State *
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      addressForm.state
+                    }
+                    onChange={(e) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          state:
+                            e.target.value,
+                        })
+                      )
+                    }
+                    required
+                    placeholder="State"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Pincode *
+                  </label>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={
+                      addressForm.pincode
+                    }
+                    onChange={(e) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          pincode:
+                            e.target.value.replace(
+                              /\D/g,
+                              ''
+                            ),
+                        })
+                      )
+                    }
+                    required
+                    placeholder="6-digit pincode"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+              </div>
+
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Number
+                </label>
+
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={
+                    addressForm.phone
+                  }
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        phone:
+                          e.target.value.replace(
+                            /\D/g,
+                            ''
+                          ),
+                      })
+                    )
+                  }
+                  placeholder="10-digit mobile number"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+
+              <label className="flex items-center gap-3 cursor-pointer">
+
+                <input
+                  type="checkbox"
+                  checked={Boolean(
+                    addressForm.is_default
+                  )}
+                  onChange={(e) =>
+                    setAddressForm(
+                      (prev) => ({
+                        ...prev,
+                        is_default:
+                          e.target.checked,
+                      })
+                    )
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+
+                <span className="text-sm text-gray-700">
+                  Make this my default address
+                </span>
+
+              </label>
+
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+
                 <button
                   type="button"
                   onClick={() => {
-                    setShowAddressModal(
+                    setShowAddressForm(
                       false
                     );
-                    resetAddressForm();
+                    setEditingAddress(
+                      null
+                    );
                   }}
-                  className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
+                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
+                  disabled={
+                    savingAddress
+                  }
+                  className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
                 >
+                  {savingAddress && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+
                   {editingAddress
                     ? 'Update Address'
                     : 'Save Address'}
                 </button>
+
               </div>
+
             </form>
+
           </div>
+
         </div>
       )}
 
 
-      {/* =======================================================
-          RATING MODAL
-      ======================================================= */}
+      {/* ===================================================
+          ORDER DETAILS MODAL
+      =================================================== */}
 
-      {showRatingModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
 
-            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+
               <div>
-                <h3 className="font-black text-lg">
-                  Rate Your Order
-                </h3>
+                <h2 className="text-lg font-bold text-gray-900">
+                  Order{' '}
+                  {getDisplayOrderId(
+                    selectedOrder
+                  )}
+                </h2>
 
-                <p className="text-xs text-stone-400 mt-1">
-                  {ratingOrder
-                    ? getDisplayOrderId(
-                        ratingOrder
-                      )
-                    : ''}
+                <p className="text-sm text-gray-500">
+                  {formatDateTime(
+                    selectedOrder?.created_at
+                  )}
                 </p>
               </div>
 
               <button
                 onClick={() =>
-                  setShowRatingModal(
-                    false
+                  setSelectedOrder(
+                    null
                   )
                 }
-                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
+                className="p-2 rounded-lg hover:bg-gray-100"
               >
-                <X size={17} />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
+
             </div>
 
 
-            <div className="p-5">
-              <p className="text-sm font-bold text-center">
-                How was your experience?
-              </p>
+            <div className="p-5 space-y-6">
 
-              <div className="flex justify-center gap-2 mt-5">
-                {[1, 2, 3, 4, 5].map(
-                  (value) => (
-                    <button
-                      key={value}
-                      onClick={() =>
-                        setRating(value)
-                      }
-                      className="p-1"
-                    >
-                      <Star
-                        size={32}
-                        fill={
-                          value <= rating
-                            ? 'currentColor'
-                            : 'none'
+              <div>
+
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  Order Tracking
+                </h3>
+
+                <div className="overflow-x-auto">
+
+                  <div className="flex min-w-[650px]">
+
+                    {getTrackingSteps(
+                  selectedOrder
+                ).map(
+                  (
+                    step,
+                    index,
+                    allSteps
+                  ) => {
+
+                    const Icon =
+                      step.icon;
+
+                    return (
+                      <div
+                        key={
+                          step.key
                         }
-                        className={
-                          value <= rating
-                            ? 'text-amber-400'
-                            : 'text-stone-300'
-                        }
-                      />
-                    </button>
-                  )
+                        className="flex-1 relative"
+                      >
+
+                        <div className="flex items-center">
+
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${
+                              step.completed ||
+                              step.active
+                                ? 'bg-green-600 border-green-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-400'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                          </div>
+
+                          {index <
+                            allSteps.length -
+                              1 && (
+                            <div
+                              className={`h-0.5 flex-1 mx-2 ${
+                                step.completed
+                                  ? 'bg-green-600'
+                                  : 'bg-gray-200'
+                              }`}
+                            />
+                          )}
+
+                        </div>
+
+                        <p
+                          className={`text-xs mt-2 ${
+                            step.active
+                              ? 'font-semibold text-green-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {step.label}
+                        </p>
+
+                        {step.time && (
+                          <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
+                            {step.time}
+                          </p>
+                        )}
+
+                      </div>
+                    );
+                  }
                 )}
+
               </div>
 
-              <textarea
-                value={ratingComment}
-                onChange={(event) =>
-                  setRatingComment(
-                    event.target.value
-                  )
-                }
-                rows={4}
-                placeholder="Tell us about your experience..."
-                className="w-full mt-5 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500 resize-none"
-              />
             </div>
 
-
-            <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
-              <button
-                onClick={() =>
-                  setShowRatingModal(
-                    false
-                  )
-                }
-                className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={
-                  handleRateOrderSubmit
-                }
-                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
-              >
-                Submit Rating
-              </button>
-            </div>
           </div>
+
+
+          <div>
+
+            <h3 className="font-semibold text-gray-900 mb-3">
+              Order Items
+            </h3>
+
+            <div className="space-y-3">
+
+              {(Array.isArray(
+                selectedOrder?.order_items
+              )
+                ? selectedOrder.order_items
+                : []
+              ).map(
+                (item, index) => {
+
+                  const product =
+                    item?.products;
+
+                  const variant =
+                    findOrderItemVariant(
+                      item,
+                      product
+                    );
+
+                  const image =
+                    product?.image_url ||
+                    product?.image ||
+                    product?.images?.[0] ||
+                    product?.gallery?.[0] ||
+                    '';
+
+                  return (
+                    <div
+                      key={
+                        item?.id ||
+                        index
+                      }
+                      className="flex items-center gap-3 border border-gray-200 rounded-xl p-3"
+                    >
+
+                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+
+                        {image ? (
+                          <img
+                            src={image}
+                            alt={
+                              product?.name ||
+                              'Product'
+                            }
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <Package className="w-6 h-6 text-gray-300" />
+                        )}
+
+                      </div>
+                      
+                          <div className="flex-1 min-w-0">
+
+                            <p className="font-medium text-gray-900">
+                              {product?.name ||
+                                'Product'}
+                            </p>
+
+                            {variant && (
+                              <p className="text-sm text-gray-500">
+                                {getVariantLabel(
+                                  variant
+                                )}
+                              </p>
+                            )}
+
+                            <p className="text-sm text-gray-500">
+                              Qty:{' '}
+                              {Number(
+                                item?.quantity
+                              ) || 1}
+                            </p>
+
+                          </div>
+
+                          <div className="text-right">
+
+                            <p className="font-semibold">
+                              {formatCurrency(
+                                item?.price
+                              )}
+                            </p>
+
+                            <p className="text-sm text-gray-500">
+                              {formatCurrency(
+                                getItemSubtotal(
+                                  item
+                                )
+                              )}
+                            </p>
+
+                          </div>
+
+                        </div>
+                      );
+                    }
+                  )}
+
+                </div>
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                  Delivery Address
+                </h3>
+
+                <div className="bg-gray-50 rounded-xl p-4">
+
+                  {selectedOrder?.address ? (
+                    <p className="text-sm text-gray-700 leading-6">
+                      {selectedOrder.address}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-700">
+                        {selectedOrder?.delivery_address ||
+                          selectedOrder?.shipping_address ||
+                          'Address information not available'}
+                      </p>
+                    </>
+                  )}
+
+                </div>
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-semibold text-gray-900 mb-3">
+                  Payment
+                </h3>
+
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-4">
+
+                  <CreditCard className="w-5 h-5 text-gray-500" />
+
+                  <div>
+
+                    <p className="text-sm font-medium text-gray-900">
+                      {selectedOrder?.payment_method ||
+                        'Payment'}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      {selectedOrder?.payment_status ||
+                        ''}
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div className="border-t border-gray-100 pt-4">
+
+                <div className="space-y-2 text-sm">
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">
+                      Subtotal
+                    </span>
+
+                    <span>
+                      {formatCurrency(
+                        getOrderItemsSubtotal(
+                          selectedOrder
+                        )
+                      )}
+                    </span>
+                  </div>
+
+
+                  {getDiscount(
+                    selectedOrder
+                  ) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">
+                        Discount
+                      </span>
+
+                      <span className="text-green-600">
+                        -
+                        {formatCurrency(
+                          getDiscount(
+                            selectedOrder
+                          )
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">
+                      Delivery
+                    </span>
+
+                    <span>
+                      {getDeliveryCharge(
+                        selectedOrder
+                      ) > 0
+                        ? formatCurrency(
+                            getDeliveryCharge(
+                              selectedOrder
+                            )
+                          )
+                        : 'FREE'}
+                    </span>
+                  </div>
+
+
+                  {getHandlingCharge(
+                    selectedOrder
+                  ) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">
+                        Handling
+                      </span>
+
+                      <span>
+                        {formatCurrency(
+                          getHandlingCharge(
+                            selectedOrder
+                          )
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+
+                  {getTax(
+                    selectedOrder
+                  ) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">
+                        Tax
+                      </span>
+
+                      <span>
+                        {formatCurrency(
+                          getTax(
+                            selectedOrder
+                          )
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+
+                  <div className="flex justify-between pt-3 border-t border-gray-200 text-base font-bold">
+
+                    <span>
+                      Total
+                    </span>
+
+                    <span className="text-green-600">
+                      {formatCurrency(
+                        getOrderTotal(
+                          selectedOrder
+                        )
+                      )}
+                    </span>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div className="flex flex-wrap justify-end gap-3 pt-2">
+
+                <button
+                  onClick={() =>
+                    setInvoiceOrder(
+                      selectedOrder
+                    )
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
+                >
+                  <FileText className="w-4 h-4" />
+                  Invoice
+                </button>
+
+
+                {String(
+                  getOrderStatus(
+                    selectedOrder
+                  )
+                ).toUpperCase() ===
+                  'DELIVERED' && (
+                  <button
+                    onClick={() =>
+                      openRatingModal(
+                        selectedOrder
+                      )
+                    }
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                  >
+                    <Star className="w-4 h-4" />
+                    Rate Order
+                  </button>
+                )}
+
+
+                <button
+                  onClick={() =>
+                    handleReorder(
+                      selectedOrder
+                    )
+                  }
+                  disabled={
+                    reorderingOrderId ===
+                    getOrderId(
+                      selectedOrder
+                    )
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {reorderingOrderId ===
+                  getOrderId(
+                    selectedOrder
+                  ) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+
+                  Reorder
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
       )}
 
 
-      {/* =======================================================
+      {/* ===================================================
+          RATING MODAL
+      =================================================== */}
+
+      {ratingOrder && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+
+              <div>
+                <h2 className="font-bold text-gray-900">
+                  Rate Your Order
+                </h2>
+
+                <p className="text-sm text-gray-500">
+                  {getDisplayOrderId(
+                    ratingOrder
+                  )}
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setRatingOrder(null)
+                }
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+            </div>
+
+
+            <div className="p-5">
+
+              <p className="text-sm text-gray-600 text-center mb-4">
+                How was your overall experience?
+              </p>
+
+
+              <div className="flex justify-center gap-2 mb-5">
+
+                {[1, 2, 3, 4, 5].map(
+                  (star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() =>
+                        setRatingValue(
+                          star
+                        )
+                      }
+                      className="p-1"
+                    >
+                      <Star
+                        className={`w-8 h-8 ${
+                          star <=
+                          ratingValue
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  )
+                )}
+
+              </div>
+
+
+              <textarea
+                value={
+                  ratingComment
+                }
+                onChange={(e) =>
+                  setRatingComment(
+                    e.target.value
+                  )
+                }
+                rows={4}
+                placeholder="Tell us about your experience..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+
+              <div className="flex justify-end gap-3 mt-4">
+
+                <button
+                  onClick={() =>
+                    setRatingOrder(
+                      null
+                    )
+                  }
+                  className="px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={
+                    handleSubmitRating
+                  }
+                  disabled={
+                    savingRating ||
+                    !ratingValue
+                  }
+                  className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {savingRating && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+
+                  Submit Rating
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+
+      {/* ===================================================
           INVOICE
-      ======================================================= */}
+      =================================================== */}
 
       {invoiceOrder && (
         <InvoiceModal
@@ -3284,8 +3318,8 @@ export default function CustomerOrdersPage() {
         />
       )}
 
-
-      <Footer />
     </div>
   );
-}
+};
+
+export default CustomerOrdersPage;

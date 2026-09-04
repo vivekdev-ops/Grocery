@@ -125,7 +125,7 @@ export default function StoreHeader({
 
           {/* Logo */}
           <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => navigate('/')}
             className="flex items-center gap-2.5 shrink-0 group btn-press cursor-pointer"
           >
             <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
@@ -225,13 +225,13 @@ export default function StoreHeader({
                           <Package size={15} className="text-stone-400" /> My Orders
                         </button>
                         <button
-                          onClick={() => { setIsAccountMenuOpen(false); navigate('/profile'); }}
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }}
                           className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
                         >
                           <MapPin size={15} className="text-stone-400" /> Saved Addresses
                         </button>
                         <button
-                          onClick={() => { setIsAccountMenuOpen(false); navigate('/profile'); }}
+                          onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }}
                           className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
                         >
                           <FileText size={15} className="text-stone-400" /> My Prescriptions
