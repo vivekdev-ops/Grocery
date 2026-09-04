@@ -154,6 +154,9 @@ export default function CustomerStorefront() {
           phone: addressForm.phone,
           otp: generatedOtp,
           coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          discount_amount: discountAmount,
+          delivery_fee: deliveryFee,
+          handling_charge: 5,
           latitude: selectedAddrObj?.latitude || null,
           longitude: selectedAddrObj?.longitude || null
         }])
@@ -723,7 +726,7 @@ export default function CustomerStorefront() {
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
   .from('orders')
-  .select('*, order_items(*, products(*))')
+  .select('*, order_items(*, products(*, product_variants(*)))')
   .eq('customer_email', email)
   .order('created_at', { ascending: false });
 
@@ -1923,7 +1926,7 @@ export default function CustomerStorefront() {
     )}
 
     {orderSuccess && (
-      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
         <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
           <div className="w-20 h-20 bg-emerald-50 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto border border-emerald-200">
             <CheckCircle size={40} />
@@ -1932,12 +1935,20 @@ export default function CustomerStorefront() {
             <h2 className="text-2xl font-black text-slate-900">Order Placed!</h2>
             <p className="text-slate-500 text-xs mt-1">Your quick delivery order <span className="font-mono font-bold text-slate-900">#{orderSuccess}</span> is being packed.</p>
           </div>
-          <button 
-            onClick={() => { setOrderSuccess(null); setIsProfileOpen(true); setOpenSection('orders'); }}
-            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            Track Order Status <ArrowRight size={16} />
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
+              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Track Order Status <ArrowRight size={16} />
+            </button>
+            <button
+              onClick={() => setOrderSuccess(null)}
+              className="w-full py-2.5 rounded-2xl text-xs font-bold text-stone-500 hover:text-stone-800 hover:bg-stone-50 transition cursor-pointer"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
       </div>
     )}

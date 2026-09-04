@@ -8,11 +8,18 @@ export default function CustomerAuth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (e) => {
     e.preventDefault();
+    
+    if (isSignUp && !acceptedTerms) {
+      alert("Please accept the Terms and Conditions to sign up.");
+      return;
+    }
+
     setLoading(true);
 
     if (isSignUp) {
@@ -22,6 +29,7 @@ export default function CustomerAuth() {
       } else {
         alert("Registration successful! You can now log in.");
         setIsSignUp(false);
+        setAcceptedTerms(false);
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -64,7 +72,36 @@ export default function CustomerAuth() {
               value={password} onChange={e => setPassword(e.target.value)}
             />
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 transition cursor-pointer">
+
+          {/* Terms and Conditions Checkbox (Shown only during sign up) */}
+          {isSignUp && (
+            <div className="flex items-start gap-2.5 pt-1">
+              <input 
+                type="checkbox" 
+                id="terms" 
+                required
+                checked={acceptedTerms}
+                onChange={e => setAcceptedTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+              />
+              <label htmlFor="terms" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" className="text-green-600 font-bold hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy-policy" target="_blank" className="text-green-600 font-bold hover:underline">
+                  Privacy Policy
+                </Link>.
+              </label>
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={loading || (isSignUp && !acceptedTerms)} 
+            className="w-full bg-green-600 text-white p-3 rounded-xl font-bold hover:bg-green-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {loading ? 'Please wait...' : isSignUp ? 'Register Account' : 'Login'}
           </button>
 
@@ -81,7 +118,13 @@ export default function CustomerAuth() {
         </form>
 
         <div className="mt-6 text-sm">
-          <button onClick={() => setIsSignUp(!isSignUp)} className="text-green-700 font-medium hover:underline cursor-pointer">
+          <button 
+            onClick={() => { 
+              setIsSignUp(!isSignUp); 
+              setAcceptedTerms(false); 
+            }} 
+            className="text-green-700 font-medium hover:underline cursor-pointer"
+          >
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Register"}
           </button>
         </div>

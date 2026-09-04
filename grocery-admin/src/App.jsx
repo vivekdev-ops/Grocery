@@ -418,7 +418,7 @@ function AnimatedRoutes() {
         <Route path="/shopkeeper"      element={<ShopkeeperPortal />} />
         <Route path="/delivery"        element={<DeliveryPortal />} />
         <Route path="/privacy-policy"  element={<PageWrap><PrivacyPolicy /></PageWrap>} />
-        <Route path="/terms-of-service" element={<PageWrap><TermsOfService /></PageWrap>} />
+        <Route path="/terms"           element={<PageWrap><TermsOfService /></PageWrap>} />
         <Route path="/forgot-password" element={<PageWrap><ForgotPassword /></PageWrap>} />
         <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
         <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />

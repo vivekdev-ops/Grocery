@@ -133,7 +133,7 @@ export default function CustomerOrdersPage() {
 
       const { data: ordersData } = await supabase
         .from('orders')
-        .select('*, order_items(*, products(*))')
+        .select('*, order_items(*, products(*, product_variants(*)))')
         .eq('customer_email', email)
         .order('created_at', { ascending: false });
 

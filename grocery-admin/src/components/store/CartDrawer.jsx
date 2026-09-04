@@ -107,7 +107,7 @@ export default function CartDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
-            className="fixed inset-0 bg-stone-950/50 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-stone-950/50 backdrop-blur-sm z-[100]"
             onClick={onClose}
           />
 
@@ -117,7 +117,7 @@ export default function CartDrawer({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.8 }}
             transition={{ type: 'spring', stiffness: 340, damping: 34 }}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col font-sans"
+            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-[100] flex flex-col font-sans"
             onClick={e => e.stopPropagation()}
           >
             {/* ── HEADER ── */}
@@ -211,7 +211,15 @@ export default function CartDrawer({
             {variantLabel}
           </span>
         )}
-        <p className="text-[10px] text-stone-400 mt-0.5">₹{itemPrice.toFixed(2)} each</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <p className="text-[10px] text-stone-700 font-bold">₹{itemPrice.toFixed(0)}</p>
+          {(() => {
+            const itemMrp = Number(item?.variant?.mrp || item?.product?.mrp || 0);
+            return itemMrp > itemPrice ? (
+              <p className="text-[9px] text-stone-400 line-through">₹{itemMrp.toFixed(0)}</p>
+            ) : null;
+          })()}
+        </div>
       </div>
       <div className="flex items-center gap-1 bg-stone-100 rounded-xl p-0.5 shrink-0">
         <button onClick={() => updateQuantity(uniqueKey, -1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
