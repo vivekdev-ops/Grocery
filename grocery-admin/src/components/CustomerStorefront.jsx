@@ -722,10 +722,10 @@ export default function CustomerStorefront() {
 
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
-      .from('orders')
-      .select('*, order_items(*, products(*))')
-      .eq('customer_email', email)
-      .order('created_at', { ascending: false });
+  .from('orders')
+  .select('*, order_items(*, products(*))')
+  .eq('customer_email', email)
+  .order('created_at', { ascending: false });
 
     if (!error && data) {
       setMyOrders(data || []);

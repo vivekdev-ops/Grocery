@@ -942,6 +942,19 @@ export default function CustomerOrdersPage() {
                   </p>
                 </div>
 
+                {/* Delivery Verification OTP Card */}
+                {selectedOrder.otp && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 flex justify-between items-center shadow-2xs">
+                    <div>
+                      <span className="text-emerald-900 font-black text-xs block uppercase tracking-wider">Delivery Verification OTP</span>
+                      <span className="text-[11px] text-emerald-700 font-medium">Provide this code to the delivery partner</span>
+                    </div>
+                    <span className="font-mono font-black text-emerald-800 text-lg tracking-widest bg-white px-4 py-2 rounded-xl border border-emerald-200 shadow-xs">
+                      {selectedOrder.otp}
+                    </span>
+                  </div>
+                )}
+
                 {/* Items in this order */}
                 <div className="space-y-3 pt-2">
                   <p className="font-black text-xs text-stone-900 uppercase tracking-wider">{selectedOrder.order_items?.length || 0} items in this order</p>
