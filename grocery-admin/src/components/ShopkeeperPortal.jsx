@@ -1,21 +1,18 @@
 // src/components/ShopkeeperPortal.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter, Bell } from 'lucide-react';
+import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter, Bell, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { registerPushToken } from '../utils/notifications';
 import NotificationBell from './NotificationBell';
 
-// Replace your existing getApplicableCommissionPct in ShopkeeperPortal.jsx with this:
 const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
-  // 1. If an individual custom rate is set on this shopkeeper's profile, use it
   if (profile?.custom_commission_pct !== null && profile?.custom_commission_pct !== undefined && profile?.custom_commission_pct !== '') {
     return Number(profile.custom_commission_pct);
   }
 
-  // 2. Otherwise, evaluate the order's cart total against your cart-value tier rules from the database
   if (!rules || !Array.isArray(rules) || rules.length === 0) {
-    return 2; // fallback
+    return 2;
   }
 
   const targetRole = typeof roleType === 'string' ? roleType.toLowerCase() : 'shopkeeper';
@@ -33,7 +30,7 @@ const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
     return Number(matchedRule.commission_pct);
   }
 
-  return 2; // default fallback
+  return 2;
 };
 
 export default function ShopkeeperPortal() {
@@ -63,6 +60,20 @@ export default function ShopkeeperPortal() {
   const [galleryImages, setGalleryImages] = useState([]);
   const [variants, setVariants] = useState([]);
   const [editingId, setEditingId] = useState(null);
+
+  // Store Location & Map State
+  const [locationForm, setLocationForm] = useState({
+    address: '',
+    latitude: '',
+    longitude: ''
+  });
+  const [pincodeQuery, setPincodeQuery] = useState('');
+  const [searchingPin, setSearchingPin] = useState(false);
+  const [savingLocation, setSavingLocation] = useState(false);
+
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerInstanceRef = useRef(null);
 
   const navigate = useNavigate();
 
@@ -94,8 +105,103 @@ export default function ShopkeeperPortal() {
   useEffect(() => {
     if (shopkeeperProfile?.id) {
       fetchStoreData(shopkeeperProfile.id);
+      setLocationForm({
+        address: shopkeeperProfile.address || '',
+        latitude: shopkeeperProfile.latitude !== null && shopkeeperProfile.latitude !== undefined ? shopkeeperProfile.latitude : '',
+        longitude: shopkeeperProfile.longitude !== null && shopkeeperProfile.longitude !== undefined ? shopkeeperProfile.longitude : ''
+      });
     }
-  }, [datePreset, startDate, endDate, commissionRules]);
+  }, [datePreset, startDate, endDate, commissionRules, shopkeeperProfile?.id]);
+
+  // Initialize interactive OpenStreetMap (Leaflet) when location tab is active
+  useEffect(() => {
+    if (activeTab === 'location') {
+      const timer = setTimeout(() => {
+        initializeMap();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
+
+  const initializeMap = () => {
+    if (!window.L || !mapContainerRef.current) return;
+
+    const initialLat = Number(locationForm.latitude) || 26.8467;
+    const initialLon = Number(locationForm.longitude) || 80.9462;
+
+    if (!mapInstanceRef.current) {
+      const map = window.L.map(mapContainerRef.current).setView([initialLat, initialLon], 13);
+      
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+
+      const marker = window.L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+
+      marker.on('dragend', function (e) {
+        const coords = marker.getLatLng();
+        setLocationForm(prev => ({
+          ...prev,
+          latitude: coords.lat.toFixed(6),
+          longitude: coords.lng.toFixed(6)
+        }));
+      });
+
+      map.on('click', function (e) {
+        marker.setLatLng(e.latlng);
+        setLocationForm(prev => ({
+          ...prev,
+          latitude: e.latlng.lat.toFixed(6),
+          longitude: e.latlng.lng.toFixed(6)
+        }));
+      });
+
+      mapInstanceRef.current = map;
+      markerInstanceRef.current = marker;
+    } else {
+      mapInstanceRef.current.setView([initialLat, initialLon], 13);
+      markerInstanceRef.current.setLatLng([initialLat, initialLon]);
+      mapInstanceRef.current.invalidateSize();
+    }
+  };
+
+  const updateMapMarker = (lat, lon) => {
+    if (mapInstanceRef.current && markerInstanceRef.current) {
+      const newLatLng = [Number(lat), Number(lon)];
+      mapInstanceRef.current.setView(newLatLng, 15);
+      markerInstanceRef.current.setLatLng(newLatLng);
+    }
+  };
+
+  const handleSearchPincode = async (e) => {
+    e.preventDefault();
+    if (!pincodeQuery.trim()) return;
+
+    setSearchingPin(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(pincodeQuery.trim())}&country=India&format=json&limit=1`);
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        setLocationForm(prev => ({
+          ...prev,
+          latitude: Number(lat).toFixed(6),
+          longitude: Number(lon).toFixed(6),
+          address: prev.address || display_name
+        }));
+        updateMapMarker(lat, lon);
+        alert(`Location found for PIN ${pincodeQuery}! Pin placed on map.`);
+      } else {
+        alert("Pincode not found. Please try searching by nearby city or landmark.");
+      }
+    } catch (err) {
+      alert("Error searching location by pincode.");
+    } finally {
+      setSearchingPin(false);
+    }
+  };
 
   const fetchDependencies = async () => {
     const [catData, rulesData] = await Promise.all([
@@ -111,7 +217,7 @@ export default function ShopkeeperPortal() {
     try {
       let { data: profileData, error: profileErr } = await supabase
         .from('shopkeeper_profiles')
-        .select('id, user_id, store_name, phone, address, custom_commission_pct') // <-- explicitly include custom_commission_pct
+        .select('id, user_id, store_name, phone, address, latitude, longitude, custom_commission_pct')
         .or(`user_id.eq.${user.id},id.eq.${user.id}`)
         .maybeSingle();
 
@@ -295,6 +401,62 @@ export default function ShopkeeperPortal() {
     if (!error && session) fetchStoreData(shopkeeperProfile?.id || session.user.id);
   };
 
+  const handleFetchGpsLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        setLocationForm(prev => ({
+          ...prev,
+          latitude: lat.toFixed(6),
+          longitude: lon.toFixed(6)
+        }));
+        updateMapMarker(lat, lon);
+        alert(`GPS Location fetched successfully!\nLat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
+      },
+      () => {
+        alert("Unable to retrieve your location. Please check browser permissions.");
+      }
+    );
+  };
+
+  const handleSaveLocation = async (e) => {
+    e.preventDefault();
+    if (!shopkeeperProfile?.id) return;
+
+    setSavingLocation(true);
+    try {
+      const { error } = await supabase
+        .from('shopkeeper_profiles')
+        .update({
+          address: locationForm.address,
+          latitude: locationForm.latitude !== '' ? parseFloat(locationForm.latitude) : null,
+          longitude: locationForm.longitude !== '' ? parseFloat(locationForm.longitude) : null
+        })
+        .eq('id', shopkeeperProfile.id);
+
+      if (error) throw error;
+
+      setShopkeeperProfile(prev => ({
+        ...prev,
+        address: locationForm.address,
+        latitude: locationForm.latitude !== '' ? parseFloat(locationForm.latitude) : null,
+        longitude: locationForm.longitude !== '' ? parseFloat(locationForm.longitude) : null
+      }));
+
+      alert("Store location saved successfully!");
+    } catch (err) {
+      alert("Error saving location: " + err.message);
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
   const totalNetRevenue = orders
     .filter(o => o.status === 'delivered')
     .reduce((sum, o) => {
@@ -334,6 +496,9 @@ export default function ShopkeeperPortal() {
           </button>
           <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
             <ShoppingCart size={16} /> My Store Orders ({orders.length})
+          </button>
+          <button onClick={() => setActiveTab('location')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'location' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
+            <MapPin size={16} /> Store Location
           </button>
         </nav>
 
@@ -705,6 +870,113 @@ export default function ShopkeeperPortal() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'location' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Store Location & Map Pinned Coordinates</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Search by PIN code or drag the marker on the map to pin your store's exact location.</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-5 max-w-3xl">
+              
+              {/* Pincode Search Bar */}
+              <form onSubmit={handleSearchPincode} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search by PIN Code (e.g. 272155)" 
+                    value={pincodeQuery}
+                    onChange={e => setPincodeQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-stone-200 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-bold"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={searchingPin}
+                  className="bg-stone-900 hover:bg-stone-800 text-white font-bold px-5 py-3 rounded-2xl text-xs transition cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  {searchingPin ? 'Searching...' : 'Search PIN'}
+                </button>
+              </form>
+
+              {/* Interactive Map Container */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[10px] text-stone-400 font-bold uppercase tracking-wider">
+                  <span>Interactive Map (Drag pin or click to relocate)</span>
+                  <button type="button" onClick={handleFetchGpsLocation} className="text-emerald-700 hover:underline cursor-pointer">
+                    Use Current GPS
+                  </button>
+                </div>
+                <div 
+                  ref={mapContainerRef} 
+                  className="w-full h-72 rounded-2xl border border-stone-200 z-10 shadow-2xs" 
+                />
+              </div>
+
+              <form onSubmit={handleSaveLocation} className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">Store Address</label>
+                  <textarea 
+                    rows="2" 
+                    required 
+                    placeholder="e.g. Shop No. 4, Main Market, Civil Lines, Harraiya" 
+                    value={locationForm.address} 
+                    onChange={e => setLocationForm({...locationForm, address: e.target.value})}
+                    className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Latitude</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      required
+                      placeholder="e.g. 26.8467" 
+                      value={locationForm.latitude} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setLocationForm({...locationForm, latitude: val});
+                        if (val && locationForm.longitude) updateMapMarker(val, locationForm.longitude);
+                      }}
+                      className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Longitude</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      required
+                      placeholder="e.g. 80.9462" 
+                      value={locationForm.longitude} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setLocationForm({...locationForm, longitude: val});
+                        if (locationForm.latitude && val) updateMapMarker(locationForm.latitude, val);
+                      }}
+                      className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    type="submit" 
+                    disabled={savingLocation}
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-2xl text-xs transition shadow-xs cursor-pointer disabled:opacity-50 uppercase tracking-wider"
+                  >
+                    {savingLocation ? 'Saving Location...' : 'Save Store Location & Pinned Coordinates'}
+                  </button>
+                </div>
+              </form>
+
+            </div>
           </div>
         )}
 

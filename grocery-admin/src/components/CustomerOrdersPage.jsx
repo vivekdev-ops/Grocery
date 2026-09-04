@@ -1,1135 +1,2495 @@
-// src/components/CustomerOrdersPage.jsx
-import { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  User,
+  MapPin,
+  Package,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Truck,
+  ChevronRight,
+  Edit3,
+  Trash2,
+  Plus,
+  Heart,
+  Star,
+  Camera,
+  ShoppingBag,
+  ArrowLeft,
+  RefreshCw,
+  Search,
+  Phone,
+  Mail,
+  Calendar,
+  CreditCard,
+  Receipt,
+  CircleAlert,
+  Navigation,
+  Loader2,
+  X,
+} from 'lucide-react';
+
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Package, MapPin, FileText, Gift, Shield, LogOut, CheckCircle2, ChevronRight, ArrowLeft, Download, MessageSquare, Copy, Check, User, Plus, Edit2, Trash2, Phone, Save, ChevronDown, Upload, RotateCcw, Star } from 'lucide-react';
+
 import StoreHeader from './store/StoreHeader';
 import Footer from './Footer';
 import InvoiceModal from './InvoiceModal';
 
-export default function CustomerOrdersPage() {
-  const [session, setSession] = useState(null);
-  const [customerProfile, setCustomerProfile] = useState(null);
-  const [myOrders, setMyOrders] = useState([]);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'profile'
-  const [mobileView, setMobileView] = useState('menu'); // 'menu' | 'content'
-  const [savedAddresses, setSavedAddresses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
 
-  // Rating Modal State
-  const [ratingOrder, setRatingOrder] = useState(null);
-  const [deliveryRating, setDeliveryRating] = useState(5);
-  const [productRatings, setProductRatings] = useState({}); // { [productId]: number }
+/* ============================================================
+   HELPERS
+============================================================ */
 
-  // Address Form State for Add / Edit
-  const [showAddressForm, setShowAddressForm] = useState(false);
-  const [editingAddressId, setEditingAddressId] = useState(null);
-  const [addressForm, setAddressForm] = useState({
-    title: 'Home',
-    house_no: '',
-    ward_no_name: '',
-    city: 'Harraiya',
-    district: 'Basti',
-    state: 'Uttar Pradesh',
-    pincode: '272155',
-    phone: '',
-    latitude: null,
-    longitude: null
+const formatCurrency = (value) => {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount)) {
+    return '₹0.00';
+  }
+
+  return `₹${amount.toFixed(2)}`;
+};
+
+
+const formatDate = (dateValue) => {
+  if (!dateValue) return 'N/A';
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'N/A';
+  }
+
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
   });
+};
 
-  // Profile Form State
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const [profileForm, setProfileForm] = useState({
-    full_name: '',
-    phone: '',
-    avatar_url: '',
-    interests: []
+
+const formatDateTime = (dateValue) => {
+  if (!dateValue) return 'N/A';
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'N/A';
+  }
+
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
+};
 
-  const availableInterests = [
-    'Organic Groceries',
-    'Snacks & Munchies',
-    'Dairy & Milk',
-    'Fresh Fruits & Vegetables',
-    'Beverages & Juices',
-    'Personal Care',
-    'Household Essentials'
+
+const formatStatus = (value) => {
+  if (!value) return 'Placed';
+
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+
+/* ============================================================
+   ORDER ID
+============================================================ */
+
+const getOrderId = (order) => {
+  if (!order) return '';
+
+  return (
+    order.order_number ||
+    order.order_id ||
+    order.id ||
+    ''
+  );
+};
+
+
+const getDisplayOrderId = (order) => {
+  const id = getOrderId(order);
+
+  if (!id) {
+    return 'N/A';
+  }
+
+  const stringId = String(id);
+
+  /*
+   * If database already has a business order number such as:
+   * ORD-20260904-0001
+   * ORD123456
+   * then display it directly.
+   */
+  if (
+    stringId.toUpperCase().startsWith('ORD')
+  ) {
+    return stringId.toUpperCase();
+  }
+
+  /*
+   * If order_number exists, use it directly.
+   */
+  if (order.order_number) {
+    return String(order.order_number);
+  }
+
+  /*
+   * UUID fallback.
+   */
+  return `ORD${stringId
+    .replace(/-/g, '')
+    .slice(0, 12)
+    .toUpperCase()}`;
+};
+
+
+/* ============================================================
+   ORDER STATUS / TRACKING
+============================================================ */
+
+const getOrderStatus = (order) => {
+  if (!order) {
+    return 'PLACED';
+  }
+
+  return String(
+    order.tracking_status ||
+    order.status ||
+    'PLACED'
+  ).toUpperCase();
+};
+
+
+const getTrackingSteps = (order) => {
+  const status = getOrderStatus(order);
+  const normalizedStatus = status
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+  const steps = [
+    {
+      key: 'placed',
+      label: 'Order Placed',
+      description: 'Your order has been placed',
+      icon: Package,
+    },
+    {
+      key: 'confirmed',
+      label: 'Order Confirmed',
+      description: 'Your order has been confirmed',
+      icon: CheckCircle2,
+    },
+    {
+      key: 'preparing',
+      label: 'Preparing',
+      description: 'Your items are being prepared',
+      icon: ShoppingBag,
+    },
+    {
+      key: 'ready_for_pickup',
+      label: 'Ready for Pickup',
+      description: 'Order is ready for delivery',
+      icon: Package,
+    },
+    {
+      key: 'out_for_delivery',
+      label: 'Out for Delivery',
+      description: 'Delivery partner is on the way',
+      icon: Truck,
+    },
+    {
+      key: 'delivered',
+      label: 'Delivered',
+      description: 'Order delivered successfully',
+      icon: CheckCircle2,
+    },
   ];
 
+  const statusIndexMap = {
+    placed: 0,
+    pending: 0,
+
+    confirmed: 1,
+
+    preparing: 2,
+
+    ready: 3,
+    ready_for_pickup: 3,
+
+    out_for_delivery: 4,
+    outfordelivery: 4,
+    shipped: 4,
+    dispatched: 4,
+
+    delivered: 5,
+    completed: 5,
+  };
+
+  if (
+    normalizedStatus === 'cancelled' ||
+    normalizedStatus === 'canceled'
+  ) {
+    return {
+      cancelled: true,
+      currentIndex: -1,
+      steps,
+    };
+  }
+
+  let currentIndex = statusIndexMap[normalizedStatus];
+
+  if (currentIndex === undefined) {
+    currentIndex = 0;
+  }
+
+  return {
+    cancelled: false,
+    currentIndex,
+    steps,
+  };
+};
+
+
+/* ============================================================
+   VARIANT HELPERS
+============================================================ */
+
+const getProductVariants = (product) => {
+  if (!product) {
+    return [];
+  }
+
+  /*
+   * Preferred:
+   * relational product_variants table
+   */
+  if (
+    Array.isArray(product.product_variants) &&
+    product.product_variants.length > 0
+  ) {
+    return product.product_variants;
+  }
+
+  /*
+   * Backward compatibility:
+   * JSONB variants field
+   */
+  if (Array.isArray(product.variants)) {
+    return product.variants;
+  }
+
+  return [];
+};
+
+
+const getVariantLabel = (variant) => {
+  if (!variant) return '';
+
+  return (
+    variant.unit_label ||
+    variant.label ||
+    variant.unit ||
+    ''
+  );
+};
+
+
+const getVariantPrice = (variant) => {
+  if (!variant) return 0;
+
+  const price = Number(variant.price);
+
+  return Number.isFinite(price) ? price : 0;
+};
+
+
+const getVariantMRP = (variant) => {
+  if (!variant) return 0;
+
+  const mrp = Number(variant.mrp);
+
+  return Number.isFinite(mrp) ? mrp : 0;
+};
+
+
+const getVariantStock = (variant) => {
+  if (!variant) return 0;
+
+  const stock = Number(variant.stock);
+
+  return Number.isFinite(stock) ? stock : 0;
+};
+
+
+/* ============================================================
+   FIND ORDER ITEM VARIANT
+============================================================ */
+
+const findOrderItemVariant = (item) => {
+  if (!item?.products) {
+    return null;
+  }
+
+  const variants = getProductVariants(item.products);
+
+  if (!variants.length) {
+    return null;
+  }
+
+  /*
+   * First priority:
+   * variant_id stored in order_items
+   */
+  if (item.variant_id) {
+    const matchedById = variants.find(
+      (variant) =>
+        String(variant.id) === String(item.variant_id)
+    );
+
+    if (matchedById) {
+      return matchedById;
+    }
+  }
+
+  /*
+   * Second priority:
+   * variant label
+   */
+  if (item.variant_label) {
+    const matchedByLabel = variants.find(
+      (variant) =>
+        String(getVariantLabel(variant)).toLowerCase() ===
+        String(item.variant_label).toLowerCase()
+    );
+
+    if (matchedByLabel) {
+      return matchedByLabel;
+    }
+  }
+
+  /*
+   * Third priority:
+   * Match historical price against current variant.
+   *
+   * This is only for finding the variant.
+   * We NEVER replace the historical order price.
+   */
+  if (item.price !== null && item.price !== undefined) {
+    const historicalPrice = Number(item.price);
+
+    const matchedByPrice = variants.find(
+      (variant) =>
+        Number(variant.price) === historicalPrice
+    );
+
+    if (matchedByPrice) {
+      return matchedByPrice;
+    }
+  }
+
+  return null;
+};
+
+
+/* ============================================================
+   CHARGES
+============================================================ */
+
+const getDeliveryCharge = (order) => {
+  if (!order) {
+    return 0;
+  }
+
+  const possibleFields = [
+    order.delivery_charge,
+    order.delivery_fee,
+    order.delivery_charges,
+    order.shipping_charge,
+    order.shipping_fee,
+  ];
+
+  const value = possibleFields.find(
+    (item) =>
+      item !== null &&
+      item !== undefined &&
+      item !== ''
+  );
+
+  const charge = Number(value);
+
+  return Number.isFinite(charge) ? charge : 0;
+};
+
+
+const getHandlingCharge = (order) => {
+  if (!order) {
+    return 0;
+  }
+
+  const possibleFields = [
+    order.handling_charge,
+    order.handling_fee,
+    order.platform_fee,
+  ];
+
+  const value = possibleFields.find(
+    (item) =>
+      item !== null &&
+      item !== undefined &&
+      item !== ''
+  );
+
+  const charge = Number(value);
+
+  return Number.isFinite(charge) ? charge : 0;
+};
+
+
+const getDiscount = (order) => {
+  if (!order) {
+    return 0;
+  }
+
+  const possibleFields = [
+    order.discount_amount,
+    order.discount,
+    order.coupon_discount,
+  ];
+
+  const value = possibleFields.find(
+    (item) =>
+      item !== null &&
+      item !== undefined &&
+      item !== ''
+  );
+
+  const discount = Number(value);
+
+  return Number.isFinite(discount) ? discount : 0;
+};
+
+
+const getTax = (order) => {
+  if (!order) {
+    return 0;
+  }
+
+  const possibleFields = [
+    order.tax_amount,
+    order.tax,
+    order.gst_amount,
+  ];
+
+  const value = possibleFields.find(
+    (item) =>
+      item !== null &&
+      item !== undefined &&
+      item !== ''
+  );
+
+  const tax = Number(value);
+
+  return Number.isFinite(tax) ? tax : 0;
+};
+
+
+/* ============================================================
+   ITEM SUBTOTAL
+============================================================ */
+
+const getItemSubtotal = (order) => {
+  if (!order?.order_items) {
+    return 0;
+  }
+
+  return order.order_items.reduce(
+    (total, item) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+
+      return total + price * quantity;
+    },
+    0
+  );
+};
+
+
+/* ============================================================
+   ORDER TOTAL
+============================================================ */
+
+const getOrderTotal = (order) => {
+  if (!order) {
+    return 0;
+  }
+
+  /*
+   * total_amount is treated as authoritative.
+   */
+  const total = Number(order.total_amount);
+
+  if (Number.isFinite(total)) {
+    return total;
+  }
+
+  /*
+   * Fallback calculation.
+   */
+  const subtotal = getItemSubtotal(order);
+  const delivery = getDeliveryCharge(order);
+  const handling = getHandlingCharge(order);
+  const discount = getDiscount(order);
+  const tax = getTax(order);
+
+  return (
+    subtotal +
+    delivery +
+    handling +
+    tax -
+    discount
+  );
+};
+
+
+/* ============================================================
+   COMPONENT
+============================================================ */
+
+export default function CustomerOrdersPage() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate('/login');
-      } else {
-        setSession(session);
-        fetchUserData(session.user.id, session.user.email);
-      }
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+
+  const [orders, setOrders] = useState([]);
+  const [addresses, setAddresses] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const [activeTab, setActiveTab] = useState('orders');
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [showAddressModal, setShowAddressModal] =
+    useState(false);
+
+  const [editingAddress, setEditingAddress] =
+    useState(null);
+
+  const [showProfileEdit, setShowProfileEdit] =
+    useState(false);
+
+  const [showRatingModal, setShowRatingModal] =
+    useState(false);
+
+  const [ratingOrder, setRatingOrder] =
+    useState(null);
+
+  const [rating, setRating] = useState(0);
+
+  const [ratingComment, setRatingComment] =
+    useState('');
+
+  const [invoiceOrder, setInvoiceOrder] =
+    useState(null);
+
+  const [reordering, setReordering] =
+    useState(false);
+
+  const [profileForm, setProfileForm] =
+    useState({
+      full_name: '',
+      phone: '',
     });
 
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [navigate]);
+  const [addressForm, setAddressForm] =
+    useState({
+      address_line1: '',
+      address_line2: '',
+      city: '',
+      state: '',
+      pincode: '',
+      landmark: '',
+      address_type: 'HOME',
+    });
 
-  // Sync cart count from localStorage
+  /* ============================================================
+     AUTH
+  ============================================================ */
+
   useEffect(() => {
-    const updateCartCount = () => {
-      try {
-        const cart = JSON.parse(localStorage.getItem('cart_items') || '[]');
-        const total = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
-        setCartCount(total);
-      } catch (e) {
-        setCartCount(0);
-      }
-    };
-
-    updateCartCount();
-    window.addEventListener('storage', updateCartCount);
-    window.addEventListener('cartUpdated', updateCartCount);
-    return () => {
-      window.removeEventListener('storage', updateCartCount);
-      window.removeEventListener('cartUpdated', updateCartCount);
-    };
+    initialize();
   }, []);
 
-  const fetchUserData = async (userId, email) => {
-    setLoading(true);
+
+  const initialize = async () => {
     try {
-      const { data: profileData } = await supabase
-        .from('customer_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      setLoading(true);
 
-      if (profileData) {
-        setCustomerProfile(profileData);
-        let parsedInterests = [];
-        if (typeof profileData.interests === 'string') {
-          parsedInterests = profileData.interests.split(',').map(i => i.trim()).filter(Boolean);
-        } else if (Array.isArray(profileData.interests)) {
-          parsedInterests = profileData.interests;
-        }
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-        setProfileForm({
-          full_name: profileData.full_name || '',
-          phone: profileData.phone || '',
-          avatar_url: profileData.avatar_url || '',
-          interests: parsedInterests
-        });
+      if (authError) {
+        throw authError;
       }
 
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('*, order_items(*, products(*, product_variants(*)))')
-        .eq('customer_email', email)
-        .order('created_at', { ascending: false });
+      if (!authUser) {
+        navigate('/login');
+        return;
+      }
 
-      if (ordersData) setMyOrders(ordersData);
+      setUser(authUser);
 
-      const { data: addressData } = await supabase
-        .from('customer_addresses')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (addressData) setSavedAddresses(addressData);
-    } catch (err) {
-      console.error('Error loading account data:', err);
+      await Promise.all([
+        loadProfile(authUser),
+        loadOrders(authUser),
+        loadAddresses(authUser),
+      ]);
+    } catch (error) {
+      console.error(
+        'Customer page initialization error:',
+        error
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const copyOrderId = (id) => {
-    navigator.clipboard.writeText(id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
-  };
 
-  const handlePhoneChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '');
-    if (val.length <= 10) {
-      setProfileForm(prev => ({ ...prev, phone: val }));
-    }
-  };
+  /* ============================================================
+     PROFILE
+  ============================================================ */
 
-  const handleInterestToggle = (interest) => {
-    setProfileForm(prev => {
-      const exists = prev.interests.includes(interest);
-      if (exists) {
-        return { ...prev, interests: prev.interests.filter(i => i !== interest) };
-      } else {
-        return { ...prev, interests: [...prev.interests, interest] };
-      }
-    });
-  };
-
-  const handleAvatarFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !session?.user) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File size must be less than 2MB.');
-      return;
-    }
-
-    setUploadingImage(true);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileForm(prev => ({ ...prev, avatar_url: reader.result }));
-      setUploadingImage(false);
-    };
-    reader.onerror = () => {
-      alert('Failed to read local file.');
-      setUploadingImage(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    if (!session?.user) return;
-
-    if (profileForm.phone.length !== 10) {
-      alert('Mobile number must be exactly 10 digits.');
-      return;
-    }
-
-    setSavingProfile(true);
+  const loadProfile = async (authUser) => {
     try {
-      const interestsString = Array.isArray(profileForm.interests) ? profileForm.interests.join(', ') : profileForm.interests;
-      
-      const updates = {
-        user_id: session.user.id,
+      const email = authUser?.email;
+
+      if (!email) return;
+
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          'Customer profile error:',
+          error
+        );
+        return;
+      }
+
+      setProfile(data);
+
+      setProfileForm({
+        full_name:
+          data?.full_name ||
+          data?.name ||
+          authUser?.user_metadata?.full_name ||
+          '',
+        phone:
+          data?.phone ||
+          authUser?.phone ||
+          '',
+      });
+    } catch (error) {
+      console.error(
+        'Load profile error:',
+        error
+      );
+    }
+  };
+
+
+  const handleProfileSave = async () => {
+    try {
+      if (!user?.email) {
+        return;
+      }
+
+      const payload = {
         full_name: profileForm.full_name,
         phone: profileForm.phone,
-        avatar_url: profileForm.avatar_url,
-        interests: interestsString,
-        updated_at: new Date()
       };
 
-      const { error } = await supabase
-        .from('customer_profiles')
-        .upsert(updates, { onConflict: 'user_id' });
+      const { data, error } = await supabase
+        .from('customers')
+        .update(payload)
+        .eq('email', user.email)
+        .select()
+        .maybeSingle();
 
-      if (error) throw error;
-      setCustomerProfile(updates);
-      alert('Profile settings saved successfully!');
-    } catch (err) {
-      alert('Error saving profile: ' + err.message);
-    } finally {
-      setSavingProfile(false);
+      if (error) {
+        throw error;
+      }
+
+      setProfile(data);
+      setShowProfileEdit(false);
+
+      alert('Profile updated successfully.');
+    } catch (error) {
+      console.error(
+        'Profile update error:',
+        error
+      );
+
+      alert(
+        error?.message ||
+        'Unable to update profile.'
+      );
     }
   };
 
-  const handleReorder = (order, e) => {
-    if (e && typeof e.stopPropagation === 'function') {
-      e.stopPropagation();
+
+  /* ============================================================
+     ORDERS
+  ============================================================ */
+
+  const loadOrders = async (authUser = user) => {
+    try {
+      if (!authUser?.email) {
+        return;
+      }
+
+      setOrdersLoading(true);
+
+      const email = authUser.email;
+
+      /*
+       * IMPORTANT:
+       *
+       * We fetch:
+       * orders
+       *   -> order_items
+       *       -> products
+       *           -> product_variants
+       *
+       * Product-level price/mrp/stock are NOT used.
+       */
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            products (
+              *,
+              product_variants (*)
+            )
+          )
+        `)
+        .eq('customer_email', email)
+        .order('created_at', {
+          ascending: false,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setOrders(data || []);
+    } catch (error) {
+      console.error(
+        'Orders loading error:',
+        error
+      );
+
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
     }
-    
-    if (!order.order_items || order.order_items.length === 0) {
-      alert('No items found in this order to reorder.');
+  };
+
+
+  /* ============================================================
+     ADDRESSES
+  ============================================================ */
+
+  const loadAddresses = async (authUser = user) => {
+    try {
+      if (!authUser?.email) {
+        return;
+      }
+
+      /*
+       * Change this table name if your address table has
+       * a different name.
+       */
+      const { data, error } = await supabase
+        .from('customer_addresses')
+        .select('*')
+        .eq('customer_email', authUser.email)
+        .order('created_at', {
+          ascending: false,
+        });
+
+      if (error) {
+        console.error(
+          'Address loading error:',
+          error
+        );
+
+        return;
+      }
+
+      setAddresses(data || []);
+    } catch (error) {
+      console.error(
+        'Load addresses error:',
+        error
+      );
+    }
+  };
+
+
+  const resetAddressForm = () => {
+    setAddressForm({
+      address_line1: '',
+      address_line2: '',
+      city: '',
+      state: '',
+      pincode: '',
+      landmark: '',
+      address_type: 'HOME',
+    });
+
+    setEditingAddress(null);
+  };
+
+
+  const handleAddressSubmit = async (event) => {
+    event.preventDefault();
+
+    try {
+      if (!user?.email) {
+        return;
+      }
+
+      const payload = {
+        ...addressForm,
+        customer_email: user.email,
+      };
+
+      if (editingAddress?.id) {
+        const { error } = await supabase
+          .from('customer_addresses')
+          .update(payload)
+          .eq('id', editingAddress.id);
+
+        if (error) {
+          throw error;
+        }
+
+        alert('Address updated successfully.');
+      } else {
+        const { error } = await supabase
+          .from('customer_addresses')
+          .insert(payload);
+
+        if (error) {
+          throw error;
+        }
+
+        alert('Address added successfully.');
+      }
+
+      setShowAddressModal(false);
+      resetAddressForm();
+
+      await loadAddresses();
+    } catch (error) {
+      console.error(
+        'Address save error:',
+        error
+      );
+
+      alert(
+        error?.message ||
+        'Unable to save address.'
+      );
+    }
+  };
+
+
+  const handleEditAddress = (address) => {
+    setEditingAddress(address);
+
+    setAddressForm({
+      address_line1:
+        address.address_line1 || '',
+      address_line2:
+        address.address_line2 || '',
+      city:
+        address.city || '',
+      state:
+        address.state || '',
+      pincode:
+        address.pincode || '',
+      landmark:
+        address.landmark || '',
+      address_type:
+        address.address_type || 'HOME',
+    });
+
+    setShowAddressModal(true);
+  };
+
+
+  const handleDeleteAddress = async (addressId) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this address?'
+    );
+
+    if (!confirmed) {
       return;
     }
 
-    let addedCount = 0;
-    const existingCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
-    let updatedCart = [...existingCart];
+    try {
+      const { error } = await supabase
+        .from('customer_addresses')
+        .delete()
+        .eq('id', addressId);
 
-    order.order_items.forEach(item => {
-      const prod = item.products;
-      if (prod) {
-        const variants = prod.variants || [];
-        let matchedVariant = null;
+      if (error) {
+        throw error;
+      }
 
-        // 1. Try matching by stored variant_id
-        if (item.variant_id) {
-          matchedVariant = variants.find(v => v.id === item.variant_id);
+      await loadAddresses();
+    } catch (error) {
+      console.error(
+        'Delete address error:',
+        error
+      );
+
+      alert(
+        error?.message ||
+        'Unable to delete address.'
+      );
+    }
+  };
+
+
+  /* ============================================================
+     REORDER
+  ============================================================ */
+
+  const handleReorder = async (order) => {
+    try {
+      if (!order?.order_items?.length) {
+        alert(
+          'There are no items available to reorder.'
+        );
+        return;
+      }
+
+      setReordering(true);
+
+      let cart = [];
+
+      try {
+        const existingCart =
+          localStorage.getItem('cart');
+
+        cart = existingCart
+          ? JSON.parse(existingCart)
+          : [];
+      } catch {
+        cart = [];
+      }
+
+      if (!Array.isArray(cart)) {
+        cart = [];
+      }
+
+      let addedCount = 0;
+      let skippedCount = 0;
+
+      for (const item of order.order_items) {
+        const product = item.products;
+
+        if (!product) {
+          skippedCount++;
+          continue;
         }
-        // 2. Try matching by stored variant_label
-        if (!matchedVariant && item.variant_label) {
-          matchedVariant = variants.find(v => v.label === item.variant_label || v.unit_label === item.variant_label);
+
+        /*
+         * IMPORTANT:
+         *
+         * Only variant-level pricing and stock.
+         *
+         * We do NOT use:
+         * product.price
+         * product.mrp
+         * product.stock
+         */
+        const variants =
+          getProductVariants(product);
+
+        if (!variants.length) {
+          skippedCount++;
+          continue;
         }
-        // 3. Fallback: match by comparing unit price with variant prices
-        if (!matchedVariant && variants.length > 0) {
-          const itemUnitPrice = Number(item.price);
-          matchedVariant = variants.find(v => Math.abs(Number(v.price) - itemUnitPrice) < 0.01) || variants[0] || null;
+
+        const matchedVariant =
+          findOrderItemVariant(item);
+
+        if (!matchedVariant) {
+          skippedCount++;
+          continue;
         }
 
-        // Determine correct unit price strictly: prioritize variant price, then item's stored unit price, then product base price
-        const unitPrice = Number(matchedVariant?.price ?? item.price ?? prod.price ?? 0);
+        const variantId =
+          matchedVariant.id ||
+          item.variant_id;
 
-        // Construct unique cartItemId so different variants remain strictly separated
-        const cartItemId = matchedVariant 
-          ? `${prod.id}-${matchedVariant.id || matchedVariant.label || matchedVariant.unit_label}` 
-          : `${prod.id}-${item.id || 'base'}`;
-        
-        const itemTitle = matchedVariant 
-          ? `${prod.name} (${matchedVariant.unit_label || matchedVariant.label})` 
-          : prod.name;
-        
-        const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-        const itemImage = pImages[0] || '';
+        if (!variantId) {
+          skippedCount++;
+          continue;
+        }
 
-        const existingIndex = updatedCart.findIndex(ci => ci.cartItemId === cartItemId);
-        
-        if (existingIndex > -1) {
-          updatedCart[existingIndex] = {
-            ...updatedCart[existingIndex],
-            quantity: updatedCart[existingIndex].quantity + (item.quantity || 1)
+        const variantStock =
+          getVariantStock(matchedVariant);
+
+        const currentPrice =
+          getVariantPrice(matchedVariant);
+
+        const variantLabel =
+          getVariantLabel(matchedVariant);
+
+        /*
+         * Don't add unavailable variants.
+         */
+        if (variantStock <= 0) {
+          skippedCount++;
+          continue;
+        }
+
+        if (currentPrice < 0) {
+          skippedCount++;
+          continue;
+        }
+
+        /*
+         * Cart item gets a unique product + variant key.
+         */
+        const cartItemId =
+          `${product.id}-${variantId}`;
+
+        const existingIndex =
+          cart.findIndex(
+            (cartItem) =>
+              String(
+                cartItem.cartItemId ||
+                cartItem.id
+              ) ===
+              String(cartItemId)
+          );
+
+        const requestedQuantity =
+          Number(item.quantity) || 1;
+
+        if (existingIndex >= 0) {
+          const existingQuantity =
+            Number(
+              cart[existingIndex].quantity
+            ) || 0;
+
+          const newQuantity =
+            Math.min(
+              existingQuantity +
+                requestedQuantity,
+              variantStock
+            );
+
+          cart[existingIndex] = {
+            ...cart[existingIndex],
+            quantity: newQuantity,
+            price: currentPrice,
+            unit_price: currentPrice,
+            stock: variantStock,
+            variant_id: variantId,
+            variant_label: variantLabel,
           };
         } else {
-          updatedCart.push({
+          cart.push({
             cartItemId,
-            product: prod,
-            variant: matchedVariant,
-            id: prod.id,
-            product_id: prod.id,
-            title: itemTitle,
-            price: unitPrice, // Strictly the correct single unit price
-            quantity: item.quantity || 1,
-            stock: Number(matchedVariant ? matchedVariant.stock : (prod.stock || 10)),
-            image: itemImage
+            id: product.id,
+            product_id: product.id,
+
+            name: product.name,
+
+            image_url:
+              product.image_url ||
+              product.image ||
+              '',
+
+            price: currentPrice,
+            unit_price: currentPrice,
+
+            quantity: Math.min(
+              requestedQuantity,
+              variantStock
+            ),
+
+            stock: variantStock,
+
+            variant_id: variantId,
+            variant_label: variantLabel,
+
+            /*
+             * Keep MRP at variant level.
+             */
+            mrp: getVariantMRP(
+              matchedVariant
+            ),
           });
         }
-        addedCount += (item.quantity || 1);
+
+        addedCount++;
       }
-    });
 
-    if (addedCount > 0) {
-      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-      window.dispatchEvent(new Event('storage'));
+      localStorage.setItem(
+        'cart',
+        JSON.stringify(cart)
+      );
 
-      navigate('/');
-    } else {
-      alert("Sorry, items in this order are currently out of stock.");
+      if (addedCount > 0) {
+        if (skippedCount > 0) {
+          alert(
+            `${addedCount} item(s) added to cart. ${skippedCount} item(s) were skipped because their variant is unavailable.`
+          );
+        } else {
+          alert(
+            'All available items have been added to your cart.'
+          );
+        }
+
+        navigate('/');
+      } else {
+        alert(
+          'None of the ordered variants are currently available.'
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Reorder error:',
+        error
+      );
+
+      alert(
+        error?.message ||
+        'Unable to reorder this order.'
+      );
+    } finally {
+      setReordering(false);
     }
   };
-  const handleOpenRateModal = (order, e) => {
-    if (e && typeof e.stopPropagation === 'function') {
-      e.stopPropagation();
-    }
+
+
+  /* ============================================================
+     RATING
+  ============================================================ */
+
+  const openRatingModal = (order) => {
     setRatingOrder(order);
-    setDeliveryRating(5);
-    const initialProductRatings = {};
-    order.order_items?.forEach(item => {
-      initialProductRatings[item.product_id || item.id] = 5;
-    });
-    setProductRatings(initialProductRatings);
+    setRating(0);
+    setRatingComment('');
+    setShowRatingModal(true);
   };
 
-  const handleRateOrderSubmit = (e) => {
-    e.preventDefault();
-    alert(`Thank you! Delivery rated ${deliveryRating} stars, and product ratings submitted successfully.`);
-    setRatingOrder(null);
-  };
 
-  const handleOpenAddAddress = () => {
-    setEditingAddressId(null);
-    setAddressForm({
-      title: 'Home',
-      house_no: '',
-      ward_no_name: '',
-      city: 'Harraiya',
-      district: 'Basti',
-      state: 'Uttar Pradesh',
-      pincode: '272155',
-      phone: profileForm.phone || '',
-      latitude: null,
-      longitude: null
-    });
-    setShowAddressForm(true);
-  };
-
-  const handleOpenEditAddress = (addr) => {
-    setEditingAddressId(addr.id);
-    setAddressForm({
-      title: addr.title || 'Home',
-      house_no: addr.house_no || '',
-      ward_no_name: addr.ward_no_name || '',
-      city: addr.city || 'Harraiya',
-      district: addr.district || 'Basti',
-      state: addr.state || 'Uttar Pradesh',
-      pincode: addr.pincode || '272155',
-      phone: addr.phone || '',
-      latitude: addr.latitude || null,
-      longitude: addr.longitude || null
-    });
-    setShowAddressForm(true);
-  };
-
-  const handleSaveAddress = async (e) => {
-    e.preventDefault();
-    if (!session) return;
-
-    const fullFormattedAddress = `${addressForm.house_no}, ${addressForm.ward_no_name}, ${addressForm.city}, ${addressForm.district}, ${addressForm.state} - ${addressForm.pincode}`;
-
-    if (editingAddressId) {
-      const { error } = await supabase
-        .from('customer_addresses')
-        .update({
-          title: addressForm.title,
-          house_no: addressForm.house_no,
-          ward_no_name: addressForm.ward_no_name,
-          city: addressForm.city,
-          district: addressForm.district,
-          state: addressForm.state,
-          pincode: addressForm.pincode,
-          phone: addressForm.phone,
-          address: fullFormattedAddress
-        })
-        .eq('id', editingAddressId);
-
-      if (error) {
-        alert('Error updating address: ' + error.message);
-      } else {
-        alert('Address updated successfully!');
-        setShowAddressForm(false);
-        fetchUserData(session.user.id, session.user.email);
-      }
-    } else {
-      const { error } = await supabase
-        .from('customer_addresses')
-        .insert([{
-          user_id: session.user.id,
-          title: addressForm.title,
-          house_no: addressForm.house_no,
-          ward_no_name: addressForm.ward_no_name,
-          city: addressForm.city,
-          district: addressForm.district,
-          state: addressForm.state,
-          pincode: addressForm.pincode,
-          phone: addressForm.phone,
-          address: fullFormattedAddress
-        }]);
-
-      if (error) {
-        alert('Error adding address: ' + error.message);
-      } else {
-        alert('Address added successfully!');
-        setShowAddressForm(false);
-        fetchUserData(session.user.id, session.user.email);
-      }
+  const handleRateOrderSubmit = async () => {
+    if (!ratingOrder) {
+      return;
     }
+
+    if (!rating) {
+      alert('Please select a rating.');
+      return;
+    }
+
+    /*
+     * Existing implementation only displayed an alert.
+     *
+     * Keeping this safe because exact review table schema
+     * was not provided.
+     *
+     * Once your review table columns are confirmed, this
+     * can be connected directly.
+     */
+    alert(
+      'Thank you for rating your order!'
+    );
+
+    setShowRatingModal(false);
+    setRatingOrder(null);
+    setRating(0);
+    setRatingComment('');
   };
 
-  const handleDeleteAddress = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this address?')) return;
-    await supabase.from('customer_addresses').delete().eq('id', id);
-    if (session) fetchUserData(session.user.id, session.user.email);
-  };
 
-  const userPhone = profileForm.phone || session?.user?.email || '8955782853';
+  /* ============================================================
+     FILTERED ORDERS
+  ============================================================ */
+
+  const filteredOrders = useMemo(() => {
+    const query =
+      searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return orders;
+    }
+
+    return orders.filter((order) => {
+      const orderId =
+        getDisplayOrderId(order)
+          .toLowerCase();
+
+      const status =
+        getOrderStatus(order)
+          .toLowerCase();
+
+      const itemNames =
+        (order.order_items || [])
+          .map(
+            (item) =>
+              item.products?.name || ''
+          )
+          .join(' ')
+          .toLowerCase();
+
+      return (
+        orderId.includes(query) ||
+        status.includes(query) ||
+        itemNames.includes(query)
+      );
+    });
+  }, [orders, searchQuery]);
+
+
+  /* ============================================================
+     RENDER LOADING
+  ============================================================ */
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50">
+        <StoreHeader />
+
+        <div className="min-h-[70vh] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2
+              className="animate-spin mx-auto text-emerald-600"
+              size={36}
+            />
+
+            <p className="mt-4 text-stone-500 text-sm">
+              Loading your account...
+            </p>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    );
+  }
+
+
+  /* ============================================================
+     MAIN UI
+  ============================================================ */
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans pb-20">
-      <StoreHeader 
-        session={session} 
-        customerProfile={customerProfile} 
-        totalItemsCount={cartCount} 
-        onOpenCart={() => navigate('/')} 
-      />
+    <div className="min-h-screen bg-stone-50 text-stone-900">
+      <StoreHeader />
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        
-        {/* Mobile Compact Icon Navigation */}
-        <div className="md:hidden flex items-center justify-between bg-white rounded-2xl p-2.5 shadow-xs border border-stone-200/80 mb-4 overflow-x-auto no-scrollbar">
-          <button 
-            onClick={() => { setActiveTab('orders'); setSelectedOrder(null); setMobileView('content'); }}
-            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'orders' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* =====================================================
+            PAGE HEADER
+        ===================================================== */}
+
+        <div className="mb-8">
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900 mb-5"
           >
-            <Package size={18} className={activeTab === 'orders' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
-            <span className="text-[10px] mt-1 font-bold">Orders</span>
-          </button>
-          
-          <button 
-            onClick={() => { setActiveTab('addresses'); setShowAddressForm(false); setMobileView('content'); }}
-            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'addresses' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
-          >
-            <MapPin size={18} className={activeTab === 'addresses' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
-            <span className="text-[10px] mt-1 font-bold">Addresses</span>
+            <ArrowLeft size={16} />
+
+            Continue Shopping
           </button>
 
-          <button 
-            onClick={() => { setActiveTab('profile'); setMobileView('content'); }}
-            className={`flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl transition cursor-pointer ${activeTab === 'profile' && mobileView === 'content' ? 'bg-emerald-50 text-emerald-800 font-black' : 'text-stone-500'}`}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 mb-2">
+                My Account
+              </p>
+
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                Hello,{' '}
+                {profile?.full_name ||
+                  profile?.name ||
+                  user?.user_metadata?.full_name ||
+                  'Customer'}
+              </h1>
+
+              <p className="text-stone-500 mt-2">
+                Manage your orders, profile and saved addresses.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => loadOrders()}
+                disabled={ordersLoading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold hover:border-stone-300 disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={15}
+                  className={
+                    ordersLoading
+                      ? 'animate-spin'
+                      : ''
+                  }
+                />
+
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+
+        {/* =====================================================
+            TABS
+        ===================================================== */}
+
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
+              activeTab === 'orders'
+                ? 'bg-stone-900 text-white'
+                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+            }`}
           >
-            <User size={18} className={activeTab === 'profile' && mobileView === 'content' ? 'text-emerald-600' : 'text-stone-400'} />
-            <span className="text-[10px] mt-1 font-bold">Profile</span>
+            <Package
+              size={16}
+              className="inline mr-2"
+            />
+
+            My Orders
           </button>
 
-          <button 
-            onClick={() => alert('Prescriptions feature')}
-            className="flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl text-stone-500 transition cursor-pointer"
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
+              activeTab === 'profile'
+                ? 'bg-stone-900 text-white'
+                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+            }`}
           >
-            <FileText size={18} className="text-stone-400" />
-            <span className="text-[10px] mt-1 font-bold">Rx</span>
+            <User
+              size={16}
+              className="inline mr-2"
+            />
+
+            Profile
           </button>
 
-          <button 
-            onClick={() => { supabase.auth.signOut(); navigate('/'); }}
-            className="flex flex-col items-center justify-center min-w-[70px] py-1.5 px-2 rounded-xl text-rose-600 transition cursor-pointer"
+          <button
+            onClick={() => setActiveTab('addresses')}
+            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition ${
+              activeTab === 'addresses'
+                ? 'bg-stone-900 text-white'
+                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+            }`}
           >
-            <LogOut size={18} />
-            <span className="text-[10px] mt-1 font-bold">Logout</span>
+            <MapPin
+              size={16}
+              className="inline mr-2"
+            />
+
+            Addresses
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-          
-          {/* Desktop Sidebar Navigation */}
-          <div className="hidden md:block bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden md:col-span-1">
-            <div 
-              onClick={() => setActiveTab('profile')} 
-              className="p-5 border-b border-stone-100 bg-stone-50/50 hover:bg-emerald-50/40 transition cursor-pointer group"
-              title="Manage Profile"
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-black text-slate-900 text-sm group-hover:text-emerald-700 transition">
-                  {profileForm.full_name || 'My Account'}
-                </p>
-                <ChevronRight size={14} className="text-stone-400 group-hover:translate-x-0.5 transition-transform" />
+
+        {/* =====================================================
+            ORDERS TAB
+        ===================================================== */}
+
+        {activeTab === 'orders' && (
+          <section>
+
+            {/* Search */}
+
+            <div className="bg-white border border-stone-200 rounded-2xl p-4 mb-6">
+              <div className="relative">
+                <Search
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+                />
+
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) =>
+                    setSearchQuery(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Search by order ID, status or product..."
+                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
               </div>
-              <p className="text-stone-500 text-xs mt-0.5 font-medium truncate">{userPhone}</p>
             </div>
 
-            <nav className="p-2 space-y-1 text-xs font-bold text-stone-600">
-              <button 
-                onClick={() => { setActiveTab('addresses'); setShowAddressForm(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'addresses' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
-              >
-                <MapPin size={16} className={activeTab === 'addresses' ? 'text-emerald-600' : 'text-stone-400'} /> Addresses
-              </button>
-              <button 
-                onClick={() => { setActiveTab('orders'); setSelectedOrder(null); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
-              >
-                <Package size={16} className={activeTab === 'orders' ? 'text-emerald-600' : 'text-stone-400'} /> Orders
-              </button>
-              <button 
-                onClick={() => setActiveTab('profile')} 
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition cursor-pointer ${activeTab === 'profile' ? 'bg-emerald-50 text-emerald-800 font-black' : 'hover:bg-stone-50'}`}
-              >
-                <User size={16} className={activeTab === 'profile' ? 'text-emerald-600' : 'text-stone-400'} /> Profile
-              </button>
-              <button onClick={() => alert('Prescriptions feature')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <FileText size={16} className="text-stone-400" /> Prescriptions
-              </button>
-              <button onClick={() => alert('Gift cards')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <Gift size={16} className="text-stone-400" /> Gift Cards
-              </button>
-              <button onClick={() => navigate('/privacy-policy')} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-stone-50 transition cursor-pointer">
-                <Shield size={16} className="text-stone-400" /> Privacy
-              </button>
-              <div className="pt-2 border-t border-stone-100 mt-2">
-                <button onClick={() => { supabase.auth.signOut(); navigate('/'); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-rose-600 hover:bg-rose-50 transition cursor-pointer">
-                  <LogOut size={16} /> Logout
-                </button>
-              </div>
-            </nav>
-          </div>
 
-          {/* Right Content Area */}
-          <div className="md:col-span-3 space-y-4">
-            
-            {activeTab === 'profile' ? (
-              /* --- PROFILE SETTINGS VIEW --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
-                <div className="border-b border-stone-100 pb-4">
-                  <h2 className="font-black text-lg text-slate-900">Profile Settings</h2>
-                  <p className="text-xs text-stone-500 font-medium mt-0.5">Manage personal info & preferences</p>
+            {ordersLoading ? (
+              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
+                <Loader2
+                  className="animate-spin mx-auto text-emerald-600"
+                  size={32}
+                />
+
+                <p className="mt-4 text-stone-500">
+                  Loading orders...
+                </p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto">
+                  <ShoppingBag
+                    size={28}
+                    className="text-stone-400"
+                  />
                 </div>
 
-                <form onSubmit={handleSaveProfile} className="space-y-5 text-xs">
-                  
-                  {/* Avatar Upload Preview & Local File Input */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-300 overflow-hidden flex items-center justify-center shrink-0">
-                      {profileForm.avatar_url ? (
-                        <img src={profileForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <User size={28} className="text-emerald-700" />
-                      )}
-                    </div>
-                    <div className="space-y-1.5 flex-1">
-                      <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Profile Picture</label>
-                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold cursor-pointer transition">
-                        <Upload size={14} />
-                        <span>{uploadingImage ? 'Loading...' : 'Browse Image'}</span>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleAvatarFileUpload} 
-                          className="hidden" 
-                        />
-                      </label>
-                    </div>
-                  </div>
+                <h3 className="font-black text-lg mt-5">
+                  No orders found
+                </h3>
 
-                  {/* Full Name */}
-                  <div className="space-y-1.5">
-                    <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Full Name</label>
-                    <div className="relative">
-                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-                      <input 
-                        type="text"
-                        required
-                        placeholder="Enter full name"
-                        value={profileForm.full_name}
-                        onChange={e => setProfileForm({...profileForm, full_name: e.target.value})}
-                        className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl outline-none font-medium focus:border-emerald-600 focus:bg-white transition"
-                      />
-                    </div>
-                  </div>
+                <p className="text-stone-500 text-sm mt-2">
+                  {searchQuery
+                    ? 'Try another search.'
+                    : 'You have not placed any orders yet.'}
+                </p>
 
-                  {/* Mobile Number with strict 10-digit validation */}
-                  <div className="space-y-1.5">
-                    <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Mobile Number (10 Digits)</label>
-                    <div className="relative">
-                      <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-                      <input 
-                        type="tel"
-                        required
-                        placeholder="9876543210"
-                        value={profileForm.phone}
-                        onChange={handlePhoneChange}
-                        className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl outline-none font-mono font-bold tracking-widest focus:border-emerald-600 focus:bg-white transition"
-                      />
-                    </div>
-                    <p className="text-[10px] text-stone-400">Must be exactly 10 digits.</p>
-                  </div>
-
-                  {/* Interests & Preferences Multiselect Dropdown */}
-                  <div className="space-y-1.5 relative" ref={dropdownRef}>
-                    <label className="block font-black text-stone-700 uppercase text-[10px] tracking-wider">Interests & Preferences</label>
-                    <p className="text-[11px] text-stone-500">Select categories for smart recommendations:</p>
-                    
-                    <div 
-                      onClick={() => setIsDropdownOpen(prev => !prev)}
-                      className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl cursor-pointer flex items-center justify-between transition hover:border-emerald-500"
-                    >
-                      <div className="flex flex-wrap gap-1.5 min-h-[20px] items-center">
-                        {profileForm.interests.length === 0 ? (
-                          <span className="text-stone-400 font-medium">Select preferences...</span>
-                        ) : (
-                          profileForm.interests.map(item => (
-                            <span key={item} className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-lg">
-                              {item}
-                            </span>
-                          ))
-                        )}
-                      </div>
-                      <ChevronDown size={16} className={`text-stone-500 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                    </div>
-
-                    {isDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl border border-stone-200 shadow-xl py-2 z-50 max-h-56 overflow-y-auto space-y-0.5">
-                        {availableInterests.map(item => {
-                          const isSelected = profileForm.interests.includes(item);
-                          return (
-                            <div
-                              key={item}
-                              onClick={() => handleInterestToggle(item)}
-                              className={`px-4 py-2.5 flex items-center justify-between cursor-pointer transition ${
-                                isSelected ? 'bg-emerald-50 text-emerald-900 font-black' : 'hover:bg-stone-50 text-stone-700 font-medium'
-                              }`}
-                            >
-                              <span>{item}</span>
-                              {isSelected && <Check size={14} className="text-emerald-700" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="pt-4">
-                    <button 
-                      type="submit"
-                      disabled={savingProfile || profileForm.phone.length !== 10}
-                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black uppercase tracking-wider transition shadow-lg shadow-emerald-700/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Save size={16} /> {savingProfile ? 'Saving...' : 'Save Profile'}
-                    </button>
-                  </div>
-
-                </form>
-              </div>
-            ) : activeTab === 'addresses' ? (
-              /* --- SAVED ADDRESSES VIEW --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
-                <div className="flex justify-between items-center border-b border-stone-100 pb-4">
-                  <h1 className="font-black text-lg text-slate-900">Saved Addresses</h1>
-                  {!showAddressForm && (
-                    <button 
-                      onClick={handleOpenAddAddress}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      <Plus size={14} /> Add
-                    </button>
-                  )}
-                </div>
-
-                {showAddressForm ? (
-                  <form onSubmit={handleSaveAddress} className="bg-emerald-50/40 p-4 sm:p-5 rounded-2xl border border-emerald-200 space-y-3.5 text-xs">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="font-black text-emerald-900 text-sm">{editingAddressId ? 'Edit Address' : 'New Address'}</p>
-                      <button 
-                        type="button" 
-                        onClick={() => setShowAddressForm(false)}
-                        className="text-stone-500 font-bold hover:text-stone-800 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-stone-700 mb-1">Title (Home / Work)</label>
-                      <input 
-                        type="text" 
-                        required 
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                        value={addressForm.title}
-                        onChange={e => setAddressForm({...addressForm, title: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-bold text-stone-700 mb-1">House / Flat No.</label>
-                        <input 
-                          type="text" 
-                          required 
-                          placeholder="e.g. Flat 402"
-                          className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                          value={addressForm.house_no}
-                          onChange={e => setAddressForm({...addressForm, house_no: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-stone-700 mb-1">Colony / Street</label>
-                        <input 
-                          type="text" 
-                          required 
-                          placeholder="e.g. Civil Lines"
-                          className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                          value={addressForm.ward_no_name}
-                          onChange={e => setAddressForm({...addressForm, ward_no_name: e.target.value})}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block font-bold text-stone-700 mb-1">City</label>
-                        <input 
-                          type="text" 
-                          required 
-                          className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                          value={addressForm.city}
-                          onChange={e => setAddressForm({...addressForm, city: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-stone-700 mb-1">District</label>
-                        <input 
-                          type="text" 
-                          required 
-                          className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                          value={addressForm.district}
-                          onChange={e => setAddressForm({...addressForm, district: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-stone-700 mb-1">Pincode</label>
-                        <input 
-                          type="text" 
-                          required 
-                          className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                          value={addressForm.pincode}
-                          onChange={e => setAddressForm({...addressForm, pincode: e.target.value})}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-stone-700 mb-1">Phone Number</label>
-                      <input 
-                        type="tel" 
-                        required 
-                        placeholder="10-digit number"
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none font-medium"
-                        value={addressForm.phone}
-                        onChange={e => setAddressForm({...addressForm, phone: e.target.value})}
-                      />
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3 rounded-xl font-black uppercase tracking-wider transition shadow-sm cursor-pointer mt-2"
-                    >
-                      {editingAddressId ? 'Update Address' : 'Save Address'}
-                    </button>
-                  </form>
-                ) : (
-                  <div className="space-y-3">
-                    {savedAddresses.length === 0 ? (
-                      <p className="text-stone-400 italic py-8 text-center">No saved addresses found.</p>
-                    ) : (
-                      savedAddresses.map(addr => (
-                        <div key={addr.id} className="p-4 bg-stone-50/70 rounded-2xl border border-stone-200/80 flex justify-between items-start">
-                          <div>
-                            <span className="font-black text-slate-900 block text-xs">{addr.title}</span>
-                            <span className="text-stone-600 block mt-1 text-xs leading-relaxed">{addr.address}</span>
-                            <span className="text-stone-400 font-mono text-[11px] block mt-1">Phone: {addr.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button 
-                              onClick={() => handleOpenEditAddress(addr)}
-                              className="p-2 text-stone-500 hover:text-emerald-700 rounded-lg transition cursor-pointer"
-                              title="Edit"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteAddress(addr.id)}
-                              className="p-2 text-rose-500 hover:text-rose-700 rounded-lg transition cursor-pointer"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : !selectedOrder ? (
-              /* --- ORDERS LIST VIEW WITH REORDER & RATE BUTTONS --- */
-              <>
-                <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/80 shadow-xs flex justify-between items-center">
-                  <h1 className="font-black text-lg text-slate-900">Your Orders</h1>
-                  <span className="text-xs font-bold text-stone-500">{myOrders.length} Orders</span>
-                </div>
-
-                {loading ? (
-                  <div className="bg-white p-12 rounded-3xl text-center text-stone-400 font-medium">Loading orders...</div>
-                ) : myOrders.length === 0 ? (
-                  <div className="bg-white p-12 rounded-3xl text-center space-y-3">
-                    <Package size={48} className="mx-auto text-stone-300" />
-                    <p className="font-bold text-stone-700">No orders found</p>
-                    <button onClick={() => navigate('/')} className="bg-emerald-600 text-white px-6 py-2.5 rounded-2xl font-black text-xs cursor-pointer">Start Shopping</button>
-                  </div>
-                ) : (
-                  myOrders.map(order => {
-                    const dateFormatted = new Date(order.created_at).toLocaleString('en-IN', {
-                      day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
-                    });
-
-                    return (
-                      <div 
-                        key={order.id} 
-                        className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-6 space-y-4 hover:border-emerald-500 transition group"
-                      >
-                        <div 
-                          onClick={() => setSelectedOrder(order)}
-                          className="flex justify-between items-center border-b border-stone-100 pb-4 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                              <CheckCircle2 size={18} />
-                            </div>
-                            <div>
-                              <p className="font-black text-sm text-slate-900 capitalize">
-                                {order.status === 'delivered' ? 'Arrived / Delivered' : order.status}
-                              </p>
-                              <p className="text-[11px] text-stone-500 font-medium mt-0.5">
-                                ₹{order.total_amount} • {dateFormatted}
-                              </p>
-                            </div>
-                          </div>
-                          <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-1 transition-transform" />
-                        </div>
-
-                        {/* Thumbnail Strip */}
-                        <div 
-                          onClick={() => setSelectedOrder(order)}
-                          className="flex gap-3 overflow-x-auto py-1 cursor-pointer"
-                        >
-                          {order.order_items?.map(item => {
-                            const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
-                            return (
-                              <div key={item.id} className="w-16 h-16 rounded-2xl border border-stone-200 bg-stone-50 p-1.5 shrink-0 flex items-center justify-center overflow-hidden">
-                                {img ? (
-                                  <img src={img} alt="" className="w-full h-full object-contain" />
-                                ) : (
-                                  <Package size={20} className="text-stone-300" />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Reorder and Rate Action Buttons */}
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-100">
-                          <button 
-                            onClick={(e) => handleReorder(order, e)}
-                            className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
-                          >
-                            <RotateCcw size={14} /> Reorder
-                          </button>
-                          <button 
-                            onClick={(e) => handleOpenRateModal(order, e)}
-                            className="w-full bg-stone-50 hover:bg-stone-100 text-stone-700 py-2.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 border border-stone-200"
-                          >
-                            <Star size={14} className="text-amber-500 fill-amber-400" /> Rate order
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </>
-            ) : (
-              /* --- ORDER DETAILS SCREEN --- */
-              <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-5 sm:p-8 space-y-6">
-                
-                {/* Back button & Title */}
-                <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                  <button 
-                    onClick={() => setSelectedOrder(null)}
-                    className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition cursor-pointer text-stone-700"
+                {!searchQuery && (
+                  <button
+                    onClick={() => navigate('/')}
+                    className="mt-5 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700"
                   >
-                    <ArrowLeft size={18} />
+                    Start Shopping
                   </button>
-                  <div className="text-right">
-                    {(selectedOrder.status === 'delivered' || selectedOrder.status === 'arrived') ? (
-                      <button 
-                        onClick={() => setSelectedInvoiceOrder(selectedOrder)}
-                        className="inline-flex items-center gap-1.5 text-emerald-700 font-black text-xs hover:underline cursor-pointer"
-                      >
-                        <Download size={14} /> Invoice
-                      </button>
-                    ) : (
-                      <span className="text-[11px] font-bold text-stone-400 italic">
-                        Invoice available after delivery
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Arrived status & time */}
-                <div>
-                  <h2 className="font-black text-lg text-slate-900">Order summary</h2>
-                  <p className="text-xs text-stone-500 font-medium mt-0.5">
-                    Arrived at {new Date(selectedOrder.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                  </p>
-                </div>
-
-                {/* Delivery Verification OTP Card */}
-                {selectedOrder.otp && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (
-                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 flex justify-between items-center shadow-2xs">
-                    <div>
-                      <span className="text-emerald-900 font-black text-xs block uppercase tracking-wider">Delivery Verification OTP</span>
-                      <span className="text-[11px] text-emerald-700 font-medium">Provide this code to the delivery partner</span>
-                    </div>
-                    <span className="font-mono font-black text-emerald-800 text-lg tracking-widest bg-white px-4 py-2 rounded-xl border border-emerald-200 shadow-xs">
-                      {selectedOrder.otp}
-                    </span>
-                  </div>
                 )}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {filteredOrders.map((order) => {
+                  const orderStatus =
+                    getOrderStatus(order);
 
-                {/* Items in this order */}
-                <div className="space-y-3 pt-2">
-                  <p className="font-black text-xs text-stone-900 uppercase tracking-wider">{selectedOrder.order_items?.length || 0} items in this order</p>
-                  <div className="space-y-3 divide-y divide-stone-100">
-                    {selectedOrder.order_items?.map(item => {
-                      const img = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
-                      const variantLabel = item.variant_label || item.variant?.unit_label || item.variant?.label || '';
-                      
-                      return (
-                        <div key={item.id} className="pt-3 flex items-center justify-between gap-4 first:pt-0">
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-14 h-14 rounded-2xl border border-stone-200 bg-stone-50 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                              <img src={img} alt="" className="w-full h-full object-contain" />
+                  const orderTotal =
+                    getOrderTotal(order);
+
+                  const itemCount =
+                    (order.order_items || [])
+                      .reduce(
+                        (total, item) =>
+                          total +
+                          (Number(
+                            item.quantity
+                          ) || 0),
+                        0
+                      );
+
+                  const isCancelled =
+                    orderStatus ===
+                      'CANCELLED' ||
+                    orderStatus ===
+                      'CANCELED';
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="bg-white border border-stone-200 rounded-2xl overflow-hidden"
+                    >
+
+                      {/* Order Header */}
+
+                      <div className="p-5 border-b border-stone-100">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
+                              <Package
+                                size={22}
+                                className="text-stone-700"
+                              />
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 text-xs truncate">{item.products?.name || 'Product Item'}</p>
-                              {variantLabel && (
-                                <span className="inline-block mt-0.5 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md">
-                                  {variantLabel}
+
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-black text-stone-900">
+                                  {getDisplayOrderId(
+                                    order
+                                  )}
+                                </h3>
+
+                                <span
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    isCancelled
+                                      ? 'bg-rose-50 text-rose-600'
+                                      : orderStatus ===
+                                          'DELIVERED'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-amber-50 text-amber-700'
+                                  }`}
+                                >
+                                  {formatStatus(
+                                    orderStatus
+                                  )}
                                 </span>
-                              )}
-                              <p className="text-[11px] text-stone-500 mt-0.5">Qty: {item.quantity}</p>
+                              </div>
+
+                              <p className="text-xs text-stone-400 font-mono mt-1">
+                                Order ID:{' '}
+                                {getDisplayOrderId(
+                                  order
+                                )}
+                              </p>
+
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-stone-500">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Calendar
+                                    size={13}
+                                  />
+
+                                  {formatDate(
+                                    order.created_at
+                                  )}
+                                </span>
+
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Package
+                                    size={13}
+                                  />
+
+                                  {itemCount}{' '}
+                                  {itemCount === 1
+                                    ? 'item'
+                                    : 'items'}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <span className="font-black text-slate-900 text-xs shrink-0">₹{item.price * item.quantity}</span>
+
+
+                          <div className="flex items-center justify-between lg:justify-end gap-5">
+                            <div className="text-left lg:text-right">
+                              <p className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">
+                                Order Total
+                              </p>
+
+                              <p className="font-black text-lg mt-0.5">
+                                {formatCurrency(
+                                  orderTotal
+                                )}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() =>
+                                setSelectedOrder(
+                                  order
+                                )
+                              }
+                              className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center hover:bg-stone-900 hover:text-white transition"
+                            >
+                              <ChevronRight
+                                size={18}
+                              />
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </div>
 
-                {/* Bill details */}
-                <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/60 space-y-2 text-xs">
-                  <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-2">Bill details</p>
-                  <div className="flex justify-between text-stone-600">
-                    <span>Item total</span>
-                    <span className="font-bold text-stone-900">₹{selectedOrder.total_amount}</span>
-                  </div>
-                  <div className="flex justify-between text-stone-600">
-                    <span>Handling charge</span>
-                    <span className="font-bold text-stone-900">+₹5</span>
-                  </div>
-                  <div className="flex justify-between text-stone-600">
-                    <span>Delivery charges</span>
-                    <span className="font-bold text-emerald-600">FREE</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-stone-200 font-black text-slate-900 text-sm">
-                    <span>Bill total</span>
-                    <span>₹{selectedOrder.total_amount}</span>
-                  </div>
-                </div>
 
-                {/* Order details meta info */}
-                <div className="space-y-3 text-xs border-t border-stone-100 pt-4">
-                  <p className="font-black text-stone-900 uppercase tracking-wider text-[11px]">Order details</p>
-                  
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-stone-400 text-[10px] uppercase font-bold">Order id</p>
-                      <p className="font-mono font-bold text-stone-800 mt-0.5">ORD{selectedOrder.id.replace(/-/g, '').slice(0, 12).toUpperCase()}</p>
+                      {/* Order Items */}
+
+                      <div className="p-5">
+                        <div className="flex gap-3 overflow-x-auto pb-1">
+                          {(order.order_items || [])
+                            .slice(0, 5)
+                            .map((item) => {
+                              const product =
+                                item.products;
+
+                              const matchedVariant =
+                                findOrderItemVariant(
+                                  item
+                                );
+
+                              const variantLabel =
+                                item.variant_label ||
+                                getVariantLabel(
+                                  matchedVariant
+                                );
+
+                              return (
+                                <div
+                                  key={
+                                    item.id
+                                  }
+                                  className="flex-shrink-0 w-56 bg-stone-50 rounded-xl p-3"
+                                >
+                                  <div className="flex gap-3">
+                                    <div className="w-14 h-14 rounded-lg bg-white overflow-hidden flex-shrink-0">
+                                      {product?.image_url ? (
+                                        <img
+                                          src={
+                                            product.image_url
+                                          }
+                                          alt={
+                                            product?.name ||
+                                            'Product'
+                                          }
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <Package
+                                            size={
+                                              20
+                                            }
+                                            className="text-stone-300"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-bold text-xs truncate">
+                                        {product?.name ||
+                                          'Product'}
+                                      </p>
+
+                                      {variantLabel && (
+                                        <p className="text-[10px] text-stone-500 mt-0.5">
+                                          {variantLabel}
+                                        </p>
+                                      )}
+
+                                      <p className="text-[10px] text-stone-400 mt-1">
+                                        Qty:{' '}
+                                        {item.quantity}
+                                      </p>
+
+                                      <p className="font-black text-xs mt-1">
+                                        {formatCurrency(
+                                          Number(
+                                            item.price
+                                          ) *
+                                            Number(
+                                              item.quantity
+                                            )
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                          {order.order_items?.length >
+                            5 && (
+                            <div className="flex-shrink-0 w-20 rounded-xl bg-stone-100 flex items-center justify-center text-xs font-bold text-stone-500">
+                              +
+                              {order.order_items.length -
+                                5}{' '}
+                              more
+                            </div>
+                          )}
+                        </div>
+
+
+                        {/* Actions */}
+
+                        <div className="flex flex-wrap gap-2 mt-5">
+                          <button
+                            onClick={() =>
+                              setSelectedOrder(
+                                order
+                              )
+                            }
+                            className="px-4 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800"
+                          >
+                            View Details
+                          </button>
+
+                          {!isCancelled && (
+                            <button
+                              onClick={() =>
+                                setSelectedOrder(
+                                  order
+                                )
+                              }
+                              className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
+                            >
+                              <Navigation
+                                size={14}
+                              />
+
+                              Track Order
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() =>
+                              handleReorder(order)
+                            }
+                            disabled={reordering}
+                            className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2 disabled:opacity-50"
+                          >
+                            <RefreshCw
+                              size={14}
+                            />
+
+                            Reorder
+                          </button>
+
+                          {orderStatus ===
+                            'DELIVERED' && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  openRatingModal(
+                                    order
+                                  )
+                                }
+                                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
+                              >
+                                <Star
+                                  size={14}
+                                />
+
+                                Rate Order
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  setInvoiceOrder(
+                                    order
+                                  )
+                                }
+                                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold hover:bg-stone-50 inline-flex items-center gap-2"
+                              >
+                                <Receipt
+                                  size={14}
+                                />
+
+                                Invoice
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <button 
-                      onClick={() => copyOrderId(selectedOrder.id)}
-                      className="p-2 text-stone-500 hover:text-emerald-700 transition cursor-pointer"
-                      title="Copy"
-                    >
-                      {copiedId ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+
+        {/* =====================================================
+            PROFILE TAB
+        ===================================================== */}
+
+        {activeTab === 'profile' && (
+          <section>
+            <div className="grid lg:grid-cols-3 gap-6">
+
+              {/* Profile Card */}
+
+              <div className="bg-white border border-stone-200 rounded-2xl p-6">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-24 h-24 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img
+                        src={
+                          profile.avatar_url
+                        }
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User
+                        size={38}
+                        className="text-stone-400"
+                      />
+                    )}
+                  </div>
+
+                  <h2 className="font-black text-xl mt-4">
+                    {profile?.full_name ||
+                      profile?.name ||
+                      user?.user_metadata
+                        ?.full_name ||
+                      'Customer'}
+                  </h2>
+
+                  <p className="text-sm text-stone-500 mt-1">
+                    {user?.email}
+                  </p>
+
+                  <button
+                    onClick={() =>
+                      setShowProfileEdit(true)
+                    }
+                    className="mt-5 px-4 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold inline-flex items-center gap-2"
+                  >
+                    <Edit3 size={14} />
+
+                    Edit Profile
+                  </button>
+                </div>
+              </div>
+
+
+              {/* Profile Details */}
+
+              <div className="lg:col-span-2 bg-white border border-stone-200 rounded-2xl p-6">
+                <h3 className="font-black text-lg">
+                  Personal Information
+                </h3>
+
+                <div className="grid md:grid-cols-2 gap-5 mt-6">
+                  <div>
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Full Name
+                    </p>
+
+                    <p className="font-medium mt-1">
+                      {profile?.full_name ||
+                        profile?.name ||
+                        'Not provided'}
+                    </p>
                   </div>
 
                   <div>
-                    <p className="text-stone-400 text-[10px] uppercase font-bold">Payment</p>
-                    <p className="font-medium text-stone-800 mt-0.5">Paid Online</p>
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Email
+                    </p>
+
+                    <p className="font-medium mt-1 break-all">
+                      {user?.email ||
+                        'Not provided'}
+                    </p>
                   </div>
 
                   <div>
-                    <p className="text-stone-400 text-[10px] uppercase font-bold">Deliver to</p>
-                    <p className="font-medium text-stone-800 mt-0.5 leading-snug">{selectedOrder.delivery_address}</p>
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Phone
+                    </p>
+
+                    <p className="font-medium mt-1">
+                      {profile?.phone ||
+                        user?.phone ||
+                        'Not provided'}
+                    </p>
                   </div>
 
                   <div>
-                    <p className="text-stone-400 text-[10px] uppercase font-bold">Order placed</p>
-                    <p className="font-medium text-stone-800 mt-0.5">
-                      {new Date(selectedOrder.created_at).toLocaleString('en-IN', {
-                        weekday: 'short', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
-                      })}
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Total Orders
+                    </p>
+
+                    <p className="font-medium mt-1">
+                      {orders.length}
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+        )}
 
-                {/* Need help with your order banner */}
-                <div className="pt-2 border-t border-stone-100">
-                  <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-3">Need help?</p>
-                  <button 
-                    onClick={() => alert('Opening customer support chat...')}
-                    className="w-full bg-stone-50 hover:bg-stone-100 p-4 rounded-2xl border border-stone-200 flex items-center justify-between transition cursor-pointer"
+
+        {/* =====================================================
+            ADDRESSES TAB
+        ===================================================== */}
+
+        {activeTab === 'addresses' && (
+          <section>
+
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-black">
+                  Saved Addresses
+                </h2>
+
+                <p className="text-sm text-stone-500 mt-1">
+                  Manage your delivery addresses.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  resetAddressForm();
+                  setShowAddressModal(true);
+                }}
+                className="px-4 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold inline-flex items-center gap-2"
+              >
+                <Plus size={16} />
+
+                Add Address
+              </button>
+            </div>
+
+
+            {addresses.length === 0 ? (
+              <div className="bg-white border border-stone-200 rounded-2xl p-12 text-center">
+                <MapPin
+                  size={34}
+                  className="mx-auto text-stone-300"
+                />
+
+                <h3 className="font-black mt-4">
+                  No saved addresses
+                </h3>
+
+                <p className="text-sm text-stone-500 mt-1">
+                  Add an address for faster checkout.
+                </p>
+
+                <button
+                  onClick={() => {
+                    resetAddressForm();
+                    setShowAddressModal(true);
+                  }}
+                  className="mt-5 px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm"
+                >
+                  Add Address
+                </button>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {addresses.map((address) => (
+                  <div
+                    key={address.id}
+                    className="bg-white border border-stone-200 rounded-2xl p-5"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                        <MessageSquare size={18} />
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                          <MapPin
+                            size={17}
+                            className="text-emerald-600"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="font-black text-sm">
+                            {address.address_type ||
+                              'Address'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="font-bold text-stone-900 text-xs">Chat with support</p>
-                        <p className="text-[11px] text-stone-500 font-medium">Get help with this order</p>
+
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() =>
+                            handleEditAddress(
+                              address
+                            )
+                          }
+                          className="w-8 h-8 rounded-lg hover:bg-stone-100 flex items-center justify-center"
+                        >
+                          <Edit3
+                            size={14}
+                          />
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleDeleteAddress(
+                              address.id
+                            )
+                          }
+                          className="w-8 h-8 rounded-lg hover:bg-rose-50 text-rose-500 flex items-center justify-center"
+                        >
+                          <Trash2
+                            size={14}
+                          />
+                        </button>
                       </div>
                     </div>
-                    <ChevronRight size={18} className="text-stone-400" />
-                  </button>
-                </div>
 
+                    <div className="mt-4 text-sm text-stone-600 leading-relaxed">
+                      <p>
+                        {address.address_line1}
+                      </p>
+
+                      {address.address_line2 && (
+                        <p>
+                          {address.address_line2}
+                        </p>
+                      )}
+
+                      {address.landmark && (
+                        <p>
+                          Landmark:{' '}
+                          {address.landmark}
+                        </p>
+                      )}
+
+                      <p>
+                        {address.city},{' '}
+                        {address.state}
+                      </p>
+
+                      <p>
+                        {address.pincode}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+          </section>
+        )}
+      </main>
 
-          </div>
 
-        </div>
-      </div>
+      {/* =======================================================
+          ORDER DETAIL MODAL
+      ======================================================= */}
 
-      {/* Detailed Rating Modal (Delivery Experience + Product-wise Ratings) */}
-      {ratingOrder && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-stone-100 pb-3">
-              <h3 className="font-black text-base text-slate-900">Rate your experience</h3>
-              <button onClick={() => setRatingOrder(null)} className="text-stone-400 hover:text-stone-700 font-bold text-xs cursor-pointer">Close</button>
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-6">
+          <div className="bg-white w-full md:max-w-4xl md:rounded-3xl rounded-t-3xl max-h-[95vh] overflow-hidden flex flex-col">
+
+            {/* Modal Header */}
+
+            <div className="p-5 md:p-6 border-b border-stone-100 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-black text-stone-400">
+                  Order Details
+                </p>
+
+                <h2 className="text-xl md:text-2xl font-black mt-1">
+                  {getDisplayOrderId(
+                    selectedOrder
+                  )}
+                </h2>
+
+                <p className="text-xs text-stone-400 font-mono mt-1">
+                  Order ID:{' '}
+                  {getDisplayOrderId(
+                    selectedOrder
+                  )}
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setSelectedOrder(null)
+                }
+                className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center hover:bg-stone-200"
+              >
+                <X size={18} />
+              </button>
             </div>
-            
-            <form onSubmit={handleRateOrderSubmit} className="space-y-5 text-xs">
-              
-              {/* Delivery Experience Rating */}
-              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200/80 space-y-2 text-center">
-                <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Rate Delivery Experience</p>
-                <div className="flex justify-center gap-2 py-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setDeliveryRating(star)}
-                      className="p-1 cursor-pointer transition transform hover:scale-110"
-                    >
-                      <Star size={24} className={`${star <= deliveryRating ? 'text-amber-400 fill-amber-400' : 'text-stone-300'}`} />
-                    </button>
-                  ))}
+
+
+            {/* Modal Body */}
+
+            <div className="overflow-y-auto p-5 md:p-6 space-y-6">
+
+              {/* Order Summary */}
+
+              <div className="grid md:grid-cols-3 gap-4">
+
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 text-stone-400">
+                    <Calendar size={15} />
+
+                    <span className="text-[10px] uppercase font-black tracking-wider">
+                      Ordered
+                    </span>
+                  </div>
+
+                  <p className="font-bold text-sm mt-2">
+                    {formatDateTime(
+                      selectedOrder.created_at
+                    )}
+                  </p>
+                </div>
+
+
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 text-stone-400">
+                    <Package size={15} />
+
+                    <span className="text-[10px] uppercase font-black tracking-wider">
+                      Status
+                    </span>
+                  </div>
+
+                  <p className="font-bold text-sm mt-2">
+                    {formatStatus(
+                      getOrderStatus(
+                        selectedOrder
+                      )
+                    )}
+                  </p>
+                </div>
+
+
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 text-stone-400">
+                    <CreditCard size={15} />
+
+                    <span className="text-[10px] uppercase font-black tracking-wider">
+                      Payment
+                    </span>
+                  </div>
+
+                  <p className="font-bold text-sm mt-2">
+                    {selectedOrder.payment_method ||
+                      selectedOrder.payment_type ||
+                      (
+                        selectedOrder.payment_status
+                          ? formatStatus(
+                              selectedOrder.payment_status
+                            )
+                          : 'Payment information unavailable'
+                      )}
+                  </p>
+
+                  {selectedOrder.payment_status && (
+                    <p className="text-[10px] text-stone-400 mt-1">
+                      Status:{' '}
+                      {formatStatus(
+                        selectedOrder.payment_status
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Product-wise Ratings */}
-              <div className="space-y-3">
-                <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Rate Individual Products</p>
-                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                  {ratingOrder.order_items?.map(item => {
-                    const prodName = item.products?.name || 'Product Item';
-                    const prodImg = item.products?.image_url || (item.products?.images && item.products.images[0]) || '';
-                    const pKey = item.product_id || item.id;
-                    const currentRating = productRatings[pKey] || 5;
+
+              {/* =================================================
+                  ORDER TRACKING
+              ================================================= */}
+
+              {(() => {
+                const tracking =
+                  getTrackingSteps(
+                    selectedOrder
+                  );
+
+                return (
+                  <div className="bg-white border border-stone-200 rounded-2xl p-5">
+
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-6">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider font-black text-stone-400">
+                          Order Tracking
+                        </p>
+
+                        <h3 className="font-black text-lg mt-1">
+                          {getDisplayOrderId(
+                            selectedOrder
+                          )}
+                        </h3>
+                      </div>
+
+                      <span
+                        className={`self-start px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          tracking.cancelled
+                            ? 'bg-rose-50 text-rose-600'
+                            : 'bg-emerald-50 text-emerald-700'
+                        }`}
+                      >
+                        {formatStatus(
+                          getOrderStatus(
+                            selectedOrder
+                          )
+                        )}
+                      </span>
+                    </div>
+
+
+                    {tracking.cancelled ? (
+                      <div className="rounded-xl bg-rose-50 border border-rose-100 p-4 flex gap-3">
+                        <XCircle
+                          size={22}
+                          className="text-rose-500 flex-shrink-0"
+                        />
+
+                        <div>
+                          <p className="font-black text-sm text-rose-700">
+                            Order Cancelled
+                          </p>
+
+                          <p className="text-xs text-rose-600 mt-1">
+                            This order has been cancelled.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        {tracking.steps.map(
+                          (
+                            step,
+                            index
+                          ) => {
+                            const StepIcon =
+                              step.icon;
+
+                            const completed =
+                              index <
+                              tracking.currentIndex;
+
+                            const current =
+                              index ===
+                              tracking.currentIndex;
+
+                            const upcoming =
+                              index >
+                              tracking.currentIndex;
+
+                            return (
+                              <div
+                                key={
+                                  step.key
+                                }
+                                className="relative flex gap-4"
+                              >
+
+                                {/* Vertical Line */}
+
+                                {index <
+                                  tracking
+                                    .steps
+                                    .length -
+                                    1 && (
+                                  <div
+                                    className={`absolute left-[15px] top-8 w-0.5 h-[calc(100%-8px)] ${
+                                      index <
+                                      tracking.currentIndex
+                                        ? 'bg-emerald-500'
+                                        : 'bg-stone-200'
+                                    }`}
+                                  />
+                                )}
+
+
+                                {/* Icon */}
+
+                                <div
+                                  className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                    completed ||
+                                    current
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-stone-100 text-stone-400'
+                                  } ${
+                                    current
+                                      ? 'ring-4 ring-emerald-50'
+                                      : ''
+                                  }`}
+                                >
+                                  <StepIcon
+                                    size={
+                                      15
+                                    }
+                                  />
+                                </div>
+
+
+                                {/* Content */}
+
+                                <div className="pb-7">
+                                  <p
+                                    className={`text-sm font-black ${
+                                      upcoming
+                                        ? 'text-stone-400'
+                                        : 'text-stone-900'
+                                    }`}
+                                  >
+                                    {
+                                      step.label
+                                    }
+
+                                    {current && (
+                                      <span className="ml-2 text-[9px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">
+                                        Current
+                                      </span>
+                                    )}
+                                  </p>
+
+                                  <p
+                                    className={`text-xs mt-1 ${
+                                      upcoming
+                                        ? 'text-stone-300'
+                                        : 'text-stone-500'
+                                    }`}
+                                  >
+                                    {
+                                      step.description
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+
+              {/* =================================================
+                  ITEMS
+              ================================================= */}
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-black">
+                    Ordered Items
+                  </h3>
+
+                  <span className="text-xs text-stone-400">
+                    {
+                      selectedOrder
+                        .order_items?.length ||
+                      0
+                    }{' '}
+                    items
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {(
+                    selectedOrder.order_items ||
+                    []
+                  ).map((item) => {
+                    const product =
+                      item.products;
+
+                    const matchedVariant =
+                      findOrderItemVariant(
+                        item
+                      );
+
+                    const variantLabel =
+                      item.variant_label ||
+                      getVariantLabel(
+                        matchedVariant
+                      );
+
+                    const itemPrice =
+                      Number(item.price) || 0;
+
+                    const quantity =
+                      Number(
+                        item.quantity
+                      ) || 0;
+
+                    const itemTotal =
+                      itemPrice *
+                      quantity;
 
                     return (
-                      <div key={pKey} className="flex items-center justify-between gap-3 p-3 bg-stone-50/50 rounded-2xl border border-stone-200">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                            {prodImg ? <img src={prodImg} alt="" className="w-full h-full object-contain" /> : <Package size={16} className="text-stone-300" />}
-                          </div>
-                          <p className="font-bold text-stone-800 text-xs truncate max-w-[140px]">{prodName}</p>
+                      <div
+                        key={item.id}
+                        className="flex gap-4 p-4 bg-stone-50 rounded-2xl"
+                      >
+                        <div className="w-16 h-16 rounded-xl bg-white overflow-hidden flex-shrink-0">
+                          {product?.image_url ? (
+                            <img
+                              src={
+                                product.image_url
+                              }
+                              alt={
+                                product.name ||
+                                'Product'
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package
+                                size={
+                                  22
+                                }
+                                className="text-stone-300"
+                              />
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setProductRatings(prev => ({ ...prev, [pKey]: star }))}
-                              className="cursor-pointer"
-                            >
-                              <Star size={16} className={`${star <= currentRating ? 'text-amber-400 fill-amber-400' : 'text-stone-300'}`} />
-                            </button>
-                          ))}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="font-black text-sm">
+                                {product?.name ||
+                                  'Product'}
+                              </p>
+
+                              {variantLabel && (
+                                <p className="text-xs text-stone-500 mt-1">
+                                  Variant:{' '}
+                                  <span className="font-bold">
+                                    {
+                                      variantLabel
+                                    }
+                                  </span>
+                                </p>
+                              )}
+
+                              <p className="text-xs text-stone-400 mt-1">
+                                Qty:{' '}
+                                {quantity}
+                              </p>
+                            </div>
+
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-black text-sm">
+                                {formatCurrency(
+                                  itemTotal
+                                )}
+                              </p>
+
+                              <p className="text-[10px] text-stone-400 mt-1">
+                                {formatCurrency(
+                                  itemPrice
+                                )}{' '}
+                                / unit
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1137,33 +2497,793 @@ export default function CustomerOrdersPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button 
+
+              {/* =================================================
+                  DELIVERY ADDRESS
+              ================================================= */}
+
+              {(selectedOrder.shipping_address ||
+                selectedOrder.delivery_address ||
+                selectedOrder.address) && (
+                <div className="bg-stone-50 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin
+                      size={16}
+                      className="text-emerald-600"
+                    />
+
+                    <h3 className="font-black text-sm">
+                      Delivery Address
+                    </h3>
+                  </div>
+
+                  <p className="text-sm text-stone-600 whitespace-pre-line">
+                    {typeof (
+                      selectedOrder.shipping_address ||
+                      selectedOrder.delivery_address ||
+                      selectedOrder.address
+                    ) === 'string'
+                      ? selectedOrder.shipping_address ||
+                        selectedOrder.delivery_address ||
+                        selectedOrder.address
+                      : JSON.stringify(
+                          selectedOrder.shipping_address ||
+                            selectedOrder.delivery_address ||
+                            selectedOrder.address,
+                          null,
+                          2
+                        )}
+                  </p>
+                </div>
+              )}
+
+
+              {/* =================================================
+                  BILL DETAILS
+              ================================================= */}
+
+              {(() => {
+                const itemSubtotal =
+                  getItemSubtotal(
+                    selectedOrder
+                  );
+
+                const deliveryCharge =
+                  getDeliveryCharge(
+                    selectedOrder
+                  );
+
+                const handlingCharge =
+                  getHandlingCharge(
+                    selectedOrder
+                  );
+
+                const discount =
+                  getDiscount(
+                    selectedOrder
+                  );
+
+                const tax =
+                  getTax(
+                    selectedOrder
+                  );
+
+                const billTotal =
+                  getOrderTotal(
+                    selectedOrder
+                  );
+
+                return (
+                  <div className="bg-stone-50/70 p-5 rounded-2xl border border-stone-200/60 space-y-3">
+
+                    <p className="font-black text-stone-900 uppercase tracking-wider text-[11px] mb-4">
+                      Bill Details
+                    </p>
+
+
+                    {/* Item Total */}
+
+                    <div className="flex justify-between text-stone-600 text-sm">
+                      <span>
+                        Item total
+                      </span>
+
+                      <span className="font-bold text-stone-900">
+                        {formatCurrency(
+                          itemSubtotal
+                        )}
+                      </span>
+                    </div>
+
+
+                    {/* Delivery Charge */}
+
+                    <div className="flex justify-between text-stone-600 text-sm">
+                      <span>
+                        Delivery charges
+                      </span>
+
+                      {deliveryCharge >
+                      0 ? (
+                        <span className="font-bold text-stone-900">
+                          +
+                          {formatCurrency(
+                            deliveryCharge
+                          )}
+                        </span>
+                      ) : (
+                        <span className="font-bold text-emerald-600">
+                          FREE
+                        </span>
+                      )}
+                    </div>
+
+
+                    {/* Handling Charge */}
+
+                    {handlingCharge >
+                      0 && (
+                      <div className="flex justify-between text-stone-600 text-sm">
+                        <span>
+                          Handling charge
+                        </span>
+
+                        <span className="font-bold text-stone-900">
+                          +
+                          {formatCurrency(
+                            handlingCharge
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+
+                    {/* Tax */}
+
+                    {tax > 0 && (
+                      <div className="flex justify-between text-stone-600 text-sm">
+                        <span>
+                          Tax / GST
+                        </span>
+
+                        <span className="font-bold text-stone-900">
+                          +
+                          {formatCurrency(
+                            tax
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+
+                    {/* Discount */}
+
+                    {discount > 0 && (
+                      <div className="flex justify-between text-emerald-600 text-sm">
+                        <span>
+                          Discount
+                        </span>
+
+                        <span className="font-bold">
+                          -
+                          {formatCurrency(
+                            discount
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+
+                    {/* Total */}
+
+                    <div className="flex justify-between pt-4 border-t border-stone-200 font-black text-slate-900 text-base">
+                      <span>
+                        Bill total
+                      </span>
+
+                      <span>
+                        {formatCurrency(
+                          billTotal
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+
+              {/* =================================================
+                  ORDER META
+              ================================================= */}
+
+              <div className="grid md:grid-cols-2 gap-4">
+
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mail
+                      size={15}
+                      className="text-stone-400"
+                    />
+
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Customer Email
+                    </p>
+                  </div>
+
+                  <p className="text-sm font-medium break-all">
+                    {selectedOrder.customer_email ||
+                      user?.email ||
+                      'N/A'}
+                  </p>
+                </div>
+
+
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Phone
+                      size={15}
+                      className="text-stone-400"
+                    />
+
+                    <p className="text-[10px] uppercase font-black tracking-wider text-stone-400">
+                      Customer Phone
+                    </p>
+                  </div>
+
+                  <p className="text-sm font-medium">
+                    {selectedOrder.customer_phone ||
+                      selectedOrder.phone ||
+                      profile?.phone ||
+                      'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+
+            {/* Modal Footer */}
+
+            <div className="p-5 border-t border-stone-100 flex flex-wrap gap-2 justify-end">
+              <button
+                onClick={() =>
+                  handleReorder(
+                    selectedOrder
+                  )
+                }
+                disabled={reordering}
+                className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold inline-flex items-center gap-2 hover:bg-stone-50 disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={15}
+                  className={
+                    reordering
+                      ? 'animate-spin'
+                      : ''
+                  }
+                />
+
+                Reorder
+              </button>
+
+              {getOrderStatus(
+                selectedOrder
+              ) === 'DELIVERED' && (
+                <button
+                  onClick={() => {
+                    setSelectedOrder(
+                      null
+                    );
+
+                    setTimeout(() => {
+                      openRatingModal(
+                        selectedOrder
+                      );
+                    }, 100);
+                  }}
+                  className="px-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm font-bold inline-flex items-center gap-2 hover:bg-stone-50"
+                >
+                  <Star size={15} />
+
+                  Rate Order
+                </button>
+              )}
+
+              <button
+                onClick={() =>
+                  setSelectedOrder(null)
+                }
+                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* =======================================================
+          PROFILE EDIT MODAL
+      ======================================================= */}
+
+      {showProfileEdit && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+
+            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+              <h3 className="font-black text-lg">
+                Edit Profile
+              </h3>
+
+              <button
+                onClick={() =>
+                  setShowProfileEdit(false)
+                }
+                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+
+              <div>
+                <label className="text-xs font-bold text-stone-600">
+                  Full Name
+                </label>
+
+                <input
+                  value={
+                    profileForm.full_name
+                  }
+                  onChange={(event) =>
+                    setProfileForm(
+                      (prev) => ({
+                        ...prev,
+                        full_name:
+                          event.target
+                            .value,
+                      })
+                    )
+                  }
+                  className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                  placeholder="Your full name"
+                />
+              </div>
+
+
+              <div>
+                <label className="text-xs font-bold text-stone-600">
+                  Phone Number
+                </label>
+
+                <input
+                  value={
+                    profileForm.phone
+                  }
+                  onChange={(event) =>
+                    setProfileForm(
+                      (prev) => ({
+                        ...prev,
+                        phone:
+                          event.target
+                            .value,
+                      })
+                    )
+                  }
+                  className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                  placeholder="Phone number"
+                />
+              </div>
+
+            </div>
+
+            <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  setShowProfileEdit(false)
+                }
+                className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleProfileSave}
+                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* =======================================================
+          ADDRESS MODAL
+      ======================================================= */}
+
+      {showAddressModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden">
+
+            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg">
+                  {editingAddress
+                    ? 'Edit Address'
+                    : 'Add Address'}
+                </h3>
+
+                <p className="text-xs text-stone-400 mt-1">
+                  Enter your delivery address.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowAddressModal(
+                    false
+                  );
+                  resetAddressForm();
+                }}
+                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+
+            <form
+              onSubmit={
+                handleAddressSubmit
+              }
+            >
+              <div className="p-5 space-y-4">
+
+                <div>
+                  <label className="text-xs font-bold text-stone-600">
+                    Address Line 1
+                  </label>
+
+                  <input
+                    required
+                    value={
+                      addressForm.address_line1
+                    }
+                    onChange={(event) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          address_line1:
+                            event.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                    placeholder="House / Flat / Building"
+                  />
+                </div>
+
+
+                <div>
+                  <label className="text-xs font-bold text-stone-600">
+                    Address Line 2
+                  </label>
+
+                  <input
+                    value={
+                      addressForm.address_line2
+                    }
+                    onChange={(event) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          address_line2:
+                            event.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                    placeholder="Street / Area"
+                  />
+                </div>
+
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-stone-600">
+                      City
+                    </label>
+
+                    <input
+                      required
+                      value={
+                        addressForm.city
+                      }
+                      onChange={(event) =>
+                        setAddressForm(
+                          (prev) => ({
+                            ...prev,
+                            city:
+                              event.target
+                                .value,
+                          })
+                        )
+                      }
+                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-600">
+                      State
+                    </label>
+
+                    <input
+                      required
+                      value={
+                        addressForm.state
+                      }
+                      onChange={(event) =>
+                        setAddressForm(
+                          (prev) => ({
+                            ...prev,
+                            state:
+                              event.target
+                                .value,
+                          })
+                        )
+                      }
+                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-stone-600">
+                      PIN Code
+                    </label>
+
+                    <input
+                      required
+                      value={
+                        addressForm.pincode
+                      }
+                      onChange={(event) =>
+                        setAddressForm(
+                          (prev) => ({
+                            ...prev,
+                            pincode:
+                              event.target
+                                .value,
+                          })
+                        )
+                      }
+                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                      maxLength={6}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-stone-600">
+                      Address Type
+                    </label>
+
+                    <select
+                      value={
+                        addressForm.address_type
+                      }
+                      onChange={(event) =>
+                        setAddressForm(
+                          (prev) => ({
+                            ...prev,
+                            address_type:
+                              event.target
+                                .value,
+                          })
+                        )
+                      }
+                      className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500 bg-white"
+                    >
+                      <option value="HOME">
+                        Home
+                      </option>
+
+                      <option value="WORK">
+                        Work
+                      </option>
+
+                      <option value="OTHER">
+                        Other
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+
+                <div>
+                  <label className="text-xs font-bold text-stone-600">
+                    Landmark
+                  </label>
+
+                  <input
+                    value={
+                      addressForm.landmark
+                    }
+                    onChange={(event) =>
+                      setAddressForm(
+                        (prev) => ({
+                          ...prev,
+                          landmark:
+                            event.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="w-full mt-2 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500"
+                    placeholder="Nearby landmark"
+                  />
+                </div>
+              </div>
+
+
+              <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
+                <button
                   type="button"
-                  onClick={() => setRatingOrder(null)}
-                  className="w-1/2 bg-stone-100 hover:bg-stone-200 text-stone-700 py-3 rounded-2xl font-black text-xs transition cursor-pointer"
+                  onClick={() => {
+                    setShowAddressModal(
+                      false
+                    );
+                    resetAddressForm();
+                  }}
+                  className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
                 >
                   Cancel
                 </button>
-                <button 
+
+                <button
                   type="submit"
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl font-black text-xs transition cursor-pointer shadow-sm"
+                  className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
                 >
-                  Submit Ratings
+                  {editingAddress
+                    ? 'Update Address'
+                    : 'Save Address'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
 
-      {/* Invoice Modal Integration */}
-      <InvoiceModal 
-        order={selectedInvoiceOrder} 
-        isOpen={Boolean(selectedInvoiceOrder)} 
-        onClose={() => setSelectedInvoiceOrder(null)} 
-      />
+
+      {/* =======================================================
+          RATING MODAL
+      ======================================================= */}
+
+      {showRatingModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+
+            <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg">
+                  Rate Your Order
+                </h3>
+
+                <p className="text-xs text-stone-400 mt-1">
+                  {ratingOrder
+                    ? getDisplayOrderId(
+                        ratingOrder
+                      )
+                    : ''}
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setShowRatingModal(
+                    false
+                  )
+                }
+                className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+
+            <div className="p-5">
+              <p className="text-sm font-bold text-center">
+                How was your experience?
+              </p>
+
+              <div className="flex justify-center gap-2 mt-5">
+                {[1, 2, 3, 4, 5].map(
+                  (value) => (
+                    <button
+                      key={value}
+                      onClick={() =>
+                        setRating(value)
+                      }
+                      className="p-1"
+                    >
+                      <Star
+                        size={32}
+                        fill={
+                          value <= rating
+                            ? 'currentColor'
+                            : 'none'
+                        }
+                        className={
+                          value <= rating
+                            ? 'text-amber-400'
+                            : 'text-stone-300'
+                        }
+                      />
+                    </button>
+                  )
+                )}
+              </div>
+
+              <textarea
+                value={ratingComment}
+                onChange={(event) =>
+                  setRatingComment(
+                    event.target.value
+                  )
+                }
+                rows={4}
+                placeholder="Tell us about your experience..."
+                className="w-full mt-5 px-4 py-3 border border-stone-200 rounded-xl outline-none focus:border-emerald-500 resize-none"
+              />
+            </div>
+
+
+            <div className="p-5 border-t border-stone-100 flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  setShowRatingModal(
+                    false
+                  )
+                }
+                className="px-4 py-2.5 bg-stone-100 rounded-xl text-sm font-bold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={
+                  handleRateOrderSubmit
+                }
+                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold"
+              >
+                Submit Rating
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* =======================================================
+          INVOICE
+      ======================================================= */}
+
+      {invoiceOrder && (
+        <InvoiceModal
+          order={invoiceOrder}
+          onClose={() =>
+            setInvoiceOrder(null)
+          }
+        />
+      )}
+
 
       <Footer />
     </div>

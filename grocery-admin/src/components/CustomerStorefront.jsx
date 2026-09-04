@@ -941,28 +941,30 @@ export default function CustomerStorefront() {
   };
 
   const calculateFee = (subtotal, distKm) => {
-    if (!deliveryRules || deliveryRules.length === 0) return 40;
+    if (!deliveryRules || deliveryRules.length === 0) return 40; // Default fallback fee
 
     const currentDist = Number(distKm || 0);
 
+    // Find rule matching minimum cart value and maximum distance constraints
     let matchedRule = deliveryRules.find(r => {
       const minCart = Number(r.min_cart_value || 0);
-      const maxCart = Number(r.max_cart_value || 999999);
+      const maxCart = Number(r.max_cart_value || 99999);
       const minDst = Number(r.min_distance_km || 0);
-      const maxDst = Number(r.max_distance_km || 999);
+      const maxDst = Number(r.max_distance_km || 5000);
 
       return subtotal >= minCart && subtotal <= maxCart && currentDist >= minDst && currentDist <= maxDst;
     });
 
     if (matchedRule) return Number(matchedRule.delivery_fee);
 
-    const cartOnlyRule = deliveryRules.find(r => {
+    // Fallback if exact range isn't matched
+    let cartFallback = deliveryRules.find(r => {
       const minCart = Number(r.min_cart_value || 0);
-      const maxCart = Number(r.max_cart_value || 999999);
+      const maxCart = Number(r.max_cart_value || 99999);
       return subtotal >= minCart && subtotal <= maxCart;
     });
 
-    if (cartOnlyRule) return Number(cartOnlyRule.delivery_fee);
+    if (cartFallback) return Number(cartFallback.delivery_fee);
 
     return 40;
   };
@@ -1079,9 +1081,9 @@ export default function CustomerStorefront() {
     }
   }, [cartSubtotal]);
 
-  const handleApplyCoupon = async () => {
+ const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
-     
+    
     try {
       const { data, error } = await supabase
         .from('coupons')
@@ -1129,12 +1131,34 @@ export default function CustomerStorefront() {
         }
       }
 
+      // Check minimum order value constraint
       if (cartSubtotal < (data.min_order_value || 0)) {
         alert(`Minimum order value of ₹${data.min_order_value} required for this coupon.`);
         return;
       }
 
-      let discount = data.discount_type === 'percentage' ? (cartSubtotal * data.discount_value) / 100 : data.discount_value;
+      // Check specific product constraint if configured by admin
+      if (data.product_id) {
+        const hasEligibleProduct = cart.some(item => (item.product?.id || item.id || item.product_id) === data.product_id);
+        if (!hasEligibleProduct) {
+          alert("This coupon is only valid for a specific product in your cart.");
+          return;
+        }
+      }
+
+      // Check specific category constraint if configured by admin
+      if (data.category_id) {
+        const hasEligibleCategory = cart.some(item => (item.product?.category_id || item.category_id) === data.category_id);
+        if (!hasEligibleCategory) {
+          alert("This coupon is only valid for items from a specific category.");
+          return;
+        }
+      }
+
+      let discount = data.discount_type === 'percentage' 
+        ? (cartSubtotal * data.discount_value) / 100 
+        : data.discount_value;
+
       setDiscountAmount(Math.min(discount, cartSubtotal));
       setAppliedCoupon(data);
       setCouponInput('');

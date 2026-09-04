@@ -1,53 +1,74 @@
 // src/components/CouponManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Tag, Plus, Trash2, Edit3, X, Repeat, Sparkles, CheckCircle2, BarChart3 } from 'lucide-react';
+import { Tag, Plus, Trash2, Edit3, X, Sparkles, CheckCircle2, BarChart3 } from 'lucide-react';
 
 export default function CouponManager() {
   const [coupons, setCoupons] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [usageStats, setUsageStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  
   const [form, setForm] = useState({ 
     code: '', 
     discount_type: 'percentage', 
     discount_value: '', 
     min_order_value: '',
     usage_limit_type: 'multiple', // 'one_time' or 'multiple'
-    expiry_date: ''
+    expiry_date: '',
+    product_id: '',
+    category_id: ''
   });
 
   useEffect(() => {
-    fetchCouponsAndStats();
+    fetchCouponsProductsCategoriesAndStats();
   }, []);
 
-  const fetchCouponsAndStats = async () => {
+  const fetchCouponsProductsCategoriesAndStats = async () => {
     setLoading(true);
+
     // 1. Fetch coupons
-    const { data: couponData, error: couponError } = await supabase
+    const { data: couponData } = await supabase
       .from('coupons')
-      .select('*')
+      .select('*, products(name), categories(name)')
       .order('created_at', { ascending: false });
 
-    if (!couponError && couponData) {
-      setCoupons(couponData || []);
+    if (couponData) setCoupons(couponData);
 
-      // 2. Fetch usage statistics from orders table
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('coupon_code');
+    // 2. Fetch products for product-specific coupon rules
+    const { data: prodData } = await supabase
+      .from('products')
+      .select('id, name')
+      .order('name');
 
-      if (!orderError && orderData) {
-        const stats = {};
-        orderData.forEach(order => {
-          if (order.coupon_code) {
-            const upperCode = order.coupon_code.toUpperCase();
-            stats[upperCode] = (stats[upperCode] || 0) + 1;
-          }
-        });
-        setUsageStats(stats);
-      }
+    if (prodData) setProducts(prodData);
+
+    // 3. Fetch categories for category-specific coupon rules
+    const { data: catData } = await supabase
+      .from('categories')
+      .select('id, name')
+      .order('name');
+
+    if (catData) setCategories(catData);
+
+    // 4. Fetch usage statistics from orders table
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('coupon_code');
+
+    if (orderData) {
+      const stats = {};
+      orderData.forEach(order => {
+        if (order.coupon_code) {
+          const upperCode = order.coupon_code.toUpperCase();
+          stats[upperCode] = (stats[upperCode] || 0) + 1;
+        }
+      });
+      setUsageStats(stats);
     }
+
     setLoading(false);
   };
 
@@ -60,11 +81,12 @@ export default function CouponManager() {
       min_order_value: form.min_order_value ? parseFloat(form.min_order_value) : 0,
       usage_limit_type: form.usage_limit_type,
       expiry_date: form.expiry_date || null,
+      product_id: form.product_id ? form.product_id : null,
+      category_id: form.category_id ? form.category_id : null,
       is_active: true
     };
 
     if (editingId) {
-      // Update existing coupon
       const { error } = await supabase
         .from('coupons')
         .update(payload)
@@ -74,10 +96,9 @@ export default function CouponManager() {
       else {
         alert("Coupon updated successfully!");
         resetForm();
-        fetchCouponsAndStats();
+        fetchCouponsProductsCategoriesAndStats();
       }
     } else {
-      // Insert new coupon
       const { error } = await supabase
         .from('coupons')
         .insert([payload]);
@@ -86,7 +107,7 @@ export default function CouponManager() {
       else {
         alert("Coupon created successfully!");
         resetForm();
-        fetchCouponsAndStats();
+        fetchCouponsProductsCategoriesAndStats();
       }
     }
   };
@@ -99,7 +120,9 @@ export default function CouponManager() {
       discount_value: coupon.discount_value,
       min_order_value: coupon.min_order_value || '',
       usage_limit_type: coupon.usage_limit_type || 'multiple',
-      expiry_date: coupon.expiry_date || ''
+      expiry_date: coupon.expiry_date || '',
+      product_id: coupon.product_id || '',
+      category_id: coupon.category_id || ''
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -112,14 +135,16 @@ export default function CouponManager() {
       discount_value: '', 
       min_order_value: '',
       usage_limit_type: 'multiple',
-      expiry_date: ''
+      expiry_date: '',
+      product_id: '',
+      category_id: ''
     });
   };
 
   const handleDeleteCoupon = async (id) => {
     if (!window.confirm("Are you sure you want to delete this coupon?")) return;
     const { error } = await supabase.from('coupons').delete().eq('id', id);
-    if (!error) fetchCouponsAndStats();
+    if (!error) fetchCouponsProductsCategoriesAndStats();
   };
 
   return (
@@ -131,7 +156,7 @@ export default function CouponManager() {
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             <Tag size={24} className="text-emerald-700"/> Coupon & Discount Management
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Create, edit, and track promo codes with usage limits and redemption analytics.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Create, edit, and track promo codes with cart, product, and category restrictions.</p>
         </div>
       </div>
 
@@ -181,7 +206,7 @@ export default function CouponManager() {
           <div>
             <label className="block font-bold text-slate-700 mb-1">Coupon Code</label>
             <input 
-              type="text" required placeholder="e.g. WELCOME50" 
+              type="text" required placeholder="e.g. GROCERY50" 
               className="w-full border border-emerald-200 p-3 rounded-2xl text-xs uppercase bg-emerald-50/20 font-mono font-bold text-slate-900 outline-none focus:border-emerald-600" 
               value={form.code} onChange={e => setForm({...form, code: e.target.value})} 
             />
@@ -214,6 +239,32 @@ export default function CouponManager() {
               className="w-full border border-emerald-200 p-3 rounded-2xl text-xs bg-emerald-50/20 font-medium text-slate-900 outline-none" 
               value={form.min_order_value} onChange={e => setForm({...form, min_order_value: e.target.value})} 
             />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Specific Product Target (Optional)</label>
+            <select 
+              className="w-full border border-emerald-200 p-3 rounded-2xl text-xs bg-emerald-50/20 font-bold text-slate-800 outline-none cursor-pointer truncate" 
+              value={form.product_id} onChange={e => setForm({...form, product_id: e.target.value})}
+            >
+              <option value="">Any Product (Storewide)</option>
+              {products.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Specific Category Target (Optional)</label>
+            <select 
+              className="w-full border border-emerald-200 p-3 rounded-2xl text-xs bg-emerald-50/20 font-bold text-slate-800 outline-none cursor-pointer truncate" 
+              value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}
+            >
+              <option value="">Any Category (Storewide)</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -264,6 +315,7 @@ export default function CouponManager() {
               <th className="p-4">Code</th>
               <th className="p-4">Discount</th>
               <th className="p-4">Min Order</th>
+              <th className="p-4">Target Rule</th>
               <th className="p-4">Usage Limit</th>
               <th className="p-4">Times Used</th>
               <th className="p-4">Expiry Date</th>
@@ -273,18 +325,27 @@ export default function CouponManager() {
           </thead>
           <tbody className="divide-y divide-emerald-50 text-xs">
             {loading ? (
-              <tr><td colSpan="8" className="p-8 text-center text-slate-500 font-medium">Loading coupons...</td></tr>
+              <tr><td colSpan="9" className="p-8 text-center text-slate-500 font-medium">Loading coupons...</td></tr>
             ) : coupons.length === 0 ? (
-              <tr><td colSpan="8" className="p-8 text-center text-slate-400 italic">No active coupons created yet.</td></tr>
+              <tr><td colSpan="9" className="p-8 text-center text-slate-400 italic">No active coupons created yet.</td></tr>
             ) : (
               coupons.map(coupon => {
                 const isExpired = coupon.expiry_date && new Date(coupon.expiry_date) < new Date();
                 const timesUsed = usageStats[coupon.code.toUpperCase()] || 0;
+                
+                let targetText = 'Storewide';
+                if (coupon.product_id && coupon.products?.name) {
+                  targetText = `Product: ${coupon.products.name}`;
+                } else if (coupon.category_id && coupon.categories?.name) {
+                  targetText = `Category: ${coupon.categories.name}`;
+                }
+
                 return (
                   <tr key={coupon.id} className="hover:bg-emerald-50/40 transition">
                     <td className="p-4 font-mono font-black text-slate-900">{coupon.code}</td>
                     <td className="p-4 font-black text-emerald-700">{coupon.discount_type === 'percentage' ? `${coupon.discount_value}% OFF` : `₹${coupon.discount_value} OFF`}</td>
                     <td className="p-4 font-medium text-slate-700">₹{coupon.min_order_value || 0}</td>
+                    <td className="p-4 font-semibold text-slate-700">{targetText}</td>
                     <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
                         coupon.usage_limit_type === 'one_time' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'

@@ -1,6 +1,6 @@
 // src/components/store/CartDrawer.jsx
 import { useState, useEffect } from 'react';
-import { ShoppingCart, MapPin, X, Plus, Minus, ShieldCheck, Tag, Zap, ChevronDown, Trash2, CheckCircle } from 'lucide-react';
+import { ShoppingCart, MapPin, X, Plus, Minus, ShieldCheck, Tag, Zap, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CollapsedAddressSelector from '../CollapsedAddressSelector';
 import { supabase } from '../../supabaseClient';
@@ -90,7 +90,7 @@ export default function CartDrawer({
   const amountNeeded = Math.max(0, freeDeliveryThreshold - cartSubtotal);
   const progressPct = Math.min(100, (cartSubtotal / freeDeliveryThreshold) * 100);
 
-  const isCartEmpty       = cart.length === 0;
+  const isCartEmpty        = cart.length === 0;
   const isAddressMissing = savedAddresses.length === 0 || !selectedAddressId;
   const isCheckoutDisabled = checkingOut || isCartEmpty || isAddressMissing;
 
@@ -179,63 +179,73 @@ export default function CartDrawer({
                   ) : (
                     <div className="space-y-2">
                       {cart.map(item => {
-  const uniqueKey = item?.cartItemId || item?.id || item?.product_id;
-  const itemImage = item?.image || item?.image_url || (item?.images && item.images[0]) || '';
-  const itemTitle = item?.title || item?.name || 'Product Item';
-  const itemPrice = Number(item?.price || 0);
-  const variantLabel = item?.variant?.unit_label || item?.variant?.label || '';
+                        const uniqueKey = item?.cartItemId || item?.id || item?.product_id;
+                        const itemImage = item?.image || item?.image_url || (item?.images && item.images[0]) || '';
+                        const itemTitle = item?.title || item?.name || 'Product Item';
+                        const itemOfferPrice = Number(item?.price || 0);
+                        const variantLabel = item?.variant?.unit_label || item?.variant?.label || '';
+                        
+                        // Extract MRP safely from variant or product fallback
+                        const itemMrp = Number(item?.variant?.mrp || item?.product?.mrp || item?.mrp || itemOfferPrice);
+                        const hasMrp = itemMrp > itemOfferPrice;
+                        let discountPercent = 0;
+                        if (hasMrp) {
+                          discountPercent = Math.round(((itemMrp - itemOfferPrice) / itemMrp) * 100);
+                        }
 
-  if (!uniqueKey) return null;
+                        if (!uniqueKey) return null;
 
-  return (
-    <motion.div
-      key={uniqueKey}
-      layout
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -16 }}
-      transition={{ duration: 0.22 }}
-      className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-100 shadow-xs"
-    >
-      {itemImage ? (
-        <img src={itemImage} alt={itemTitle} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-100" />
-      ) : (
-        <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
-          <ShoppingCart size={16} className="text-brand-300" />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-[11px] text-stone-900 truncate leading-tight">{itemTitle}</p>
-        {variantLabel && (
-          <span className="inline-block mt-0.5 text-[9px] font-extrabold text-brand-700 bg-brand-50 px-1.5 py-0.2 rounded-md">
-            {variantLabel}
-          </span>
-        )}
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <p className="text-[10px] text-stone-700 font-bold">₹{itemPrice.toFixed(0)}</p>
-          {(() => {
-            const itemMrp = Number(item?.variant?.mrp || item?.product?.mrp || 0);
-            return itemMrp > itemPrice ? (
-              <p className="text-[9px] text-stone-400 line-through">₹{itemMrp.toFixed(0)}</p>
-            ) : null;
-          })()}
-        </div>
-      </div>
-      <div className="flex items-center gap-1 bg-stone-100 rounded-xl p-0.5 shrink-0">
-        <button onClick={() => updateQuantity(uniqueKey, -1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
-          <Minus size={11} />
-        </button>
-        <span className="text-xs font-black w-5 text-center text-stone-900">{item?.quantity || 1}</span>
-        <button onClick={() => updateQuantity(uniqueKey, 1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
-          <Plus size={11} />
-        </button>
-      </div>
-      <span className="text-xs font-black text-brand-700 shrink-0 w-14 text-right">
-        ₹{(itemPrice * (item?.quantity || 1)).toFixed(0)}
-      </span>
-    </motion.div>
-  );
-})}
+                        return (
+                          <motion.div
+                            key={uniqueKey}
+                            layout
+                            initial={{ opacity: 0, x: 16 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -16 }}
+                            transition={{ duration: 0.22 }}
+                            className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-100 shadow-xs"
+                          >
+                            {itemImage ? (
+                              <img src={itemImage} alt={itemTitle} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 border border-stone-100" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                                <ShoppingCart size={16} className="text-brand-300" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-[11px] text-stone-900 truncate leading-tight">{itemTitle}</p>
+                              {variantLabel && (
+                                <span className="inline-block mt-0.5 text-[9px] font-extrabold text-brand-700 bg-brand-50 px-1.5 py-0.2 rounded-md">
+                                  {variantLabel}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] text-stone-700 font-bold">₹{itemOfferPrice.toFixed(0)}</span>
+                                {hasMrp && (
+                                  <>
+                                    <span className="text-[9px] text-stone-400 line-through">₹{itemMrp.toFixed(0)}</span>
+                                    <span className="text-[8px] font-black text-rose-600 bg-rose-50 px-1 rounded">
+                                      {discountPercent}% OFF
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 rounded-xl p-0.5 shrink-0">
+                              <button onClick={() => updateQuantity(uniqueKey, -1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
+                                <Minus size={11} />
+                              </button>
+                              <span className="text-xs font-black w-5 text-center text-stone-900">{item?.quantity || 1}</span>
+                              <button onClick={() => updateQuantity(uniqueKey, 1)} className="w-6 h-6 hover:bg-white rounded-lg flex items-center justify-center text-stone-600 transition cursor-pointer">
+                                <Plus size={11} />
+                              </button>
+                            </div>
+                            <span className="text-xs font-black text-brand-700 shrink-0 w-14 text-right">
+                              ₹{(itemOfferPrice * (item?.quantity || 1)).toFixed(0)}
+                            </span>
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

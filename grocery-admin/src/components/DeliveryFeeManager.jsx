@@ -7,14 +7,14 @@ export default function DeliveryFeeManager() {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Form State for Add / Edit
+  // Form State: Prioritizing Min Cart Value & Max Distance rules
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ 
     min_cart_value: 0, 
     max_cart_value: 99999, 
     min_distance_km: 0, 
-    max_distance_km: 5000, 
-    delivery_fee: 40 
+    max_distance_km: 5, 
+    delivery_fee: 30 
   });
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export default function DeliveryFeeManager() {
     e.preventDefault();
     
     if (editingId) {
-      // Update existing rule
       const { error } = await supabase
         .from('delivery_rules')
         .update(form)
@@ -42,16 +41,15 @@ export default function DeliveryFeeManager() {
         alert(error.message);
       } else {
         setEditingId(null);
-        setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5000, delivery_fee: 40 });
+        setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5, delivery_fee: 30 });
         fetchRules();
       }
     } else {
-      // Insert new rule
       const { error } = await supabase.from('delivery_rules').insert([form]);
       if (error) {
         alert(error.message);
       } else {
-        setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5000, delivery_fee: 40 });
+        setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5, delivery_fee: 30 });
         fetchRules();
       }
     }
@@ -71,7 +69,7 @@ export default function DeliveryFeeManager() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5000, delivery_fee: 40 });
+    setForm({ min_cart_value: 0, max_cart_value: 99999, min_distance_km: 0, max_distance_km: 5, delivery_fee: 30 });
   };
 
   const handleDeleteRule = async (id) => {
@@ -87,42 +85,42 @@ export default function DeliveryFeeManager() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-stone-900 flex items-center gap-2">
-            <Truck className="text-emerald-600" /> Delivery Fee Tiers (Cart & Distance)
+            <Truck className="text-emerald-600" /> Delivery Fee Rules (Min Cart & Max Distance)
           </h2>
-          <p className="text-sm text-stone-500 mt-0.5">Manage fees based on cart subtotals and customer distance ranges.</p>
+          <p className="text-sm text-stone-500 mt-0.5">Configure fees triggered when cart subtotal is below a minimum threshold or distance exceeds a maximum limit.</p>
         </div>
         {editingId && (
           <button 
             onClick={handleCancelEdit}
-            className="bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 transition"
+            className="bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer"
           >
             <X size={14} /> Cancel Editing
           </button>
         )}
       </div>
 
-      <form onSubmit={handleSaveRule} className={`rounded-3xl p-6 border shadow-xs grid grid-cols-1 sm:grid-cols-6 gap-3 items-end transition-colors ${editingId ? 'bg-amber-50/60 border-amber-200' : 'bg-white'}`}>
+      <form onSubmit={handleSaveRule} className={`rounded-3xl p-6 border shadow-xs grid grid-cols-1 sm:grid-cols-5 gap-3 items-end transition-colors ${editingId ? 'bg-amber-50/60 border-amber-200' : 'bg-white'}`}>
         <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1">Min Cart (₹)</label>
-          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white" value={form.min_cart_value} onChange={e => setForm({...form, min_cart_value: parseFloat(e.target.value)} )} />
+          <label className="block text-xs font-bold text-stone-700 mb-1">If Cart Below / Min Cart (₹)</label>
+          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white outline-none" value={form.min_cart_value} onChange={e => setForm({...form, min_cart_value: parseFloat(e.target.value)} )} />
+          <span className="text-[10px] text-stone-400 mt-0.5 block">e.g. 99 (triggers fee if cart &lt; 99)</span>
         </div>
         <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1">Max Cart (₹)</label>
-          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white" value={form.max_cart_value} onChange={e => setForm({...form, max_cart_value: parseFloat(e.target.value)} )} />
+          <label className="block text-xs font-bold text-stone-700 mb-1">Max Cart Limit (₹)</label>
+          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white outline-none" value={form.max_cart_value} onChange={e => setForm({...form, max_cart_value: parseFloat(e.target.value)} )} />
+          <span className="text-[10px] text-stone-400 mt-0.5 block">e.g. 99999 (upper cap)</span>
         </div>
         <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1">Min Dist (KM)</label>
-          <input type="number" step="0.1" required className="w-full border p-3 rounded-xl text-sm bg-white" value={form.min_distance_km} onChange={e => setForm({...form, min_distance_km: parseFloat(e.target.value)} )} />
+          <label className="block text-xs font-bold text-stone-700 mb-1">If Distance Above / Max Dist (KM)</label>
+          <input type="number" step="0.1" required className="w-full border p-3 rounded-xl text-sm bg-white outline-none" value={form.max_distance_km} onChange={e => setForm({...form, max_distance_km: parseFloat(e.target.value)} )} />
+          <span className="text-[10px] text-stone-400 mt-0.5 block">e.g. 5 (triggers fee if distance &gt; 5 KM)</span>
         </div>
         <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1">Max Dist (KM)</label>
-          <input type="number" step="0.1" required className="w-full border p-3 rounded-xl text-sm bg-white" value={form.max_distance_km} onChange={e => setForm({...form, max_distance_km: parseFloat(e.target.value)} )} />
+          <label className="block text-xs font-bold text-stone-700 mb-1">Delivery Fee (₹)</label>
+          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white outline-none" value={form.delivery_fee} onChange={e => setForm({...form, delivery_fee: parseFloat(e.target.value)} )} />
+          <span className="text-[10px] text-stone-400 mt-0.5 block">e.g. 20 or 30</span>
         </div>
-        <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1">Fee (₹)</label>
-          <input type="number" required className="w-full border p-3 rounded-xl text-sm bg-white" value={form.delivery_fee} onChange={e => setForm({...form, delivery_fee: parseFloat(e.target.value)} )} />
-        </div>
-        <button type="submit" className={`font-bold py-3.5 rounded-xl text-xs flex items-center justify-center gap-1 shadow-md text-white transition ${editingId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+        <button type="submit" className={`font-bold py-3.5 rounded-xl text-xs flex items-center justify-center gap-1 shadow-md text-white transition cursor-pointer ${editingId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
           <Plus size={16} /> {editingId ? 'Update Rule' : 'Add Rule'}
         </button>
       </form>
@@ -131,9 +129,9 @@ export default function DeliveryFeeManager() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-stone-50 border-b text-xs uppercase text-stone-500 font-semibold">
-              <th className="p-4">Cart Range</th>
-              <th className="p-4">Distance Range</th>
-              <th className="p-4">Fee</th>
+              <th className="p-4">Cart Condition</th>
+              <th className="p-4">Distance Condition</th>
+              <th className="p-4">Fee Charged</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -143,8 +141,8 @@ export default function DeliveryFeeManager() {
             ) : (
               rules.map(rule => (
                 <tr key={rule.id} className={`hover:bg-stone-50/50 ${editingId === rule.id ? 'bg-amber-50/40' : ''}`}>
-                  <td className="p-4 font-bold text-stone-900">₹{rule.min_cart_value} — ₹{rule.max_cart_value}</td>
-                  <td className="p-4">{rule.min_distance_km} KM — {rule.max_distance_km} KM</td>
+                  <td className="p-4 font-bold text-stone-900">Cart between ₹{rule.min_cart_value} and ₹{rule.max_cart_value}</td>
+                  <td className="p-4">Distance up to {rule.max_distance_km} KM</td>
                   <td className="p-4 font-black text-emerald-700">₹{Number(rule.delivery_fee || 0).toFixed(2)}</td>
                   <td className="p-4 text-right space-x-1">
                     <button onClick={() => handleEditClick(rule)} className="text-blue-600 hover:text-blue-800 p-2 cursor-pointer" title="Edit Rule"><Edit size={16} /></button>
