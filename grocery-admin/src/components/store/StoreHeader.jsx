@@ -121,21 +121,33 @@ export default function StoreHeader({
 
       {/* ── MAIN HEADER ── */}
       <header className={`bg-white/92 backdrop-blur-lg sticky top-0 z-40 border-b border-stone-100 font-sans transition-shadow duration-300 ${scrolled ? 'shadow-lg shadow-stone-200/40' : ''}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
 
-          {/* Logo */}
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2.5 shrink-0 group btn-press cursor-pointer"
-          >
-            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
-              KD
-            </div>
-            <div className="hidden sm:block leading-none">
-              <p className="text-xs font-black text-stone-900 tracking-wide">KD Store</p>
-              <p className="text-[9px] text-brand-600 font-bold mt-0.5">Quick Commerce</p>
-            </div>
-          </button>
+          {/* Logo & Mobile Username */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2.5 shrink-0 group btn-press cursor-pointer"
+            >
+              <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
+                KD
+              </div>
+              <div className="hidden sm:block leading-none">
+                <p className="text-xs font-black text-stone-900 tracking-wide">KD Store</p>
+                <p className="text-[9px] text-brand-600 font-bold mt-0.5">Quick Commerce</p>
+              </div>
+            </button>
+
+            {/* Mobile Logged-in User Name display */}
+            {session && (
+              <div className="sm:hidden flex flex-col leading-tight">
+                <span className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Hello,</span>
+                <span className="text-xs font-black text-stone-800 truncate max-w-[110px]">
+                  {displayName || 'User'}
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Location widget — desktop */}
           <button
@@ -155,7 +167,7 @@ export default function StoreHeader({
             </div>
           </button>
 
-          {/* Search bar — desktop */}
+          {/* Search bar — visible on desktop everywhere, hidden on mobile home if required, but fully functional on standard catalog views */}
           <div className="flex-1 max-w-2xl hidden md:block">
             <div className="relative group">
               <Search
@@ -185,7 +197,7 @@ export default function StoreHeader({
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 ml-auto relative">
+          <div className="flex items-center gap-2 relative">
             {/* Profile / Account Dropdown Trigger */}
             {session ? (
               <div className="relative" ref={accountMenuRef}>
@@ -322,98 +334,31 @@ export default function StoreHeader({
           </div>
         </div>
 
-        {/* ── MOBILE: Location + Search ── */}
-        <div className="px-4 pb-3 md:hidden space-y-2">
-          <button
-            onClick={fetchCurrentLocation}
-            className="w-full flex items-center justify-between text-xs text-stone-700 bg-stone-50 border border-stone-200 px-3 py-2 rounded-xl"
-          >
-            <span className="flex items-center gap-1.5 truncate min-w-0">
-              <MapPin size={13} className="text-brand-600 shrink-0" />
-              <span className="truncate font-medium">{locationName}</span>
-            </span>
-            {isFetchingLocation
-              ? <Loader2 size={12} className="animate-spin text-brand-500 shrink-0" />
-              : <span className="text-[9px] text-brand-600 font-black uppercase shrink-0 ml-2">Change</span>}
-          </button>
-
-          <div className="relative">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search groceries, essentials…"
-              value={searchQuery}
-              onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 pl-10 pr-11 py-2.5 rounded-xl text-xs font-medium text-stone-900 outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/10 transition-all"
-            />
-            <button
-              type="button"
-              onClick={startVoiceSearch}
-              className={`absolute inset-y-1 right-1 px-2.5 rounded-lg flex items-center justify-center transition cursor-pointer ${
-                isListening ? 'bg-rose-500 text-white animate-pulse' : 'text-stone-400 hover:text-brand-600'
-              }`}
-            >
-              {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-            </button>
+        {/* Mobile Search Bar: Visible on standard storefront pages via props, but hidden on orders/account page context */}
+        {setSearchQuery && (
+          <div className="px-4 pb-3 md:hidden">
+            <div className="relative">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search groceries, essentials…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-200 pl-10 pr-11 py-2 rounded-xl text-xs font-medium text-stone-900 outline-none focus:border-brand-500 focus:bg-white transition-all"
+              />
+              <button
+                type="button"
+                onClick={startVoiceSearch}
+                className={`absolute inset-y-1 right-1 px-2.5 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                  isListening ? 'bg-rose-500 text-white animate-pulse' : 'text-stone-400 hover:text-brand-600'
+                }`}
+              >
+                {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </header>
-
-      {/* ── MOBILE BOTTOM NAV ── */}
-      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl safe-bottom">
-        <div className="flex items-center justify-around px-4 py-2.5">
-
-          <button
-            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-brand-50 group-active:bg-brand-100 rounded-xl flex items-center justify-center transition-colors">
-              <Home size={18} className="text-brand-600" />
-            </div>
-            <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Home</span>
-          </button>
-
-          <button
-            onClick={onOpenCart}
-            className="relative flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <motion.div
-              animate={cartBounce ? { scale: [1, 1.2, 0.92, 1] } : {}}
-              transition={{ duration: 0.3, type: 'spring' }}
-              className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors"
-            >
-              <ShoppingCart size={18} className="text-stone-500" />
-            </motion.div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Cart</span>
-            {totalItemsCount > 0 && (
-              <span className="absolute -top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-badge-pop" />
-            )}
-          </button>
-
-          <button
-            onClick={() => { navigate('/account/orders'); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
-              <Package size={18} className="text-stone-500" />
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Orders</span>
-          </button>
-
-          <button
-            onClick={handleProfileClick}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center overflow-hidden transition-colors">
-              {avatarUrl
-                ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                : <User size={18} className="text-stone-500" />}
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Account</span>
-          </button>
-
-        </div>
-      </div>
     </>
   );
 }

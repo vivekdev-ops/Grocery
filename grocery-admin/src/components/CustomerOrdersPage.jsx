@@ -2,11 +2,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
-  Clock,
   Edit,
   FileText,
   Home,
@@ -24,6 +22,9 @@ import {
   ShoppingBag,
   Truck,
   CreditCard,
+  UserCircle,
+  MapPinned,
+  ShoppingBag as BagIcon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -44,20 +45,6 @@ const formatCurrency = (value) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-};
-
-const formatDate = (value) => {
-  if (!value) return '-';
-
-  try {
-    return new Date(value).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
 };
 
 const formatDateTime = (value) => {
@@ -291,14 +278,6 @@ const getDeliveryCharge = (order) => {
   ) || 0;
 };
 
-const getHandlingCharge = (order) => {
-  return Number(
-    order?.handling_charge ??
-      order?.handling_fee ??
-      0
-  ) || 0;
-};
-
 const getDiscount = (order) => {
   return Number(
     order?.discount ??
@@ -350,11 +329,10 @@ const getOrderTotal = (order) => {
 
   const subtotal = getOrderItemsSubtotal(order);
   const delivery = getDeliveryCharge(order);
-  const handling = getHandlingCharge(order);
   const discount = getDiscount(order);
   const tax = getTax(order);
 
-  return subtotal + delivery + handling + tax - discount;
+  return subtotal + delivery + tax - discount;
 };
 
 
@@ -384,6 +362,8 @@ const emptyAddressForm = {
 
 const CustomerOrdersPage = () => {
   const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'profile'
 
   const [authUser, setAuthUser] = useState(null);
   const [user, setUser] = useState(null);
@@ -1455,868 +1435,474 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24 md:pb-12">
       <StoreHeader session={authUser} customerProfile={user} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
 
         {/* =================================================
-            HEADER
+            MOBILE RESPONSIVE ICON NAVIGATION TABS
         ================================================= */}
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-
-          <div>
-            <button
-              onClick={() => navigate('/')}
-              className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-green-600 mb-3"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Store
-            </button>
-
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-              My Account
-            </h1>
-
-            <p className="text-gray-500 mt-1">
-              Manage your orders, profile and addresses.
-            </p>
-          </div>
-
+        <div className="flex bg-white rounded-2xl border border-gray-200 p-1.5 mb-5 shadow-xs gap-1">
           <button
-            onClick={() =>
-              loadOrders()
-            }
-            disabled={loadingOrders}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50"
+            onClick={() => setActiveTab('orders')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeTab === 'orders'
+                ? 'bg-green-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
           >
-            <RefreshCw
-              className={`w-4 h-4 ${
-                loadingOrders
-                  ? 'animate-spin'
-                  : ''
-              }`}
-            />
-
-            Refresh
+            <BagIcon className="w-4 h-4 shrink-0" />
+            <span>Orders</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('addresses')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeTab === 'addresses'
+                ? 'bg-green-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <MapPinned className="w-4 h-4 shrink-0" />
+            <span>Addresses</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeTab === 'profile'
+                ? 'bg-green-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <UserCircle className="w-4 h-4 shrink-0" />
+            <span>Profile</span>
+          </button>
         </div>
 
 
         {/* =================================================
-            PROFILE
+            TAB CONTENT: PROFILE
         ================================================= */}
-
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6">
-
-          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center">
-                <User className="w-5 h-5 text-green-600" />
+        {activeTab === 'profile' && (
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 animate-fadeIn">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900 text-sm sm:text-base">Profile Settings</h2>
+                  <p className="text-xs text-gray-500">Your account information</p>
+                </div>
               </div>
 
-              <div>
-                <h2 className="font-semibold text-gray-900">
-                  Profile
-                </h2>
-
-                <p className="text-sm text-gray-500">
-                  Your account information
-                </p>
-              </div>
+              {!editingProfile && (
+                <button
+                  onClick={() => setEditingProfile(true)}
+                  className="inline-flex items-center gap-1 text-xs sm:text-sm text-green-600 hover:text-green-700 font-medium p-1 cursor-pointer"
+                  title="Edit Profile"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span className="hidden xs:inline">Edit</span>
+                </button>
+              )}
             </div>
 
-            {!editingProfile && (
-              <button
-                onClick={() =>
-                  setEditingProfile(true)
-                }
-                className="inline-flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium"
-              >
-                <Edit className="w-4 h-4" />
-                Edit
-              </button>
-            )}
+            <div className="p-4 sm:p-5">
+              {editingProfile ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={profileForm.full_name}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
 
-          </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
+                      maxLength={10}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
 
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={authUser?.email || user?.email || ''}
+                      disabled
+                      className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2 text-xs sm:text-sm text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
 
-          <div className="p-5">
-
-            {editingProfile ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-
-                  <input
-                    type="text"
-                    value={
-                      profileForm.full_name
-                    }
-                    onChange={(e) =>
-                      setProfileForm(
-                        (prev) => ({
-                          ...prev,
-                          full_name:
-                            e.target.value,
-                        })
-                      )
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                  <div className="sm:col-span-2 flex justify-end gap-2.5 pt-2">
+                    <button
+                      onClick={() => setEditingProfile(false)}
+                      className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-xs sm:text-sm font-medium cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleProfileSave}
+                      disabled={savingProfile}
+                      className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium cursor-pointer"
+                    >
+                      {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Save
+                    </button>
+                  </div>
                 </div>
-
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mobile Number
-                  </label>
-
-                  <input
-                    type="tel"
-                    value={
-                      profileForm.phone
-                    }
-                    onChange={(e) =>
-                      setProfileForm(
-                        (prev) => ({
-                          ...prev,
-                          phone:
-                            e.target.value.replace(
-                              /\D/g,
-                              ''
-                            ),
-                        })
-                      )
-                    }
-                    maxLength={10}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
+                  <div>
+                    <p className="text-gray-400 text-[11px] uppercase tracking-wider font-bold mb-0.5">Name</p>
+                    <p className="font-semibold text-gray-900">{user?.full_name || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-[11px] uppercase tracking-wider font-bold mb-0.5">Email</p>
+                    <p className="font-semibold text-gray-900 break-all">{authUser?.email || user?.email || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-[11px] uppercase tracking-wider font-bold mb-0.5">Phone</p>
+                    <p className="font-semibold text-gray-900">{user?.phone || 'Not provided'}</p>
+                  </div>
                 </div>
-
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-
-                  <input
-                    type="email"
-                    value={
-                      authUser?.email ||
-                      user?.email ||
-                      ''
-                    }
-                    disabled
-                    className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2.5 text-gray-500"
-                  />
-                </div>
-
-
-                <div className="md:col-span-2 flex justify-end gap-3">
-
-                  <button
-                    onClick={() =>
-                      setEditingProfile(false)
-                    }
-                    className="px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={
-                      handleProfileSave
-                    }
-                    disabled={
-                      savingProfile
-                    }
-                    className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
-                  >
-                    {savingProfile && (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    )}
-
-                    Save Changes
-                  </button>
-
-                </div>
-
-              </div>
-            ) : (
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Name
-                  </p>
-
-                  <p className="font-medium text-gray-900">
-                    {user?.full_name ||
-                      'Not provided'}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Email
-                  </p>
-
-                  <p className="font-medium text-gray-900 break-all">
-                    {authUser?.email ||
-                      user?.email ||
-                      '-'}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Phone
-                  </p>
-
-                  <p className="font-medium text-gray-900">
-                    {user?.phone ||
-                      'Not provided'}
-                  </p>
-                </div>
-
-              </div>
-
-            )}
-
-          </div>
-
-        </section>
+              )}
+            </div>
+          </section>
+        )}
 
 
         {/* =================================================
-            ADDRESSES
+            TAB CONTENT: ADDRESSES
         ================================================= */}
-
-        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6">
-
-          <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-blue-600" />
+        {activeTab === 'addresses' && (
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 animate-fadeIn">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900 text-sm sm:text-base">My Addresses</h2>
+                  <p className="text-xs text-gray-500">Manage your delivery locations</p>
+                </div>
               </div>
 
-              <div>
-                <h2 className="font-semibold text-gray-900">
-                  My Addresses
-                </h2>
-
-                <p className="text-sm text-gray-500">
-                  Manage your delivery addresses
-                </p>
-              </div>
-
+              <button
+                onClick={handleAddAddress}
+                className="inline-flex items-center justify-center gap-1 px-3.5 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 text-xs sm:text-sm font-medium cursor-pointer shadow-sm"
+                title="Add Address"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden xs:inline">Add</span>
+              </button>
             </div>
 
-
-            <button
-              onClick={
-                handleAddAddress
-              }
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
-            >
-              <Plus className="w-4 h-4" />
-              Add Address
-            </button>
-
-          </div>
-
-
-          <div className="p-5">
-
-            {addresses.length === 0 ? (
-
-              <div className="text-center py-8">
-
-                <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-
-                <p className="text-gray-600 font-medium">
-                  No addresses saved
-                </p>
-
-                <p className="text-sm text-gray-400 mt-1">
-                  Add an address for faster checkout.
-                </p>
-
-              </div>
-
-            ) : (
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                {addresses.map(
-                  (address) => (
-
+            <div className="p-4 sm:p-5">
+              {addresses.length === 0 ? (
+                <div className="text-center py-8">
+                  <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-600 font-medium text-sm">No addresses saved</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Add an address for quick checkout.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  {addresses.map((address) => (
                     <div
                       key={address.id}
-                      className={`border rounded-xl p-4 ${
+                      className={`border rounded-2xl p-3.5 sm:p-4 transition-all ${
                         address.is_default
-                          ? 'border-green-500 bg-green-50/40'
-                          : 'border-gray-200'
+                          ? 'border-green-500 bg-green-50/30 shadow-xs'
+                          : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-
                       <div className="flex items-start justify-between gap-3">
-
-                        <div className="flex items-start gap-3 min-w-0">
-
-                          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 mt-0.5">
                             <Home className="w-4 h-4 text-gray-600" />
                           </div>
-
                           <div className="min-w-0">
-
                             <div className="flex items-center gap-2 flex-wrap">
-
-                              <span className="font-semibold text-gray-900">
-                                {address.title ||
-                                  'Address'}
+                              <span className="font-bold text-gray-900 text-xs sm:text-sm">
+                                {address.title || 'Address'}
                               </span>
-
                               {address.is_default && (
-                                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold uppercase tracking-wider">
                                   Default
                                 </span>
                               )}
-
                             </div>
-
                           </div>
-
                         </div>
 
-
-                        <div className="flex items-center gap-1">
-
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
-                            onClick={() =>
-                              handleEditAddress(
-                                address
-                              )
-                            }
-                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                            title="Edit address"
+                            onClick={() => handleEditAddress(address)}
+                            className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-green-600 cursor-pointer transition"
+                            title="Edit Address"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-
                           <button
-                            onClick={() =>
-                              handleDeleteAddress(
-                                address
-                              )
-                            }
-                            disabled={
-                              deletingAddressId ===
-                              address.id
-                            }
-                            className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 disabled:opacity-50"
-                            title="Delete address"
+                            onClick={() => handleDeleteAddress(address)}
+                            disabled={deletingAddressId === address.id}
+                            className="p-2 rounded-xl hover:bg-red-50 text-gray-500 hover:text-red-600 disabled:opacity-50 cursor-pointer transition"
+                            title="Delete Address"
                           >
-                            {deletingAddressId ===
-                            address.id ? (
+                            {deletingAddressId === address.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Trash2 className="w-4 h-4" />
                             )}
                           </button>
-
                         </div>
-
                       </div>
 
-
-                      <div className="mt-3 space-y-1">
-
-                        <p className="text-sm text-gray-700 leading-6">
-                          {[
-                            address.house_no,
-                            address.ward_no_name,
-                            address.address,
-                          ]
-                            .filter(Boolean)
-                            .join(', ')}
+                      <div className="mt-2.5 space-y-0.5 text-xs sm:text-sm pl-0 sm:pl-11.5">
+                        <p className="text-gray-700 leading-relaxed">
+                          {[address.house_no, address.ward_no_name, address.address].filter(Boolean).join(', ')}
                         </p>
-
-                        <p className="text-sm text-gray-600">
-                          {[
-                            address.city,
-                            address.district,
-                            address.state,
-                          ]
-                            .filter(Boolean)
-                            .join(', ')}
-
-                          {address.pincode
-                            ? ` - ${address.pincode}`
-                            : ''}
+                        <p className="text-gray-600">
+                          {[address.city, address.district, address.state].filter(Boolean).join(', ')}
+                          {address.pincode ? ` - ${address.pincode}` : ''}
                         </p>
-
                         {address.phone && (
-                          <p className="text-sm text-gray-500 flex items-center gap-2 pt-1">
-                            <Phone className="w-3.5 h-3.5" />
+                          <p className="text-gray-500 flex items-center gap-1.5 pt-0.5 font-medium text-xs">
+                            <Phone className="w-3.5 h-3.5 text-gray-400" />
                             {address.phone}
                           </p>
                         )}
-
                       </div>
 
-
                       {!address.is_default && (
-                        <button
-                          onClick={() =>
-                            handleSetDefaultAddress(
-                              address
-                            )
-                          }
-                          className="mt-4 text-sm text-green-600 hover:text-green-700 font-medium"
-                        >
-                          Make Default
-                        </button>
+                        <div className="mt-3 pt-2.5 border-t border-gray-100 flex justify-end">
+                          <button
+                            onClick={() => handleSetDefaultAddress(address)}
+                            className="text-xs text-green-600 hover:text-green-700 font-semibold cursor-pointer"
+                          >
+                            Set as Default
+                          </button>
+                        </div>
                       )}
-
                     </div>
-
-                  )
-                )}
-
-              </div>
-
-            )}
-
-          </div>
-
-        </section>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
 
         {/* =================================================
-            ORDERS
+            TAB CONTENT: ORDERS
         ================================================= */}
+        {activeTab === 'orders' && (
+          <section className="animate-fadeIn">
 
-        <section>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">My Orders</h2>
+                <p className="text-xs text-gray-500">{orders.length} {orders.length === 1 ? 'order' : 'orders'} found</p>
+              </div>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                My Orders
-              </h2>
-
-              <p className="text-sm text-gray-500">
-                {orders.length}{' '}
-                {orders.length === 1
-                  ? 'order'
-                  : 'orders'}{' '}
-                found
-              </p>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search orders..."
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xs"
+                />
+              </div>
             </div>
 
 
-            <div className="relative w-full md:w-80">
+            {loadingOrders ? (
+              <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center shadow-xs">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <p className="text-xs sm:text-sm text-gray-500">Loading orders...</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-200 p-8 sm:p-10 text-center shadow-xs">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                  {searchTerm ? 'No matching orders' : 'No orders yet'}
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                  {searchTerm ? 'Try a different keyword.' : 'Your placed orders will show up here.'}
+                </p>
 
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) =>
-                  setSearchTerm(
-                    e.target.value
-                  )
-                }
-                placeholder="Search orders..."
-                className="w-full bg-white border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-
-            </div>
-
-          </div>
-
-
-          {loadingOrders ? (
-
-            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
-
-              <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-3" />
-
-              <p className="text-gray-500">
-                Loading orders...
-              </p>
-
-            </div>
-
-          ) : filteredOrders.length === 0 ? (
-
-            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
-
-              <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-
-              <h3 className="font-semibold text-gray-900">
-                {searchTerm
-                  ? 'No matching orders'
-                  : 'No orders yet'}
-              </h3>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {searchTerm
-                  ? 'Try a different search term.'
-                  : 'Your completed orders will appear here.'}
-              </p>
-
-              {!searchTerm && (
-                <button
-                  onClick={() =>
-                    navigate('/')
-                  }
-                  className="mt-5 px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
-                >
-                  Start Shopping
-                </button>
-              )}
-
-            </div>
-
-          ) : (
-
-            <div className="space-y-4">
-
-              {filteredOrders.map(
-                (order) => {
-
-                  const orderId =
-                    getOrderId(order);
-
-                  const status =
-                    getOrderStatus(order);
-
-                  const items =
-                    Array.isArray(
-                      order?.order_items
-                    )
-                      ? order.order_items
-                      : [];
-
-                  const subtotal =
-                    getOrderItemsSubtotal(
-                      order
-                    );
-
-                  const total =
-                    getOrderTotal(order);
-
-                  const expanded =
-                    Boolean(
-                      expandedOrders[
-                        orderId
-                      ]
-                    );
+                {!searchTerm && (
+                  <button
+                    onClick={() => navigate('/')}
+                    className="mt-4 px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 text-xs sm:text-sm font-medium cursor-pointer shadow-sm"
+                  >
+                    Start Shopping
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {filteredOrders.map((order) => {
+                  const orderId = getOrderId(order);
+                  const status = getOrderStatus(order);
+                  const items = Array.isArray(order?.order_items) ? order.order_items : [];
+                  const subtotal = getOrderItemsSubtotal(order);
+                  const total = getOrderTotal(order);
+                  const expanded = Boolean(expandedOrders[orderId]);
+                  const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
 
                   return (
                     <div
                       key={orderId}
-                      className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+                      className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden transition"
                     >
-
-                      {/* --------------------------------
-                          ORDER HEADER
-                      --------------------------------- */}
-
-                      <div className="p-5">
-
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-
-                          <div className="flex items-start gap-4">
-
-                            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-                              <Package className="w-6 h-6 text-green-600" />
+                      <div className="p-4 sm:p-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+                          <div className="flex items-start gap-3.5 min-w-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+                              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                             </div>
 
-                            <div>
-
-                              <div className="flex flex-wrap items-center gap-2">
-
-                                <h3 className="font-bold text-gray-900">
-                                  {getDisplayOrderId(
-                                    order
-                                  )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-bold text-gray-900 text-xs sm:text-sm">
+                                  {getDisplayOrderId(order)}
                                 </h3>
-
-                                <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">
-                                  {formatStatus(
-                                    status
-                                  )}
+                                <span className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
+                                  {formatStatus(status)}
                                 </span>
-
                               </div>
-
-                              <p className="text-sm text-gray-500 mt-1">
-                                {formatDateTime(
-                                  order?.created_at
-                                )}
+                              <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">
+                                {formatDateTime(order?.created_at)}
                               </p>
-
                             </div>
-
                           </div>
 
-
-                          <div className="flex flex-wrap items-center gap-2">
-
+                          <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                             <button
-                              onClick={() =>
-                                setSelectedOrder(
-                                  order
-                                )
-                              }
-                              className="px-3.5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
+                              onClick={() => setSelectedOrder(order)}
+                              className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer transition"
+                              title="View Details"
                             >
-                              View Details
+                              Details
                             </button>
 
-                            <button
-                              onClick={() =>
-                                handleReorder(
-                                  order
-                                )
-                              }
-                              disabled={
-                                reorderingOrderId ===
-                                orderId
-                              }
-                              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                            >
-                              {reorderingOrderId ===
-                              orderId ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-4 h-4" />
-                              )}
-
-                              Reorder
-                            </button>
-
+                            {isDelivered && (
+                              <button
+                                onClick={() => handleReorder(order)}
+                                disabled={reorderingOrderId === orderId}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-50 cursor-pointer shadow-xs transition"
+                                title="Reorder"
+                              >
+                                {reorderingOrderId === orderId ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                )}
+                                <span>Reorder</span>
+                              </button>
+                            )}
                           </div>
-
                         </div>
 
-
-                        {/* --------------------------------
-                            ORDER SUMMARY
-                        --------------------------------- */}
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-4 border-t border-gray-100">
-
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-3.5 border-t border-gray-100 text-xs">
                           <div>
-                            <p className="text-xs text-gray-500">
-                              Items
-                            </p>
-
-                            <p className="font-semibold text-gray-900 mt-1">
-                              {items.length}
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Items</p>
+                            <p className="font-bold text-gray-900 mt-0.5">{items.length}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Subtotal</p>
+                            <p className="font-bold text-gray-900 mt-0.5">{formatCurrency(subtotal)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Delivery</p>
+                            <p className="font-bold text-gray-900 mt-0.5">
+                              {getDeliveryCharge(order) > 0 ? formatCurrency(getDeliveryCharge(order)) : 'FREE'}
                             </p>
                           </div>
-
                           <div>
-                            <p className="text-xs text-gray-500">
-                              Subtotal
-                            </p>
-
-                            <p className="font-semibold text-gray-900 mt-1">
-                              {formatCurrency(
-                                subtotal
-                              )}
-                            </p>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Total</p>
+                            <p className="font-black text-green-600 mt-0.5 text-sm">{formatCurrency(total)}</p>
                           </div>
-
-                          <div>
-                            <p className="text-xs text-gray-500">
-                              Delivery
-                            </p>
-
-                            <p className="font-semibold text-gray-900 mt-1">
-                              {getDeliveryCharge(
-                                order
-                              ) > 0
-                                ? formatCurrency(
-                                    getDeliveryCharge(
-                                      order
-                                    )
-                                  )
-                                : 'FREE'}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-gray-500">
-                              Total
-                            </p>
-
-                            <p className="font-bold text-green-600 mt-1">
-                              {formatCurrency(
-                                total
-                              )}
-                            </p>
-                          </div>
-
                         </div>
-
-
-                        {/* --------------------------------
-                            COLLAPSE BUTTON
-                        --------------------------------- */}
 
                         <button
-                          onClick={() =>
-                            toggleOrder(
-                              orderId
-                            )
-                          }
-                          className="mt-4 text-sm text-gray-600 hover:text-green-600 inline-flex items-center gap-1"
+                          onClick={() => toggleOrder(orderId)}
+                          className="mt-3.5 text-xs text-gray-600 hover:text-green-600 inline-flex items-center gap-1 font-medium cursor-pointer"
                         >
-                          {expanded
-                            ? 'Hide Items'
-                            : 'Show Items'}
-
-                          {expanded ? (
-                            <ChevronUp className="w-4 h-4" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
+                          <span>{expanded ? 'Hide Items' : 'View Items'}</span>
+                          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </button>
-
                       </div>
 
-
-                      {/* --------------------------------
-                          EXPANDED ITEMS
-                      --------------------------------- */}
-
                       {expanded && (
-                        <div className="border-t border-gray-100 bg-gray-50 p-5">
+                        <div className="border-t border-gray-100 bg-gray-50 p-4 sm:p-5">
+                          <div className="space-y-2.5">
+                            {items.map((item, index) => {
+                              const product = item?.products;
+                              const variant = findOrderItemVariant(item, product);
+                              const image =
+                                product?.image_url ||
+                                product?.image ||
+                                product?.images?.[0] ||
+                                product?.gallery?.[0] ||
+                                '';
 
-                          <div className="space-y-3">
-
-                            {items.map(
-                              (item, index) => {
-
-                                const product =
-                                  item?.products;
-
-                                const variant =
-                                  findOrderItemVariant(
-                                    item,
-                                    product
-                                  );
-
-                                const image =
-                                  product?.image_url ||
-                                  product?.image ||
-                                  product?.images?.[0] ||
-                                  product?.gallery?.[0] ||
-                                  '';
-
-                                return (
-                                  <div
-                                    key={
-                                      item?.id ||
-                                      index
-                                    }
-                                    className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3"
-                                  >
-
-                                    <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-
-                                      {image ? (
-                                        <img
-                                          src={image}
-                                          alt={
-                                            product?.name ||
-                                            'Product'
-                                          }
-                                          className="w-full h-full object-contain"
-                                        />
-                                      ) : (
-                                        <Package className="w-6 h-6 text-gray-300" />
-                                      )}
-
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-
-                                      <p className="font-medium text-gray-900 truncate">
-                                        {product?.name ||
-                                          'Product'}
-                                      </p>
-
-                                      {variant && (
-                                        <p className="text-sm text-gray-500">
-                                          {getVariantLabel(
-                                            variant
-                                          )}
-                                        </p>
-                                      )}
-
-                                      <p className="text-sm text-gray-500">
-                                        Qty:{' '}
-                                        {Number(
-                                          item?.quantity
-                                        ) || 1}
-                                      </p>
-
-                                    </div>
-
-                                    <div className="text-right">
-
-                                      <p className="font-semibold text-gray-900">
-                                        {formatCurrency(
-                                          item?.price
-                                        )}
-                                      </p>
-
-                                      <p className="text-xs text-gray-500">
-                                        {formatCurrency(
-                                          getItemSubtotal(
-                                            item
-                                          )
-                                        )}
-                                      </p>
-
-                                    </div>
-
+                              return (
+                                <div
+                                  key={item?.id || index}
+                                  className="bg-white rounded-xl border border-gray-200 p-2.5 sm:p-3 flex items-center gap-3 shadow-xs"
+                                >
+                                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 border border-gray-100">
+                                    {image ? (
+                                      <img src={image} alt={product?.name || 'Product'} className="w-full h-full object-contain" />
+                                    ) : (
+                                      <Package className="w-5 h-5 text-gray-300" />
+                                    )}
                                   </div>
-                                );
-                              }
-                            )}
 
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-gray-900 text-xs sm:text-sm truncate">
+                                      {product?.name || 'Product'}
+                                    </p>
+                                    {variant && (
+                                      <p className="text-[11px] sm:text-xs text-gray-500">{getVariantLabel(variant)}</p>
+                                    )}
+                                    <p className="text-[11px] sm:text-xs text-gray-500 font-medium">
+                                      Qty: {Number(item?.quantity) || 1}
+                                    </p>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <p className="font-bold text-gray-900 text-xs sm:text-sm">{formatCurrency(item?.price)}</p>
+                                    <p className="text-[10px] sm:text-xs text-gray-400">{formatCurrency(getItemSubtotal(item))}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-
                         </div>
                       )}
-
                     </div>
                   );
-                }
-              )}
+                })}
+              </div>
+            )}
 
-            </div>
-
-          )}
-
-        </section>
+          </section>
+        )}
 
       </main>
 
@@ -2329,370 +1915,172 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {showAddressForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-5 py-3.5 flex items-center justify-between z-10">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">
-                  {editingAddress
-                    ? 'Edit Address'
-                    : 'Add New Address'}
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                  {editingAddress ? 'Edit Address' : 'Add New Address'}
                 </h2>
-
-                <p className="text-sm text-gray-500">
-                  Enter your delivery address details.
-                </p>
+                <p className="text-xs text-gray-500">Enter your delivery details.</p>
               </div>
 
               <button
                 onClick={() => {
-                  setShowAddressForm(
-                    false
-                  );
-                  setEditingAddress(
-                    null
-                  );
+                  setShowAddressForm(false);
+                  setEditingAddress(null);
                 }}
-                className="p-2 rounded-lg hover:bg-gray-100"
+                className="p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
-
             </div>
 
-
-            <form
-              onSubmit={
-                handleAddressSubmit
-              }
-              className="p-5 space-y-4"
-            >
-
+            <form onSubmit={handleAddressSubmit} className="p-4 sm:p-5 space-y-3.5 text-xs sm:text-sm">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address Type
-                </label>
-
+                <label className="block font-medium text-gray-700 mb-1">Address Type</label>
                 <select
-                  value={
-                    addressForm.title
-                  }
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        title:
-                          e.target.value,
-                      })
-                    )
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={addressForm.title}
+                  onChange={(e) => setAddressForm((prev) => ({ ...prev, title: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
-                  <option value="Home">
-                    Home
-                  </option>
-
-                  <option value="Work">
-                    Work
-                  </option>
-
-                  <option value="Other">
-                    Other
-                  </option>
+                  <option value="Home">Home</option>
+                  <option value="Work">Work</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  House / Flat / Shop No. *
-                </label>
-
-                <input
-                  type="text"
-                  value={
-                    addressForm.house_no
-                  }
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        house_no:
-                          e.target.value,
-                      })
-                    )
-                  }
-                  placeholder="e.g. House No. 123"
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ward / Area / Locality
-                </label>
-
-                <input
-                  type="text"
-                  value={
-                    addressForm.ward_no_name
-                  }
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        ward_no_name:
-                          e.target.value,
-                      })
-                    )
-                  }
-                  placeholder="e.g. Sector 45"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Complete Address
-                </label>
-
-                <textarea
-                  value={
-                    addressForm.address
-                  }
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        address:
-                          e.target.value,
-                      })
-                    )
-                  }
-                  placeholder="Building, street, landmark, etc."
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City *
-                  </label>
-
+                  <label className="block font-medium text-gray-700 mb-1">House / Flat / Shop No. *</label>
                   <input
                     type="text"
-                    value={
-                      addressForm.city
-                    }
-                    onChange={(e) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          city:
-                            e.target.value,
-                        })
-                      )
-                    }
+                    value={addressForm.house_no}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, house_no: e.target.value }))}
+                    placeholder="e.g. House No. 123"
+                    required
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-gray-700 mb-1">Ward / Area / Locality</label>
+                  <input
+                    type="text"
+                    value={addressForm.ward_no_name}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, ward_no_name: e.target.value }))}
+                    placeholder="e.g. Sector 45"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-1">Complete Address</label>
+                <textarea
+                  value={addressForm.address}
+                  onChange={(e) => setAddressForm((prev) => ({ ...prev, address: e.target.value }))}
+                  placeholder="Building, street, landmark, etc."
+                  rows={2}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-medium text-gray-700 mb-1">City *</label>
+                  <input
+                    type="text"
+                    value={addressForm.city}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, city: e.target.value }))}
                     required
                     placeholder="City"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
-
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    District
-                  </label>
-
+                  <label className="block font-medium text-gray-700 mb-1">District</label>
                   <input
                     type="text"
-                    value={
-                      addressForm.district
-                    }
-                    onChange={(e) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          district:
-                            e.target.value,
-                        })
-                      )
-                    }
+                    value={addressForm.district}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))}
                     placeholder="District"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
-
               </div>
 
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State *
-                  </label>
-
+                  <label className="block font-medium text-gray-700 mb-1">State *</label>
                   <input
                     type="text"
-                    value={
-                      addressForm.state
-                    }
-                    onChange={(e) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          state:
-                            e.target.value,
-                        })
-                      )
-                    }
+                    value={addressForm.state}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, state: e.target.value }))}
                     required
                     placeholder="State"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
-
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Pincode *
-                  </label>
-
+                  <label className="block font-medium text-gray-700 mb-1">Pincode *</label>
                   <input
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
-                    value={
-                      addressForm.pincode
-                    }
-                    onChange={(e) =>
-                      setAddressForm(
-                        (prev) => ({
-                          ...prev,
-                          pincode:
-                            e.target.value.replace(
-                              /\D/g,
-                              ''
-                            ),
-                        })
-                      )
-                    }
+                    value={addressForm.pincode}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, pincode: e.target.value.replace(/\D/g, '') }))}
                     required
                     placeholder="6-digit pincode"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
-
               </div>
 
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Number
-                </label>
-
+                <label className="block font-medium text-gray-700 mb-1">Contact Number</label>
                 <input
                   type="tel"
                   inputMode="numeric"
                   maxLength={10}
-                  value={
-                    addressForm.phone
-                  }
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        phone:
-                          e.target.value.replace(
-                            /\D/g,
-                            ''
-                          ),
-                      })
-                    )
-                  }
+                  value={addressForm.phone}
+                  onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
                   placeholder="10-digit mobile number"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
 
-
-              <label className="flex items-center gap-3 cursor-pointer">
-
+              <label className="flex items-center gap-2.5 cursor-pointer pt-1">
                 <input
                   type="checkbox"
-                  checked={Boolean(
-                    addressForm.is_default
-                  )}
-                  onChange={(e) =>
-                    setAddressForm(
-                      (prev) => ({
-                        ...prev,
-                        is_default:
-                          e.target.checked,
-                      })
-                    )
-                  }
+                  checked={Boolean(addressForm.is_default)}
+                  onChange={(e) => setAddressForm((prev) => ({ ...prev, is_default: e.target.checked }))}
                   className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                 />
-
-                <span className="text-sm text-gray-700">
-                  Make this my default address
-                </span>
-
+                <span className="text-gray-700 font-medium">Make this my default address</span>
               </label>
 
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => {
-                    setShowAddressForm(
-                      false
-                    );
-                    setEditingAddress(
-                      null
-                    );
+                    setShowAddressForm(false);
+                    setEditingAddress(null);
                   }}
-                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
-
                 <button
                   type="submit"
-                  disabled={
-                    savingAddress
-                  }
-                  className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
+                  disabled={savingAddress}
+                  className="px-5 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1.5 font-medium cursor-pointer shadow-xs"
                 >
-                  {savingAddress && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  )}
-
-                  {editingAddress
-                    ? 'Update Address'
-                    : 'Save Address'}
+                  {savingAddress && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingAddress ? 'Update' : 'Save'}
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
       )}
 
@@ -2702,479 +2090,211 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 sm:px-5 py-3.5 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">
-                  Order{' '}
-                  {getDisplayOrderId(
-                    selectedOrder
-                  )}
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                  Order {getDisplayOrderId(selectedOrder)}
                 </h2>
-
-                <p className="text-sm text-gray-500">
-                  {formatDateTime(
-                    selectedOrder?.created_at
-                  )}
+                <p className="text-xs text-gray-500">
+                  {formatDateTime(selectedOrder?.created_at)}
                 </p>
               </div>
 
               <button
-                onClick={() =>
-                  setSelectedOrder(
-                    null
-                  )
-                }
-                className="p-2 rounded-lg hover:bg-gray-100"
+                onClick={() => setSelectedOrder(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
-
             </div>
 
+            <div className="p-4 sm:p-5 space-y-5 text-xs sm:text-sm">
+              <div>
+                <h3 className="font-bold text-gray-900 mb-3">Order Tracking</h3>
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex min-w-[550px]">
+                    {getTrackingSteps(selectedOrder).map((step, index, allSteps) => {
+                      const Icon = step.icon;
 
-            <div className="p-5 space-y-6">
+                      return (
+                        <div key={step.key} className="flex-1 relative">
+                          <div className="flex items-center">
+                            <div
+                              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center border-2 shrink-0 ${
+                                step.completed || step.active
+                                  ? 'bg-green-600 border-green-600 text-white'
+                                  : 'bg-white border-gray-300 text-gray-400'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                            </div>
+
+                            {index < allSteps.length - 1 && (
+                              <div
+                                className={`h-0.5 flex-1 mx-2 ${
+                                  step.completed ? 'bg-green-600' : 'bg-gray-200'
+                                }`}
+                              />
+                            )}
+                          </div>
+
+                          <p
+                            className={`text-[11px] sm:text-xs mt-2 font-medium ${
+                              step.active ? 'font-bold text-green-600' : 'text-gray-500'
+                            }`}
+                          >
+                            {step.label}
+                          </p>
+
+                          {step.time && (
+                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
+                              {step.time}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
 
               <div>
-
-                <h3 className="font-semibold text-gray-900 mb-4">
-                  Order Tracking
-                </h3>
-
-                <div className="overflow-x-auto">
-
-                  <div className="flex min-w-[650px]">
-
-                    {getTrackingSteps(
-                  selectedOrder
-                ).map(
-                  (
-                    step,
-                    index,
-                    allSteps
-                  ) => {
-
-                    const Icon =
-                      step.icon;
+                <h3 className="font-bold text-gray-900 mb-2.5">Order Items</h3>
+                <div className="space-y-2.5">
+                  {(Array.isArray(selectedOrder?.order_items) ? selectedOrder.order_items : []).map((item, index) => {
+                    const product = item?.products;
+                    const variant = findOrderItemVariant(item, product);
+                    const image =
+                      product?.image_url ||
+                      product?.image ||
+                      product?.images?.[0] ||
+                      product?.gallery?.[0] ||
+                      '';
 
                     return (
                       <div
-                        key={
-                          step.key
-                        }
-                        className="flex-1 relative"
+                        key={item?.id || index}
+                        className="flex items-center gap-3 border border-gray-200 rounded-xl p-2.5 sm:p-3 bg-gray-50/50"
                       >
-
-                        <div className="flex items-center">
-
-                          <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${
-                              step.completed ||
-                              step.active
-                                ? 'bg-green-600 border-green-600 text-white'
-                                : 'bg-white border-gray-300 text-gray-400'
-                            }`}
-                          >
-                            <Icon className="w-4 h-4" />
-                          </div>
-
-                          {index <
-                            allSteps.length -
-                              1 && (
-                            <div
-                              className={`h-0.5 flex-1 mx-2 ${
-                                step.completed
-                                  ? 'bg-green-600'
-                                  : 'bg-gray-200'
-                              }`}
-                            />
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-white flex items-center justify-center overflow-hidden shrink-0 border border-gray-200">
+                          {image ? (
+                            <img src={image} alt={product?.name || 'Product'} className="w-full h-full object-contain" />
+                          ) : (
+                            <Package className="w-5 h-5 text-gray-300" />
                           )}
-
                         </div>
 
-                        <p
-                          className={`text-xs mt-2 ${
-                            step.active
-                              ? 'font-semibold text-green-600'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          {step.label}
-                        </p>
-
-                        {step.time && (
-                          <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
-                            {step.time}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-xs sm:text-sm truncate">
+                            {product?.name || 'Product'}
                           </p>
-                        )}
-
-                      </div>
-                    );
-                  }
-                )}
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          <div>
-
-            <h3 className="font-semibold text-gray-900 mb-3">
-              Order Items
-            </h3>
-
-            <div className="space-y-3">
-
-              {(Array.isArray(
-                selectedOrder?.order_items
-              )
-                ? selectedOrder.order_items
-                : []
-              ).map(
-                (item, index) => {
-
-                  const product =
-                    item?.products;
-
-                  const variant =
-                    findOrderItemVariant(
-                      item,
-                      product
-                    );
-
-                  const image =
-                    product?.image_url ||
-                    product?.image ||
-                    product?.images?.[0] ||
-                    product?.gallery?.[0] ||
-                    '';
-
-                  return (
-                    <div
-                      key={
-                        item?.id ||
-                        index
-                      }
-                      className="flex items-center gap-3 border border-gray-200 rounded-xl p-3"
-                    >
-
-                      <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-
-                        {image ? (
-                          <img
-                            src={image}
-                            alt={
-                              product?.name ||
-                              'Product'
-                            }
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <Package className="w-6 h-6 text-gray-300" />
-                        )}
-
-                      </div>
-                      
-                          <div className="flex-1 min-w-0">
-
-                            <p className="font-medium text-gray-900">
-                              {product?.name ||
-                                'Product'}
-                            </p>
-
-                            {variant && (
-                              <p className="text-sm text-gray-500">
-                                {getVariantLabel(
-                                  variant
-                                )}
-                              </p>
-                            )}
-
-                            <p className="text-sm text-gray-500">
-                              Qty:{' '}
-                              {Number(
-                                item?.quantity
-                              ) || 1}
-                            </p>
-
-                          </div>
-
-                          <div className="text-right">
-
-                            <p className="font-semibold">
-                              {formatCurrency(
-                                item?.price
-                              )}
-                            </p>
-
-                            <p className="text-sm text-gray-500">
-                              {formatCurrency(
-                                getItemSubtotal(
-                                  item
-                                )
-                              )}
-                            </p>
-
-                          </div>
-
+                          {variant && (
+                            <p className="text-[11px] text-gray-500">{getVariantLabel(variant)}</p>
+                          )}
+                          <p className="text-[11px] text-gray-500">Qty: {Number(item?.quantity) || 1}</p>
                         </div>
-                      );
-                    }
-                  )}
 
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-gray-900 text-xs sm:text-sm">{formatCurrency(item?.price)}</p>
+                          <p className="text-[11px] text-gray-400">{formatCurrency(getItemSubtotal(item))}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-
               </div>
 
-
-              <div>
-
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-green-600" />
-                  Delivery Address
-                </h3>
-
-                <div className="bg-gray-50 rounded-xl p-4">
-
-                  {selectedOrder?.address ? (
-                    <p className="text-sm text-gray-700 leading-6">
-                      {selectedOrder.address}
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-700">
-                        {selectedOrder?.delivery_address ||
-                          selectedOrder?.shipping_address ||
-                          'Address information not available'}
-                      </p>
-                    </>
-                  )}
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
+                  <h4 className="font-bold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-gray-500">
+                    <MapPin className="w-3.5 h-3.5 text-green-600" /> Delivery Address
+                  </h4>
+                  <p className="text-gray-700 leading-relaxed">
+                    {selectedOrder?.address || selectedOrder?.delivery_address || selectedOrder?.shipping_address || 'Address info unavailable'}
+                  </p>
                 </div>
 
+                <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
+                  <h4 className="font-bold text-gray-900 mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-gray-500">
+                    <CreditCard className="w-3.5 h-3.5 text-green-600" /> Payment Info
+                  </h4>
+                  <p className="font-semibold text-gray-900">{selectedOrder?.payment_method || 'Online Payment'}</p>
+                  <p className="text-gray-500 text-[11px] mt-0.5">{selectedOrder?.payment_status || 'Paid'}</p>
+                </div>
               </div>
 
-
-              <div>
-
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  Payment
-                </h3>
-
-                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-4">
-
-                  <CreditCard className="w-5 h-5 text-gray-500" />
-
-                  <div>
-
-                    <p className="text-sm font-medium text-gray-900">
-                      {selectedOrder?.payment_method ||
-                        'Payment'}
-                    </p>
-
-                    <p className="text-xs text-gray-500">
-                      {selectedOrder?.payment_status ||
-                        ''}
-                    </p>
-
-                  </div>
-
+              <div className="border-t border-gray-100 pt-3.5 space-y-2">
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal</span>
+                  <span className="font-medium">{formatCurrency(getOrderItemsSubtotal(selectedOrder))}</span>
                 </div>
 
-              </div>
-
-
-              <div className="border-t border-gray-100 pt-4">
-
-                <div className="space-y-2 text-sm">
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">
-                      Subtotal
-                    </span>
-
-                    <span>
-                      {formatCurrency(
-                        getOrderItemsSubtotal(
-                          selectedOrder
-                        )
-                      )}
-                    </span>
+                {getDiscount(selectedOrder) > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(getDiscount(selectedOrder))}</span>
                   </div>
-
-
-                  {getDiscount(
-                    selectedOrder
-                  ) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">
-                        Discount
-                      </span>
-
-                      <span className="text-green-600">
-                        -
-                        {formatCurrency(
-                          getDiscount(
-                            selectedOrder
-                          )
-                        )}
-                      </span>
-                    </div>
-                  )}
-
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">
-                      Delivery
-                    </span>
-
-                    <span>
-                      {getDeliveryCharge(
-                        selectedOrder
-                      ) > 0
-                        ? formatCurrency(
-                            getDeliveryCharge(
-                              selectedOrder
-                            )
-                          )
-                        : 'FREE'}
-                    </span>
-                  </div>
-
-
-                  {getHandlingCharge(
-                    selectedOrder
-                  ) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">
-                        Handling
-                      </span>
-
-                      <span>
-                        {formatCurrency(
-                          getHandlingCharge(
-                            selectedOrder
-                          )
-                        )}
-                      </span>
-                    </div>
-                  )}
-
-
-                  {getTax(
-                    selectedOrder
-                  ) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">
-                        Tax
-                      </span>
-
-                      <span>
-                        {formatCurrency(
-                          getTax(
-                            selectedOrder
-                          )
-                        )}
-                      </span>
-                    </div>
-                  )}
-
-
-                  <div className="flex justify-between pt-3 border-t border-gray-200 text-base font-bold">
-
-                    <span>
-                      Total
-                    </span>
-
-                    <span className="text-green-600">
-                      {formatCurrency(
-                        getOrderTotal(
-                          selectedOrder
-                        )
-                      )}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-
-              <div className="flex flex-wrap justify-end gap-3 pt-2">
-
-                <button
-                  onClick={() =>
-                    setInvoiceOrder(
-                      selectedOrder
-                    )
-                  }
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
-                >
-                  <FileText className="w-4 h-4" />
-                  Invoice
-                </button>
-
-
-                {String(
-                  getOrderStatus(
-                    selectedOrder
-                  )
-                ).toUpperCase() ===
-                  'DELIVERED' && (
-                  <button
-                    onClick={() =>
-                      openRatingModal(
-                        selectedOrder
-                      )
-                    }
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                  >
-                    <Star className="w-4 h-4" />
-                    Rate Order
-                  </button>
                 )}
 
+                <div className="flex justify-between text-gray-600">
+                  <span>Delivery Charge</span>
+                  <span>{getDeliveryCharge(selectedOrder) > 0 ? formatCurrency(getDeliveryCharge(selectedOrder)) : 'FREE'}</span>
+                </div>
 
-                <button
-                  onClick={() =>
-                    handleReorder(
-                      selectedOrder
-                    )
-                  }
-                  disabled={
-                    reorderingOrderId ===
-                    getOrderId(
-                      selectedOrder
-                    )
-                  }
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  {reorderingOrderId ===
-                  getOrderId(
-                    selectedOrder
-                  ) ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4" />
-                  )}
+                {getTax(selectedOrder) > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tax</span>
+                    <span>{formatCurrency(getTax(selectedOrder))}</span>
+                  </div>
+                )}
 
-                  Reorder
-                </button>
-
+                <div className="flex justify-between pt-2.5 border-t border-gray-200 text-sm sm:text-base font-bold">
+                  <span className="text-gray-900">Total Amount</span>
+                  <span className="text-green-600 font-black">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                </div>
               </div>
 
+              <div className="flex flex-wrap justify-end gap-2.5 pt-3 border-t border-gray-100">
+                {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && (
+                  <>
+                    <button
+                      onClick={() => setInvoiceOrder(selectedOrder)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm font-semibold hover:bg-gray-50 cursor-pointer"
+                      title="Invoice"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Invoice</span>
+                    </button>
+
+                    <button
+                      onClick={() => openRatingModal(selectedOrder)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-yellow-300 text-yellow-700 bg-yellow-50/50 hover:bg-yellow-100/50 text-xs sm:text-sm font-semibold cursor-pointer"
+                      title="Rate Order"
+                    >
+                      <Star className="w-4 h-4 fill-yellow-400" />
+                      <span>Rate</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleReorder(selectedOrder)}
+                      disabled={reorderingOrderId === getOrderId(selectedOrder)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 text-xs sm:text-sm font-semibold cursor-pointer shadow-xs"
+                      title="Reorder"
+                    >
+                      {reorderingOrderId === getOrderId(selectedOrder) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      <span>Reorder</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -3184,123 +2304,70 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {ratingOrder && (
-        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-gray-900">
-                  Rate Your Order
-                </h2>
-
-                <p className="text-sm text-gray-500">
-                  {getDisplayOrderId(
-                    ratingOrder
-                  )}
-                </p>
+                <h2 className="font-bold text-gray-900 text-sm sm:text-base">Rate Your Experience</h2>
+                <p className="text-xs text-gray-500">{getDisplayOrderId(ratingOrder)}</p>
               </div>
 
               <button
-                onClick={() =>
-                  setRatingOrder(null)
-                }
-                className="p-2 rounded-lg hover:bg-gray-100"
+                onClick={() => setRatingOrder(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
-
             </div>
 
-
-            <div className="p-5">
-
-              <p className="text-sm text-gray-600 text-center mb-4">
-                How was your overall experience?
+            <div className="p-4 sm:p-5">
+              <p className="text-xs sm:text-sm text-gray-600 text-center mb-3.5">
+                How satisfied were you with this order?
               </p>
 
-
-              <div className="flex justify-center gap-2 mb-5">
-
-                {[1, 2, 3, 4, 5].map(
-                  (star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() =>
-                        setRatingValue(
-                          star
-                        )
-                      }
-                      className="p-1"
-                    >
-                      <Star
-                        className={`w-8 h-8 ${
-                          star <=
-                          ratingValue
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    </button>
-                  )
-                )}
-
+              <div className="flex justify-center gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRatingValue(star)}
+                    className="p-1 cursor-pointer transition transform hover:scale-110"
+                  >
+                    <Star
+                      className={`w-7 h-7 sm:w-8 sm:h-8 ${
+                        star <= ratingValue ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                      }`}
+                    />
+                  </button>
+                ))}
               </div>
 
-
               <textarea
-                value={
-                  ratingComment
-                }
-                onChange={(e) =>
-                  setRatingComment(
-                    e.target.value
-                  )
-                }
-                rows={4}
-                placeholder="Tell us about your experience..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                rows={3}
+                placeholder="Write your feedback..."
+                className="w-full border border-gray-300 rounded-xl p-3 text-xs sm:text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
               />
 
-
-              <div className="flex justify-end gap-3 mt-4">
-
+              <div className="flex justify-end gap-2.5 mt-4">
                 <button
-                  onClick={() =>
-                    setRatingOrder(
-                      null
-                    )
-                  }
-                  className="px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50"
+                  onClick={() => setRatingOrder(null)}
+                  className="px-4 py-2 rounded-xl border border-gray-300 text-xs sm:text-sm font-medium hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
-
                 <button
-                  onClick={
-                    handleSubmitRating
-                  }
-                  disabled={
-                    savingRating ||
-                    !ratingValue
-                  }
-                  className="px-5 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2"
+                  onClick={handleSubmitRating}
+                  disabled={savingRating || !ratingValue}
+                  className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  {savingRating && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  )}
-
-                  Submit Rating
+                  {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Submit
                 </button>
-
               </div>
-
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -3312,9 +2379,7 @@ const CustomerOrdersPage = () => {
       {invoiceOrder && (
         <InvoiceModal
           order={invoiceOrder}
-          onClose={() =>
-            setInvoiceOrder(null)
-          }
+          onClose={() => setInvoiceOrder(null)}
         />
       )}
 
