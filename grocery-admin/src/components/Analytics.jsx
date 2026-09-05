@@ -43,7 +43,7 @@ export default function Analytics() {
     try {
       const [ordRes, itemRes, shopRes, prodRes, staffRes] = await Promise.all([
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('order_items').select('*, products(name, shopkeeper_id, price, image_url, images, gallery)'),
+        supabase.from('order_items').select('*'),
         supabase.from('shopkeeper_profiles').select('*'),
         supabase.from('products').select('*'),
         supabase.from('staff_profiles').select('*')
@@ -111,7 +111,6 @@ export default function Analytics() {
     }
   };
 
-  // Robust helper to extract delivery agent name, email, and phone number
   const getAssignedAgent = (order) => {
     const agentId = order.delivery_agent_id || order.delivery_boy_id || order.staff_id;
     if (agentId) {
@@ -167,16 +166,30 @@ export default function Analytics() {
     };
   }).sort((a, b) => b.deliveredCount - a.deliveredCount);
 
+  // Robust product lookup map
+  const productLookup = {};
+  products.forEach(p => {
+    productLookup[p.id] = p;
+  });
+
   const productSalesMap = {};
   orders.forEach(order => {
-    const items = orderItems.filter(item => item.order_id === order.id && order.status !== 'cancelled');
+    if (order.status === 'cancelled') return;
+    const items = orderItems.filter(item => item.order_id === order.id);
     items.forEach(item => {
-      const prodName = item.products?.name || 'Unknown Product';
+      const prod = productLookup[item.product_id] || {};
+      const prodName = prod.name || item.variant_label || 'Product Item';
+      const prodImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
+
       if (!productSalesMap[prodName]) {
-        productSalesMap[prodName] = { quantity: 0, revenue: 0, image: item.products?.image_url || (item.products?.images && item.products.images[0]) || '' };
+        productSalesMap[prodName] = { 
+          quantity: 0, 
+          revenue: 0, 
+          image: prodImages[0] || '' 
+        };
       }
-      productSalesMap[prodName].quantity += item.quantity;
-      productSalesMap[prodName].revenue += item.price * item.quantity;
+      productSalesMap[prodName].quantity += Number(item.quantity || 1);
+      productSalesMap[prodName].revenue += Number(item.price || 0) * Number(item.quantity || 1);
     });
   });
 

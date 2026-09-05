@@ -89,13 +89,13 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
             categoryId = categoryMap[String(categoryName).trim().toLowerCase()] || null;
           }
 
-          // 1. Insert parent product without the 'unit' column
+          // 1. Insert parent product with 'pending' approval status for admin verification
           const productPayload = {
             shopkeeper_id: shopkeeperId,
             name: String(productName).trim(),
             category_id: categoryId,
             description: String(description),
-            approval_status: 'approved',
+            approval_status: 'pending',
             is_active: true
           };
 
@@ -152,7 +152,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
             <FileSpreadsheet className="text-emerald-600" size={20} />
             Bulk Product Upload via Excel
           </h3>
-          <p className="text-xs text-stone-500 mt-0.5">Upload an Excel spreadsheet to add multiple inventory items at once.</p>
+          <p className="text-xs text-stone-500 mt-0.5">Upload an Excel spreadsheet to submit items for admin approval.</p>
         </div>
 
         <button
@@ -198,7 +198,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
         }`}>
           <div className="flex items-center gap-2 font-black text-sm">
             {uploadResult.failCount === 0 ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertCircle size={18} className="text-amber-600" />}
-            <span>Upload Completed: {uploadResult.successCount} Successful, {uploadResult.failCount} Failed</span>
+            <span>Upload Completed: {uploadResult.successCount} Submitted for Approval, {uploadResult.failCount} Failed</span>
           </div>
 
           {uploadResult.errorsList.length > 0 && (

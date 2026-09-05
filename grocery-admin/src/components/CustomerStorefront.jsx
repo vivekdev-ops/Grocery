@@ -6,7 +6,7 @@ import {
   Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, 
   FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, 
   Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck,
-  Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen, ShieldCheck as AssuredIcon
+  Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
@@ -14,7 +14,6 @@ import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
 import { Geolocation } from '@capacitor/geolocation';
-import CustomerProfileModal from './store/CustomerProfileModal';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -103,19 +102,6 @@ export default function CustomerStorefront() {
     };
   }, []);
 
-  const getCurrentPositionNative = async () => {
-  try {
-    const coordinates = await Geolocation.getCurrentPosition();
-    return {
-      latitude: coordinates.coords.latitude,
-      longitude: coordinates.coords.longitude
-    };
-  } catch (error) {
-    console.error('Error getting native location:', error);
-    return null;
-  }
-};
-
   // Feedback Modal State
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
@@ -142,7 +128,6 @@ export default function CustomerStorefront() {
       const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
       const selectedAddrObj = savedAddresses.find(a => a.id === selectedAddressId);
 
-      // 1. Insert the parent order into the 'orders' table
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{
@@ -165,7 +150,6 @@ export default function CustomerStorefront() {
 
       if (orderError) throw orderError;
 
-      // 2. Insert cart items along with variant details into 'order_items'
       const itemsToInsert = cart.map(item => ({
         order_id: orderData.id,
         product_id: item?.product?.id || item?.id || item?.product_id,
@@ -188,12 +172,6 @@ export default function CustomerStorefront() {
       for (const item of cart) {
         if (item.variant && item.variant.id) {
           await supabase.from('product_variants').update({ stock: item.variant.stock - item.quantity }).eq('id', item.variant.id);
-        } else {
-          const pId = item?.product?.id || item?.id || item?.product_id;
-          const currentStock = Number(item?.product?.stock || item?.stock || 0);
-          if (pId) {
-          /*  await supabase.from('products').update({ stock: currentStock - item.quantity }).eq('id', pId);*/
-          }
         }
       }
 
@@ -209,9 +187,7 @@ export default function CustomerStorefront() {
       fetchStoreData();
       fetchMyOrders(session.user.email);
 
-      // ── Notify admin & shopkeepers about the new order ──
       notifyAdminOrderPlaced(orderData);
-      // Collect unique shopkeeper user_ids from cart items
       const shopkeeperIds = [
         ...new Set(
           cart
@@ -310,7 +286,7 @@ export default function CustomerStorefront() {
 
   const fetchCustomerProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('customer_profiles')
         .select('*')
         .eq('user_id', userId)
@@ -577,30 +553,6 @@ export default function CustomerStorefront() {
     }, 600);
   };
 
-  const startVoiceSearch = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice search is not supported in this browser. Please use Chrome or Safari.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
-
-    recognition.onresult = (event) => {
-      const speechToText = event.results[0][0].transcript;
-      setSearchQuery(speechToText);
-    };
-
-    recognition.start();
-  };
-
   const handleAddOrUpdateReview = async (e) => {
     e.preventDefault();
     if (!session) { navigate('/login'); return; }
@@ -725,10 +677,10 @@ export default function CustomerStorefront() {
 
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
-  .from('orders')
-  .select('*, order_items(*, products(*, product_variants(*)))')
-  .eq('customer_email', email)
-  .order('created_at', { ascending: false });
+      .from('orders')
+      .select('*, order_items(*, products(*, product_variants(*)))')
+      .eq('customer_email', email)
+      .order('created_at', { ascending: false });
 
     if (!error && data) {
       setMyOrders(data || []);
@@ -1285,7 +1237,7 @@ export default function CustomerStorefront() {
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
   return (
-    <div className="min-h-screen bg-[#F0FDF4] text-slate-900 pb-44 font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50/50 via-[#F0FDF4] to-teal-50/40 text-slate-900 pb-36 font-sans selection:bg-emerald-500 selection:text-white">
        
       {/* 1. Header Component */}
       <StoreHeader 
@@ -1303,16 +1255,21 @@ export default function CustomerStorefront() {
 
       {personalizedDeals.length > 0 && activeCategory === 'All' && !searchQuery && (
         <div className="max-w-7xl mx-auto px-4 mt-6">
-          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl space-y-4 border border-emerald-700/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
-                <h3 className="font-black text-base md:text-lg tracking-tight">Deals Picked For Your Routine</h3>
+          <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl space-y-5 border border-emerald-700/40 relative overflow-hidden">
+            <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
+              <Sparkles size={180} />
+            </div>
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-amber-400/20 rounded-2xl flex items-center justify-center border border-amber-400/30">
+                  <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
+                </div>
+                <h3 className="font-black text-base md:text-xl tracking-tight">Deals Picked For Your Routine</h3>
               </div>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Limited Time</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-black px-3.5 py-1.5 rounded-full border border-emerald-500/30 uppercase tracking-widest shadow-inner">Limited Time</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
               {personalizedDeals.map(deal => {
                 const prod = deal.products;
                 if (!prod) return null;
@@ -1339,30 +1296,30 @@ export default function CustomerStorefront() {
                 const productWithDealPrice = { ...prod, price: finalPrice, mrp: displayMrp || originalPrice };
 
                 return (
-                  <div key={deal.id} className="bg-emerald-950/70 p-4 rounded-2xl border border-emerald-800/60 flex flex-col justify-between space-y-3 backdrop-blur-md">
+                  <div key={deal.id} className="bg-emerald-900/40 hover:bg-emerald-900/60 p-4 rounded-3xl border border-emerald-700/40 flex flex-col justify-between space-y-3 backdrop-blur-md transition-all duration-300 group shadow-lg">
                     <div className="space-y-2">
-                      <div className="relative h-32 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
-                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-cover" />
+                      <div className="relative h-36 rounded-2xl overflow-hidden bg-black/20 flex items-center justify-center p-2 border border-emerald-700/30">
+                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
                          
                         {badgeText && (
-                          <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-lg shadow">
+                          <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[9px] px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider">
                             {badgeText}
                           </span>
                         )}
                       </div>
-                      <h4 className="font-bold text-xs text-white line-clamp-1">{prod.name}</h4>
+                      <h4 className="font-bold text-xs text-white line-clamp-1 group-hover:text-emerald-300 transition">{prod.name}</h4>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/50">
+                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/40">
                       <div>
-                        <span className="font-black text-sm text-emerald-300">₹{finalPrice}</span>
+                        <span className="font-black text-sm md:text-base text-emerald-300">₹{finalPrice}</span>
                         {displayMrp && displayMrp > finalPrice && (
-                          <span className="text-[10px] text-slate-400 line-through ml-1.5">₹{displayMrp}</span>
+                          <span className="text-[10px] text-emerald-400/60 line-through ml-1.5 font-bold">₹{displayMrp}</span>
                         )}
                       </div>
                       <button 
                         onClick={() => addToCart(productWithDealPrice)}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shadow"
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
                       >
                         + Add
                       </button>
@@ -1380,8 +1337,11 @@ export default function CustomerStorefront() {
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-[999] transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
             <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
-              <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5"><User size={20} className="text-emerald-700" /> My Account & Dashboard</h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer"><X size={16} /></button>
+              <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5">
+                <User size={20} className="text-emerald-700 shrink-0" /> 
+                <span className="truncate">My Account & Dashboard</span>
+              </h3>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer" title="Close"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
@@ -1397,9 +1357,9 @@ export default function CustomerStorefront() {
                   className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <User size={16} className="text-emerald-700" /> Edit Profile & Preferences
+                    <User size={16} className="text-emerald-700 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
                   </span>
-                  {openSection === 'profile_edit' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {openSection === 'profile_edit' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'profile_edit' && (
@@ -1500,7 +1460,7 @@ export default function CustomerStorefront() {
               {predictedRefillItems.length > 0 && (
                 <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 rounded-2xl border border-emerald-800 space-y-2 shadow-md">
                   <div className="flex items-center gap-2 text-amber-400 font-black">
-                    <Sparkles size={16} /> AI Smart Refill Basket
+                    <Sparkles size={16} className="shrink-0" /> AI Smart Refill Basket
                   </div>
                   <p className="text-[11px] text-emerald-200">Based on your past orders, you might need these staples soon:</p>
                   <div className="space-y-1.5 pt-1">
@@ -1509,7 +1469,7 @@ export default function CustomerStorefront() {
                         <span className="font-bold truncate max-w-[180px]">{p.name}</span>
                         <button 
                           onClick={() => addToCart(p)}
-                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer"
+                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
                         >
                           + Add
                         </button>
@@ -1526,9 +1486,10 @@ export default function CustomerStorefront() {
                   className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Package size={16} className="text-emerald-700" /> My Orders ({myOrders.length})
+                    <Package size={16} className="text-emerald-700 shrink-0" /> 
+                    <span className="truncate">My Orders ({myOrders.length})</span>
                   </span>
-                  {openSection === 'orders' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {openSection === 'orders' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'orders' && (() => {
@@ -1541,22 +1502,22 @@ export default function CustomerStorefront() {
 
                     return (
                       <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="font-mono font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
-                          <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-mono font-bold text-slate-900 truncate">#{order.id.slice(0, 8)}</span>
+                          <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black shrink-0 ${
                             order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
                             order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                           }`}>{order.status}</span>
                         </div>
                          
                         {complaintTicket && (
-                          <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border ${
+                          <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border gap-2 ${
                             complaintTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
                           }`}>
-                            <span className="flex items-center gap-1">
-                              <LifeBuoy size={12} /> Complaint Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong>
+                            <span className="flex items-center gap-1 truncate">
+                              <LifeBuoy size={12} className="shrink-0" /> <span className="truncate">Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong></span>
                             </span>
-                            <span className="font-mono text-[9px]">Ticket Active</span>
+                            <span className="font-mono text-[9px] shrink-0">Ticket Active</span>
                           </div>
                         )}
 
@@ -1564,27 +1525,33 @@ export default function CustomerStorefront() {
                           <span>{new Date(order.created_at).toLocaleDateString()}</span>
                           <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
                         </div>
-                        <div className="flex gap-2 pt-1 flex-wrap">
+                        <div className="flex gap-1.5 pt-1 flex-wrap">
                           <button 
                             onClick={() => setSelectedProfileOrder(order)}
-                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1 border border-emerald-200 cursor-pointer"
+                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
+                            title="Details"
                           >
-                            <FileText size={13} /> Details
+                            <FileText size={14} className="shrink-0" />
+                            <span className="inline sm:inline">Details</span>
                           </button>
                           {order.status === 'delivered' && (
                             <button 
                               onClick={() => handleReorder(order)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl font-black transition flex items-center gap-1 shadow-xs cursor-pointer"
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white py-2 px-3 rounded-xl font-black transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                              title="Reorder"
                             >
-                              <RotateCcw size={13} /> Reorder
+                              <RotateCcw size={14} className="shrink-0" />
+                              <span className="inline sm:inline">Reorder</span>
                             </button>
                           )}
                           {order.status === 'delivered' && (
                             <button 
                               onClick={() => setSelectedInvoiceOrder(order)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-2 rounded-xl font-bold transition border border-slate-200 cursor-pointer"
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-800 py-2 px-3 rounded-xl font-bold transition border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
+                              title="Bill"
                             >
-                              Bill
+                              <FileText size={14} className="shrink-0" />
+                              <span className="inline sm:inline">Bill</span>
                             </button>
                           )}
                         </div>
@@ -1601,27 +1568,33 @@ export default function CustomerStorefront() {
                           <div className="flex gap-1 bg-emerald-50/70 p-1 rounded-2xl border border-emerald-100 mt-2">
                             <button
                               onClick={() => setOrderTab('active')}
-                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                              className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'active' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
+                              title={`Active (${activeOrders.length})`}
                             >
-                              Active ({activeOrders.length})
+                              <span className="sm:hidden">Active</span>
+                              <span className="hidden sm:inline">Active ({activeOrders.length})</span>
                             </button>
                             <button
                               onClick={() => setOrderTab('delivered')}
-                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                              className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'delivered' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
+                              title={`Delivered (${deliveredOrders.length})`}
                             >
-                              Delivered ({deliveredOrders.length})
+                              <span className="sm:hidden">Deliv.</span>
+                              <span className="hidden sm:inline">Delivered ({deliveredOrders.length})</span>
                             </button>
                             <button
                               onClick={() => setOrderTab('cancelled')}
-                              className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer ${
+                              className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'cancelled' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
+                              title={`Cancelled (${cancelledOrders.length})`}
                             >
-                              Cancelled ({cancelledOrders.length})
+                              <span className="sm:hidden">Canc.</span>
+                              <span className="hidden sm:inline">Cancelled ({cancelledOrders.length})</span>
                             </button>
                           </div>
 
@@ -1663,9 +1636,10 @@ export default function CustomerStorefront() {
                   className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Heart size={16} className="text-rose-600" /> My Wishlist ({wishlistProducts.length})
+                    <Heart size={16} className="text-rose-600 shrink-0" /> 
+                    <span className="truncate">My Wishlist ({wishlistProducts.length})</span>
                   </span>
-                  {openSection === 'wishlist' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {openSection === 'wishlist' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'wishlist' && (
@@ -1677,16 +1651,16 @@ export default function CustomerStorefront() {
                         const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
                         return (
                           <div key={p.id} className="p-3 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white" />
-                              <div>
-                                <span className="font-bold text-slate-900 block line-clamp-1">{p.name}</span>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 block truncate">{p.name}</span>
                                 <span className="font-black text-emerald-700">₹{p.price}</span>
                               </div>
                             </div>
                             <button 
                               onClick={() => addToCart(p)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition cursor-pointer"
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
                             >
                               Add
                             </button>
@@ -1704,9 +1678,10 @@ export default function CustomerStorefront() {
                   className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin size={16} className="text-emerald-700" /> Saved Addresses ({savedAddresses.length})
+                    <MapPin size={16} className="text-emerald-700 shrink-0" /> 
+                    <span className="truncate">Saved Addresses ({savedAddresses.length})</span>
                   </span>
-                  {openSection === 'addresses' ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {openSection === 'addresses' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'addresses' && (
@@ -1735,13 +1710,13 @@ export default function CustomerStorefront() {
                     )}
 
                     {savedAddresses.map(addr => (
-                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start">
-                        <div>
-                          <span className="font-black text-slate-900 block">{addr.title}</span>
+                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <span className="font-black text-slate-900 block truncate">{addr.title}</span>
                           <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
                           <span className="text-slate-400 font-mono text-[10px] block mt-1">Phone: {addr.phone}</span>
                         </div>
-                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 size={14}/></button>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer shrink-0" title="Delete"><Trash2 size={14}/></button>
                       </div>
                     ))}
                   </div>
@@ -1752,10 +1727,11 @@ export default function CustomerStorefront() {
                 onClick={() => setIsFeedbackOpen(true)}
                 className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
               >
-                <span className="flex items-center gap-2.5">
-                  <MessageSquarePlus size={16} className="text-emerald-700" /> Send Feedback & Suggestions
+                <span className="flex items-center gap-2.5 truncate">
+                  <MessageSquarePlus size={16} className="text-emerald-700 shrink-0" /> 
+                  <span className="truncate">Send Feedback & Suggestions</span>
                 </span>
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className="shrink-0" />
               </button>
 
             </div>
@@ -1763,9 +1739,9 @@ export default function CustomerStorefront() {
             <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer shadow-2xs"
               >
-                <LogOut size={16} /> Logout Account
+                <LogOut size={16} className="shrink-0" /> Logout Account
               </button>
             </div>
           </div>
@@ -1844,6 +1820,26 @@ export default function CustomerStorefront() {
                     const itemImg = itemImages[0] || '';
                     const hasReviewed = userReviewsMap[item.product_id];
 
+                    const variantsList = Array.isArray(item.products?.product_variants) 
+                      ? item.products.product_variants 
+                      : Array.isArray(item.products?.variants) 
+                        ? item.products.variants 
+                        : [];
+
+                    const matchedVariant = variantsList.find(v => 
+                      (item.variant_id && String(v.id) === String(item.variant_id)) || 
+                      (item.variant_label && String(v.unit_label || v.label || '').trim().toLowerCase() === String(item.variant_label || '').trim().toLowerCase())
+                    );
+
+                    const itemPrice = Number(item.price || 0);
+                    const itemMrp = Number(
+                      matchedVariant?.mrp || 
+                      item.products?.mrp || 
+                      itemPrice
+                    );
+                    const hasMrp = itemMrp > itemPrice;
+                    const discountPct = hasMrp ? Math.round(((itemMrp - itemPrice) / itemMrp) * 100) : 0;
+
                     return (
                       <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
@@ -1851,7 +1847,24 @@ export default function CustomerStorefront() {
                             <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
                             <div className="min-w-0">
                               <span className="font-black text-slate-900 block truncate">{item.products?.name || 'Item'}</span>
-                              <span className="text-slate-500 font-medium text-[11px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {item.variant_label && (
+                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                    {item.variant_label}
+                                  </span>
+                                )}
+                                <span className="text-stone-500 font-medium text-[11px]">Qty: {item.quantity}</span>
+                                <span>•</span>
+                                <span className="font-bold text-slate-900 text-[11px]">₹{itemPrice * item.quantity}</span>
+                                {hasMrp && (
+                                  <span className="text-stone-400 line-through text-[10px]">₹{itemMrp * item.quantity}</span>
+                                )}
+                                {discountPct > 0 && (
+                                  <span className="text-[9px] text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    {discountPct}% OFF
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -1859,10 +1872,10 @@ export default function CustomerStorefront() {
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: item.products })}
-                                className="px-2.5 py-1.5 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition flex items-center gap-1 cursor-pointer"
-                                title="Report issue with this specific item"
+                                className="p-2 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition flex items-center justify-center cursor-pointer"
+                                title="Item Help"
                               >
-                                <LifeBuoy size={11} /> Item Help
+                                <LifeBuoy size={14} className="shrink-0" />
                               </button>
 
                               <button
@@ -1874,13 +1887,14 @@ export default function CustomerStorefront() {
                                     setNewReviewForm({ rating: 5, review_text: '' });
                                   }
                                 }}
-                                className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition flex items-center gap-1 cursor-pointer ${
+                                className={`p-2 rounded-xl font-bold text-[11px] transition flex items-center justify-center cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
                                     : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                                 }`}
+                                title={hasReviewed ? "Review" : "Rate"}
                               >
-                                {hasReviewed ? <><Star size={11} className="fill-amber-500 text-amber-500" /> Review</> : <><Star size={11} /> Rate</>}
+                                <Star size={14} className={`shrink-0 ${hasReviewed ? 'fill-amber-500 text-amber-500' : ''}`} />
                               </button>
                             </div>
                           )}
@@ -2350,7 +2364,7 @@ export default function CustomerStorefront() {
 
               </div>
 
-{/* Similar Products Shelf */}
+              {/* Similar Products Shelf */}
               {similarProducts.length > 0 && (
                 <div className="space-y-4 pt-6 border-t border-stone-100">
                   <h3 className="font-black text-sm text-stone-900">Similar products</h3>

@@ -547,61 +547,64 @@ export default function ShopkeeperPortal() {
       return sum + (shopkeeperGross - adminCut);
     }, 0);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-stone-600 font-medium">Loading store dashboard...</div>;
-  if (!session) return <div className="text-center py-20"><p>Please log in as a shopkeeper.</p><button onClick={() => navigate('/login')} className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-xl">Login</button></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-emerald-800 font-bold bg-[#F0FDF4]">Loading store dashboard...</div>;
+  if (!session) return <div className="text-center py-20 bg-[#F0FDF4] min-h-screen"><p className="text-stone-700 font-bold">Please log in as a shopkeeper.</p><button onClick={() => navigate('/login')} className="mt-4 bg-emerald-700 text-white px-6 py-2.5 rounded-2xl font-black shadow-md cursor-pointer hover:bg-emerald-800 transition">Login</button></div>;
 
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden font-sans text-xs">
+    <div className="flex h-screen bg-[#F0FDF4] overflow-hidden font-sans text-xs selection:bg-emerald-500 selection:text-white">
       
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-stone-200 flex flex-col shadow-xs print:hidden">
-        <div className="p-6 border-b border-stone-200 flex items-center justify-between">
+      <aside className="w-72 bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950 text-white flex flex-col shadow-xl print:hidden border-r border-emerald-800/40">
+        <div className="p-6 border-b border-emerald-800/50 flex items-center justify-between bg-black/20 backdrop-blur-md">
           <div className="min-w-0">
-            <h1 className="text-sm font-black text-emerald-700 truncate">{shopkeeperProfile?.store_name || 'My Store'}</h1>
-            <p className="text-[10px] text-stone-400 truncate mt-0.5">{session.user.email}</p>
+            <h1 className="text-sm font-black text-emerald-300 truncate flex items-center gap-2">
+              <Store size={16} className="text-emerald-400 shrink-0" />
+              {shopkeeperProfile?.store_name || 'My Store'}
+            </h1>
+            <p className="text-[10px] text-emerald-200/70 truncate mt-1 font-mono">{session.user.email}</p>
           </div>
-          <NotificationBell session={session} size={15} />
+          <NotificationBell session={session} size={16} />
         </div>
         
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'dashboard' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <Store size={16} /> Dashboard & Stats
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'dashboard' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
+            <BarChart3 size={17} /> Dashboard & Stats
           </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'products' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <Package size={16} /> My Products ({products.length})
+          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'products' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
+            <Package size={17} /> My Products ({products.length})
           </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <ShoppingCart size={16} /> My Store Orders ({orders.length})
+          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
+            <ShoppingCart size={17} /> My Store Orders ({orders.length})
           </button>
-          <button onClick={() => setActiveTab('location')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition cursor-pointer ${activeTab === 'location' ? 'bg-emerald-50 text-emerald-700 font-bold shadow-2xs' : 'text-stone-600 hover:bg-stone-50'}`}>
-            <MapPin size={16} /> Store Location
+          <button onClick={() => setActiveTab('location')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'location' ? 'bg-emerald-50 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
+            <MapPin size={17} /> Store Location
           </button>
         </nav>
 
-        <div className="p-4 border-t border-stone-200 space-y-2">
-          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-600 hover:bg-stone-100 rounded-xl font-medium transition cursor-pointer">
+        <div className="p-4 border-t border-emerald-800/50 space-y-2 bg-black/20 backdrop-blur-md">
+          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-3 text-emerald-200 hover:bg-emerald-900/40 rounded-2xl font-black transition cursor-pointer">
             <Store size={16} /> View Storefront
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-medium transition cursor-pointer">
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-3 text-rose-300 hover:bg-rose-950/50 rounded-2xl font-black transition cursor-pointer">
             <LogOut size={16} /> Sign Out
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
+      <main className="flex-1 overflow-y-auto p-6 md:p-10 max-w-7xl mx-auto space-y-6">
         
         {/* Global Filter & Statement Toolbar */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex-wrap gap-4 print:hidden">
+        <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm mb-6 flex-wrap gap-4 print:hidden">
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-emerald-700" />
-            <span className="font-bold text-stone-700">Filter Range:</span>
+            <span className="font-black text-stone-700 uppercase text-[10px] tracking-wider">Filter Range:</span>
             <div className="flex gap-1 flex-wrap">
               {['today', 'week', 'month', 'custom', 'all'].map(d => (
                 <button 
                   key={d} 
                   onClick={() => setDatePreset(d)} 
-                  className={`px-3 py-1 rounded-xl font-bold transition capitalize cursor-pointer ${datePreset === d ? 'bg-emerald-700 text-white shadow-xs' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition capitalize cursor-pointer ${datePreset === d ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'}`}
                 >
                   {d}
                 </button>
@@ -609,63 +612,73 @@ export default function ShopkeeperPortal() {
             </div>
           </div>
 
-          <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-xs">
+          <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition active:scale-95">
             <Printer size={14} /> Print Statement PDF
           </button>
         </div>
 
         {datePreset === 'custom' && (
-          <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-xs mb-6 flex gap-4 items-center print:hidden">
+          <div className="bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm mb-6 flex gap-4 items-center print:hidden">
             <div className="flex-1">
-              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">From Date</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+              <label className="block font-black text-[10px] text-stone-400 uppercase mb-1">From Date</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none text-stone-800" />
             </div>
             <div className="flex-1">
-              <label className="block font-bold text-[10px] text-stone-400 uppercase mb-1">To Date</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-stone-50 border p-2.5 rounded-xl text-xs font-bold outline-none" />
+              <label className="block font-black text-[10px] text-stone-400 uppercase mb-1">To Date</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none text-stone-800" />
             </div>
           </div>
         )}
 
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Store Performance Dashboard</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Overview of your catalog, net earnings, and filtered orders.</p>
+            <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-8 text-white shadow-xl space-y-3 border border-emerald-700/50 relative overflow-hidden">
+              <div className="absolute right-[-20px] bottom-[-20px] opacity-10 pointer-events-none">
+                <Store size={220} />
+              </div>
+              <span className="bg-emerald-500/20 text-emerald-300 font-black text-[10px] px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">Shopkeeper Control Center</span>
+              <h2 className="text-2xl md:text-3xl font-black tracking-tight">Welcome back, {shopkeeperProfile?.store_name || 'Partner'}! 👋</h2>
+              <p className="text-xs text-emerald-200/80 max-w-xl leading-relaxed">Manage your catalog with variants, fulfill incoming customer orders in real-time, and monitor your earnings seamlessly.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
+              <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-3 relative overflow-hidden group hover:border-emerald-300 transition">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Filtered Net Payout</span>
-                  <div className="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
-                    <DollarSign size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Filtered Net Payout</span>
+                  <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200">
+                    <DollarSign size={20} />
                   </div>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900">₹{totalNetRevenue.toFixed(2)}</h3>
-                <p className="text-[11px] text-emerald-700 font-bold">From delivered store items</p>
+                <h3 className="text-3xl font-black text-slate-900">₹{totalNetRevenue.toFixed(2)}</h3>
+                <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                  <TrendingUp size={13} /> From delivered store items
+                </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
+              <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-3 relative overflow-hidden group hover:border-emerald-300 transition">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider">My Products</span>
-                  <div className="w-9 h-9 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
-                    <Package size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">My Products</span>
+                  <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200">
+                    <Package size={20} />
                   </div>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900">{products.length}</h3>
-                <p className="text-[11px] text-stone-500 font-medium">Active items in catalog</p>
+                <h3 className="text-3xl font-black text-slate-900">{products.length}</h3>
+                <p className="text-[11px] text-stone-500 font-bold flex items-center gap-1">
+                  <ShieldCheck size={13} className="text-emerald-600" /> Active items in catalog
+                </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-2">
+              <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-3 relative overflow-hidden group hover:border-emerald-300 transition">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Filtered Orders</span>
-                  <div className="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold">
-                    <ShoppingCart size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Filtered Orders</span>
+                  <div className="w-10 h-10 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold border border-teal-200">
+                    <ShoppingCart size={20} />
                   </div>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900">{orders.length}</h3>
-                <p className="text-[11px] text-stone-500 font-medium">Customer orders matching filter</p>
+                <h3 className="text-3xl font-black text-slate-900">{orders.length}</h3>
+                <p className="text-[11px] text-teal-700 font-bold flex items-center gap-1">
+                  <Clock size={13} /> Customer orders matching filter
+                </p>
               </div>
             </div>
           </div>
@@ -680,33 +693,33 @@ export default function ShopkeeperPortal() {
               </div>
               <button
                 onClick={() => setIsExcelUploadExpanded(!isExcelUploadExpanded)}
-                className="bg-stone-100 hover:bg-stone-200 text-stone-800 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition cursor-pointer border border-stone-200 shadow-2xs"
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black px-5 py-3 rounded-2xl text-xs flex items-center gap-2 transition cursor-pointer border border-emerald-200 shadow-sm active:scale-95"
               >
-                <FileSpreadsheet size={16} className="text-emerald-700" />
+                <FileSpreadsheet size={18} className="text-emerald-700" />
                 Bulk Excel Upload
-                {isExcelUploadExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                {isExcelUploadExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </button>
             </div>
 
             {isExcelUploadExpanded && (
-              <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-md">
-                <ExcelProductUpload onUploadSuccess={() => shopkeeperProfile?.id && fetchStoreData(shopkeeperProfile.id)} />
+              <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-lg animate-fadeIn">
+                <ExcelProductUpload shopkeeperId={shopkeeperProfile?.id || session?.user?.id} onUploadSuccess={() => shopkeeperProfile?.id && fetchStoreData(shopkeeperProfile.id)} />
               </div>
             )}
 
-            <form onSubmit={handleSaveProduct} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-6">
-              <h3 className="font-bold text-xs text-slate-900 flex items-center gap-2 border-b pb-3 uppercase tracking-wider">
-                <Plus size={16} /> {editingId ? 'Edit Product & Gallery' : 'Add Product & Gallery'}
+            <form onSubmit={handleSaveProduct} className="bg-white p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-6">
+              <h3 className="font-black text-xs text-slate-900 flex items-center gap-2 border-b border-emerald-100 pb-3 uppercase tracking-wider">
+                <Plus size={16} className="text-emerald-700" /> {editingId ? 'Edit Product & Gallery' : 'Add Product & Gallery'}
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Product Name</label>
-                  <input type="text" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="e.g. Organic Milk" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
+                  <input type="text" required className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-bold text-stone-900" placeholder="e.g. Organic Milk" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Select Category</label>
-                  <select required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium cursor-pointer" value={productForm.category_id} onChange={e => setProductForm({...productForm, category_id: e.target.value})}>
+                  <select required className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-bold text-stone-900 cursor-pointer" value={productForm.category_id} onChange={e => setProductForm({...productForm, category_id: e.target.value})}>
                     <option value="">Select Category</option>
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -717,21 +730,23 @@ export default function ShopkeeperPortal() {
 
               <div className="space-y-2">
                 <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">Browse & Upload Multiple Images</label>
-                <div className="border-2 border-dashed border-stone-200 rounded-3xl p-6 text-center bg-stone-50/50 hover:bg-stone-50 transition relative">
-                  <input type="file" multiple accept="image/*" onChange={handleGalleryUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <div className="space-y-1">
-                    <Upload className="mx-auto text-stone-400" size={24} />
-                    <p className="text-xs font-bold text-stone-700">Select multiple files from your device to form the product gallery.</p>
-                    <p className="text-[10px] text-stone-400">Supports PNG, JPG, WebP</p>
+                <div className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-3xl p-8 text-center bg-emerald-50/20 transition relative">
+                  <input type="file" multiple accept="image/*" onChange={handleGalleryUpload} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                  <div className="space-y-2 pointer-events-none">
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
+                      <Upload size={22} />
+                    </div>
+                    <p className="text-xs font-black text-stone-800">Select multiple files from your device to form the product gallery.</p>
+                    <p className="text-[10px] text-stone-400">Supports PNG, JPG, WebP formats</p>
                   </div>
                 </div>
 
                 {galleryImages.length > 0 && (
                   <div className="flex flex-wrap gap-3 pt-2">
                     {galleryImages.map((img, idx) => (
-                      <div key={idx} className="relative w-16 h-16 rounded-2xl overflow-hidden border shadow-2xs group">
+                      <div key={idx} className="relative w-16 h-16 rounded-2xl overflow-hidden border border-emerald-200 shadow-xs group bg-white">
                         <img src={img} alt="" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setGalleryImages(galleryImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[10px] cursor-pointer"><X size={10}/></button>
+                        <button type="button" onClick={() => setGalleryImages(galleryImages.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[10px] cursor-pointer shadow"><X size={10}/></button>
                       </div>
                     ))}
                   </div>
@@ -740,52 +755,52 @@ export default function ShopkeeperPortal() {
 
               <div>
                 <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Description</label>
-                <textarea rows="3" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="Product details, ingredients, or specifications..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
+                <textarea rows="3" className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-medium text-stone-900 resize-none" placeholder="Product details, ingredients, or specifications..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
               </div>
 
               {/* VARIANT SECTION */}
-              <div className="space-y-3 pt-4 border-t">
-                <div className="flex justify-between items-center">
+              <div className="space-y-3 pt-4 border-t border-emerald-100">
+                <div className="flex justify-between items-center flex-wrap gap-3">
                   <div>
                     <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Layers size={14} className="text-emerald-700" /> Product Variants (e.g. 500g, 1kg, 5L)
+                      <Layers size={15} className="text-emerald-700" /> Product Variants (e.g. 500g, 1kg, 5L)
                     </h4>
-                    <p className="text-[10px] text-stone-400">Each variant requires its own pack size, selling price, MRP, and stock level.</p>
+                    <p className="text-[10px] text-stone-500 font-medium">Each variant requires its own pack size, selling price, MRP, and stock level.</p>
                   </div>
-                  <button type="button" onClick={addVariantTier} className="bg-stone-900 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-2xs hover:bg-stone-800 transition cursor-pointer">
+                  <button type="button" onClick={addVariantTier} className="bg-emerald-900 hover:bg-emerald-950 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer">
                     <Plus size={14} /> Add Variant Tier
                   </button>
                 </div>
 
                 {variants.length === 0 ? (
-                  <div className="text-center py-6 bg-amber-50 rounded-2xl border border-amber-200">
-                    <p className="text-amber-700 font-bold text-xs">No variants added yet.</p>
-                    <p className="text-[10px] text-amber-600 mt-1">Please add at least one variant configuration.</p>
+                  <div className="text-center py-8 bg-amber-50/80 rounded-2xl border border-amber-200">
+                    <p className="text-amber-800 font-black text-xs">No variants added yet.</p>
+                    <p className="text-[10px] text-amber-700 font-medium mt-1">Please add at least one variant configuration to list this product.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {variants.map((v, index) => (
-                      <div key={index} className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <div key={index} className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-200/80 space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="font-black text-emerald-800 text-xs">Variant #{index + 1}</span>
-                          <button type="button" onClick={() => removeVariant(index)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 size={14}/></button>
+                          <span className="font-black text-emerald-900 text-xs uppercase">Variant #{index + 1}</span>
+                          <button type="button" onClick={() => removeVariant(index)} className="text-rose-600 hover:text-rose-800 p-1 bg-white rounded-lg border border-rose-200 cursor-pointer shadow-2xs"><Trash2 size={13}/></button>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Unit / Pack Size</label>
-                            <input type="text" placeholder="e.g. 1 kg" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.unit_label} onChange={e => updateVariant(index, 'unit_label', e.target.value)} />
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Unit / Pack Size</label>
+                            <input type="text" placeholder="e.g. 1 kg" className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900" value={v.unit_label} onChange={e => updateVariant(index, 'unit_label', e.target.value)} />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Selling Price (₹)</label>
-                            <input type="number" step="0.01" min="0" placeholder="55.00" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} />
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Selling Price (₹)</label>
+                            <input type="number" step="0.01" min="0" placeholder="55.00" className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">MRP (₹)</label>
-                            <input type="number" step="0.01" min="0" placeholder="60.00" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.mrp} onChange={e => updateVariant(index, 'mrp', e.target.value)} />
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">MRP (₹)</label>
+                            <input type="number" step="0.01" min="0" placeholder="60.00" className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900" value={v.mrp} onChange={e => updateVariant(index, 'mrp', e.target.value)} />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Stock</label>
-                            <input type="number" min="0" step="1" placeholder="100" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.stock} onChange={e => updateVariant(index, 'stock', e.target.value)} />
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Stock</label>
+                            <input type="number" min="0" step="1" placeholder="100" className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900" value={v.stock} onChange={e => updateVariant(index, 'stock', e.target.value)} />
                           </div>
                         </div>
                       </div>
@@ -794,38 +809,38 @@ export default function ShopkeeperPortal() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t">
-                <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-3 rounded-2xl text-xs transition shadow-xs active:scale-95 cursor-pointer">
+              <div className="flex gap-3 pt-4 border-t border-emerald-100">
+                <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-8 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition shadow-md shadow-emerald-700/20 active:scale-95 cursor-pointer">
                   {editingId ? 'Update Product' : 'Add Product (Pending Approval)'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={resetForm} className="bg-stone-200 hover:bg-stone-300 text-stone-700 font-bold px-5 py-3 rounded-2xl text-xs cursor-pointer">
+                  <button type="button" onClick={resetForm} className="bg-stone-200 hover:bg-stone-300 text-stone-700 font-black px-6 py-3.5 rounded-2xl text-xs uppercase cursor-pointer transition">
                     Cancel
                   </button>
                 )}
               </div>
             </form>
 
-            <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4">
-              <h3 className="font-black text-xs text-slate-900 uppercase tracking-wider">Your Product Catalog</h3>
+            <div className="bg-white rounded-3xl border border-emerald-100 p-6 space-y-4 shadow-sm">
+              <h3 className="font-black text-xs text-slate-900 uppercase tracking-wider">Your Product Catalog ({products.length})</h3>
               {products.length === 0 ? (
                 <p className="text-xs text-stone-400 italic text-center py-8">You haven't added any products yet.</p>
               ) : (
                 <div className="space-y-3">
                   {products.map(prod => (
-                    <div key={prod.id} className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-100 text-xs">
-                      <div className="flex items-center gap-3">
-                        <img src={prod.image_url || '/placeholder.png'} alt="" className="w-12 h-12 object-cover rounded-xl bg-white border" />
+                    <div key={prod.id} className="flex items-center justify-between p-4 bg-emerald-50/20 rounded-2xl border border-emerald-100 text-xs hover:border-emerald-300 transition">
+                      <div className="flex items-center gap-3.5">
+                        <img src={prod.image_url || '/placeholder.png'} alt="" className="w-12 h-12 object-cover rounded-xl bg-white border border-emerald-200 shrink-0" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 block text-sm">{prod.name}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            <span className="font-black text-slate-900 block text-sm">{prod.name}</span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
                               prod.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                             }`}>
                               {prod.approval_status || 'pending'}
                             </span>
                           </div>
-                          <span className="text-stone-500">
+                          <span className="text-stone-500 font-medium text-[11px]">
                             {prod.variants?.length > 0 ? `${prod.variants.length} variant tier(s)` : 'No variants'}
                           </span>
                         </div>
@@ -836,8 +851,8 @@ export default function ShopkeeperPortal() {
                           setProductForm({ name: prod.name, category_id: prod.category_id || '', description: prod.description || '' }); 
                           setGalleryImages(prod.gallery || prod.images || []);
                           setVariants(prod.variants || []);
-                        }} className="p-2 bg-stone-200 hover:bg-stone-300 rounded-xl text-stone-700 cursor-pointer"><Edit size={14}/></button>
-                        <button onClick={() => handleDeleteProduct(prod.id)} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl cursor-pointer"><Trash2 size={14}/></button>
+                        }} className="p-2.5 bg-white hover:bg-stone-100 rounded-xl text-stone-700 border border-stone-200 cursor-pointer shadow-2xs transition" title="Edit Product"><Edit size={14}/></button>
+                        <button onClick={() => handleDeleteProduct(prod.id)} className="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200 cursor-pointer shadow-2xs transition" title="Delete Product"><Trash2 size={14}/></button>
                       </div>
                     </div>
                   ))}
@@ -854,13 +869,13 @@ export default function ShopkeeperPortal() {
                 <h2 className="text-xl font-black text-slate-900">Store Orders & Fulfillment</h2>
                 <p className="text-xs text-stone-500 mt-0.5">Comprehensive view of customer orders containing items from your catalog.</p>
               </div>
-              <div className="flex bg-stone-100 p-1.5 rounded-2xl gap-2 font-bold text-[11px]">
-                <span className="bg-white px-3 py-1 rounded-xl shadow-2xs text-stone-800">Total Filtered Orders: {orders.length}</span>
+              <div className="flex bg-white px-4 py-2 rounded-2xl border border-emerald-100 gap-2 font-black text-xs shadow-sm">
+                <span className="text-stone-700">Total Filtered Orders: <strong className="text-emerald-700">{orders.length}</strong></span>
               </div>
             </div>
 
             {orders.length === 0 ? (
-              <div className="bg-white p-16 rounded-3xl border border-stone-200 text-center text-stone-400 font-bold">
+              <div className="bg-white p-16 rounded-3xl border border-emerald-100 text-center text-stone-400 font-bold shadow-sm">
                 No orders received for your store items within this period.
               </div>
             ) : (
@@ -875,16 +890,16 @@ export default function ShopkeeperPortal() {
                   const netPayout = storeOrderGross - adminCut;
 
                   return (
-                    <div key={order.id} className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs">
+                    <div key={order.id} className="bg-white rounded-3xl border border-emerald-100 p-6 space-y-4 shadow-sm hover:border-emerald-300 transition">
                       
-                      <div className="flex justify-between items-center pb-4 border-b border-stone-100 flex-wrap gap-3">
+                      <div className="flex justify-between items-center pb-4 border-b border-emerald-100 flex-wrap gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold">
+                          <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200">
                             <ShoppingCart size={18} />
                           </div>
                           <div>
                             <span className="font-mono font-black text-slate-900 text-sm">Order #{order.id.slice(0, 8)}</span>
-                            <p className="text-[10px] text-stone-400 flex items-center gap-1 mt-0.5">
+                            <p className="text-[10px] text-stone-400 flex items-center gap-1 mt-0.5 font-medium">
                               <Calendar size={12} /> {new Date(order.created_at).toLocaleString()}
                             </p>
                           </div>
@@ -901,7 +916,7 @@ export default function ShopkeeperPortal() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/70 p-4 rounded-2xl border border-stone-100">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100">
                         <div className="space-y-1">
                           <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">Customer Information</span>
                           <p className="font-bold text-slate-800 flex items-center gap-1.5">
@@ -926,21 +941,21 @@ export default function ShopkeeperPortal() {
                       <div className="space-y-2">
                         <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">Catalog Items Included from Your Store</span>
                         
-                        <div className="border border-stone-200 rounded-2xl overflow-hidden">
+                        <div className="border border-emerald-200 rounded-2xl overflow-hidden bg-white">
                           <table className="w-full text-left border-collapse">
                             <thead>
-                              <tr className="bg-stone-50 border-b text-[10px] uppercase text-stone-400 font-bold">
+                              <tr className="bg-emerald-50/50 border-b border-emerald-200 text-[10px] uppercase text-emerald-900 font-black">
                                 <th className="p-3">Product</th>
                                 <th className="p-3">Qty</th>
                                 <th className="p-3">Unit Price</th>
                                 <th className="p-3 text-right">Subtotal</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-stone-100 font-medium text-slate-800">
+                            <tbody className="divide-y divide-emerald-100 font-medium text-slate-800 text-xs">
                               {storeItems.map((item, idx) => {
                                 const subtotal = Number(item.price || 0) * item.quantity;
                                 return (
-                                  <tr key={idx} className="hover:bg-stone-50">
+                                  <tr key={idx} className="hover:bg-emerald-50/20">
                                     <td className="p-3 font-bold text-slate-900">{item.products?.name || 'Custom Product'}</td>
                                     <td className="p-3">{item.quantity} units</td>
                                     <td className="p-3">₹{Number(item.price || 0).toLocaleString()}</td>
@@ -953,10 +968,10 @@ export default function ShopkeeperPortal() {
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center pt-2 border-t border-stone-100 flex-wrap gap-2">
-                        <span className="text-stone-500 font-medium text-[11px]">
-                          Gross Sales: <strong className="text-slate-800">₹{storeOrderGross.toLocaleString()}</strong> 
-                          <span className="ml-2 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-lg font-bold">Tier Rate: {tierPct}%</span>
+                      <div className="flex justify-between items-center pt-3 border-t border-emerald-100 flex-wrap gap-2 text-xs">
+                        <span className="text-stone-500 font-medium">
+                          Gross Sales: <strong className="text-slate-800 font-bold">₹{storeOrderGross.toLocaleString()}</strong> 
+                          <span className="ml-2 px-2.5 py-0.5 bg-amber-50 text-amber-800 rounded-lg font-bold border border-amber-200">Tier Rate: {tierPct}%</span>
                         </span>
                         <div className="text-right flex items-center gap-2">
                           <span className="text-[10px] text-stone-400 uppercase font-black">Net Payout Share:</span>
@@ -979,7 +994,7 @@ export default function ShopkeeperPortal() {
               <p className="text-xs text-stone-500 mt-0.5">Search by PIN code or drag the marker on the map to pin your store's exact location.</p>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-5 max-w-3xl">
+            <div className="bg-white p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-5 max-w-3xl">
               
               {/* Pincode Search Bar */}
               <form onSubmit={handleSearchPincode} className="flex gap-2">
@@ -990,13 +1005,13 @@ export default function ShopkeeperPortal() {
                     placeholder="Search by PIN Code (e.g. 272155)" 
                     value={pincodeQuery}
                     onChange={e => setPincodeQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-stone-200 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-bold"
+                    className="w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-mono font-bold text-stone-900"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={searchingPin}
-                  className="bg-stone-900 hover:bg-stone-800 text-white font-bold px-5 py-3 rounded-2xl text-xs transition cursor-pointer shrink-0 disabled:opacity-50"
+                  className="bg-emerald-900 hover:bg-emerald-950 text-white font-black px-6 py-3 rounded-2xl text-xs transition cursor-pointer shrink-0 disabled:opacity-50 uppercase tracking-wider"
                 >
                   {searchingPin ? 'Searching...' : 'Search PIN'}
                 </button>
@@ -1004,7 +1019,7 @@ export default function ShopkeeperPortal() {
 
               {/* Interactive Map Container */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center text-[10px] text-stone-400 font-bold uppercase tracking-wider">
+                <div className="flex justify-between items-center text-[10px] text-stone-500 font-black uppercase tracking-wider">
                   <span>Interactive Map (Drag pin or click to relocate)</span>
                   <button type="button" onClick={handleFetchGpsLocation} className="text-emerald-700 hover:underline cursor-pointer">
                     Use Current GPS
@@ -1012,7 +1027,7 @@ export default function ShopkeeperPortal() {
                 </div>
                 <div 
                   ref={mapContainerRef} 
-                  className="w-full h-72 rounded-2xl border border-stone-200 z-10 shadow-2xs" 
+                  className="w-full h-72 rounded-2xl border border-emerald-200 z-10 shadow-inner" 
                 />
               </div>
 
@@ -1025,7 +1040,7 @@ export default function ShopkeeperPortal() {
                     placeholder="e.g. Shop No. 4, Main Market, Civil Lines, Harraiya" 
                     value={locationForm.address} 
                     onChange={e => setLocationForm({...locationForm, address: e.target.value})}
-                    className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium"
+                    className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-medium text-stone-900 resize-none"
                   />
                 </div>
 
@@ -1043,7 +1058,7 @@ export default function ShopkeeperPortal() {
                         setLocationForm({...locationForm, latitude: val});
                         if (val && locationForm.longitude) updateMapMarker(val, locationForm.longitude);
                       }}
-                      className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-medium"
+                      className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-mono font-bold text-stone-900"
                     />
                   </div>
                   <div>
@@ -1059,7 +1074,7 @@ export default function ShopkeeperPortal() {
                         setLocationForm({...locationForm, longitude: val});
                         if (locationForm.latitude && val) updateMapMarker(locationForm.latitude, val);
                       }}
-                      className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-mono font-medium"
+                      className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/30 outline-none focus:border-emerald-600 font-mono font-bold text-stone-900"
                     />
                   </div>
                 </div>
@@ -1068,7 +1083,7 @@ export default function ShopkeeperPortal() {
                   <button 
                     type="submit" 
                     disabled={savingLocation}
-                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 rounded-2xl text-xs transition shadow-xs cursor-pointer disabled:opacity-50 uppercase tracking-wider"
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-4 rounded-2xl text-xs transition shadow-md shadow-emerald-700/20 cursor-pointer disabled:opacity-50 uppercase tracking-wider active:scale-95"
                   >
                     {savingLocation ? 'Saving Location...' : 'Save Store Location & Pinned Coordinates'}
                   </button>

@@ -29,7 +29,9 @@ import {
   AlignLeft,
   ToggleLeft,
   ToggleRight,
-  FolderTree
+  FolderTree,
+  Eye,
+  Search
 } from 'lucide-react';
 
 import ExcelProductUpload from './ExcelProductUpload';
@@ -48,6 +50,7 @@ export default function ProductManager() {
     useState('all');
 
   const [activeTab, setActiveTab] = useState('inventory');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [loading, setLoading] = useState(true);
 
@@ -1500,9 +1503,14 @@ export default function ProductManager() {
               selectedShopkeeperFilter
             ).trim();
 
+        const matchesSearch =
+          !searchQuery.trim() ||
+          product.name.toLowerCase().includes(searchQuery.toLowerCase());
+
         return (
           matchesTab &&
-          matchesShopkeeper
+          matchesShopkeeper &&
+          matchesSearch
         );
 
       })
@@ -1567,343 +1575,203 @@ export default function ProductManager() {
 
   return (
 
-    <div className="space-y-6 font-sans">
+    <div className="space-y-8 font-sans pb-16">
 
       {/* =====================================================
-          HEADER
+          HEADER SECTION (Attractive Dashboard Title & Actions)
       ===================================================== */}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
-
-        <div>
-
-          <h2 className="text-2xl font-black text-slate-900">
-            Product Inventory & Shopkeeper Moderation
-          </h2>
-
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage products, pack variants, pricing,
-            MRP, stock, reviews and store visibility.
-          </p>
-
+      <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl border border-emerald-800/50 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="absolute right-[-30px] bottom-[-30px] opacity-10 pointer-events-none">
+          <Package size={220} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="relative z-10 space-y-1">
+          <span className="bg-emerald-500/20 text-emerald-300 font-black text-[10px] px-3.5 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest">
+            Catalog Management & Control
+          </span>
+          <h2 className="text-2xl md:text-3xl font-black tracking-tight">Product Inventory Hub</h2>
+          <p className="text-xs text-emerald-200/80 max-w-xl">
+            Monitor store items, multi-pack variants, pricing rules, stock alerts, and shopkeeper moderation effortlessly.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 relative z-10 w-full md:w-auto">
 
           {/* SHOPKEEPER FILTER */}
-
-          <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-2 rounded-2xl border border-emerald-200">
-
-            <Filter
-              size={14}
-              className="text-emerald-700"
-            />
-
+          <div className="flex items-center gap-2 bg-emerald-900/60 px-3.5 py-2.5 rounded-2xl border border-emerald-700/60 backdrop-blur-md">
+            <Filter size={14} className="text-emerald-400 shrink-0" />
             <select
-              className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-              value={
-                selectedShopkeeperFilter
-              }
-              onChange={e =>
-                setSelectedShopkeeperFilter(
-                  e.target.value
-                )
-              }
+              className="text-xs font-bold text-white bg-transparent outline-none cursor-pointer"
+              value={selectedShopkeeperFilter}
+              onChange={e => setSelectedShopkeeperFilter(e.target.value)}
             >
-
-              <option value="all">
-                All Shopkeepers (Stores)
-              </option>
-
-              {shopkeepers.map(
-                shopkeeper => (
-
-                  <option
-                    key={shopkeeper.id}
-                    value={shopkeeper.id}
-                  >
-                    {shopkeeper.store_name}
-                    {' '}
-                    ({shopkeeper.email})
-                  </option>
-
-                )
-              )}
-
+              <option value="all" className="bg-slate-900 text-white">All Shopkeepers (Stores)</option>
+              {shopkeepers.map(shopkeeper => (
+                <option key={shopkeeper.id} value={shopkeeper.id} className="bg-slate-900 text-white">
+                  {shopkeeper.store_name} ({shopkeeper.email})
+                </option>
+              ))}
             </select>
-
           </div>
 
-          {/* EXCEL */}
-
+          {/* EXCEL UPLOAD TOGGLE */}
           <button
-            onClick={() =>
-              setIsExcelUploadExpanded(
-                !isExcelUploadExpanded
-              )
-            }
-            className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition cursor-pointer border border-slate-200"
+            onClick={() => setIsExcelUploadExpanded(!isExcelUploadExpanded)}
+            className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-200 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition cursor-pointer border border-emerald-700/50 backdrop-blur-md shadow-sm"
           >
-
-            <FileSpreadsheet
-              size={16}
-              className="text-emerald-700"
-            />
-
+            <FileSpreadsheet size={16} className="text-emerald-400" />
             Bulk Excel Upload
-
-            {isExcelUploadExpanded
-              ? <ChevronUp size={14} />
-              : <ChevronDown size={14} />
-            }
-
+            {isExcelUploadExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 
           {/* ADD PRODUCT */}
-
           <button
             onClick={openAddModal}
-            className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/20 active:scale-95 cursor-pointer"
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-500/25 active:scale-95 cursor-pointer ml-auto md:ml-0"
           >
-
             <Plus size={16} />
-
             Add Product
-
           </button>
 
         </div>
-
       </div>
 
       {/* =====================================================
-          EXCEL
+          EXCEL UPLOAD DRAWER
       ===================================================== */}
 
       {isExcelUploadExpanded && (
-
-        <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-md">
-
-          <ExcelProductUpload
-            onUploadSuccess={fetchData}
-          />
-
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-emerald-200 shadow-xl animate-fadeIn">
+          <ExcelProductUpload onUploadSuccess={fetchData} />
         </div>
-
       )}
 
       {/* =====================================================
-          INTELLIGENCE BAR
+          INTELLIGENCE & METRICS BAR
       ===================================================== */}
 
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-5">
-
-        <div className="flex items-center gap-2.5 border-b border-emerald-800/80 pb-3">
-
-          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-
-            <Sparkles size={18} />
-
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Catalog Capacity</span>
+            <h3 className="text-2xl font-black text-slate-900">{products.length} Items</h3>
+            <p className="text-[11px] text-stone-500 font-medium">Total active & listed products</p>
           </div>
-
-          <div>
-
-            <h3 className="font-black text-sm uppercase tracking-wider">
-              Catalog & Stock Diagnostics
-            </h3>
-
-            <p className="text-[11px] text-emerald-300/80">
-              Product and variant-level inventory health.
-            </p>
-
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200 group-hover:scale-110 transition-transform">
+            <ShieldCheck size={24} />
           </div>
-
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-
-          {/* CATALOG */}
-
-          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1">
-
-            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
-
-              <ShieldCheck size={14} />
-
-              Catalog Capacity
-
-            </div>
-
-            <p className="text-emerald-100/90">
-
-              Total catalog contains
-
-              {' '}
-
-              <strong className="text-white">
-                {products.length}
-              </strong>
-
-              {' '}products.
-
-            </p>
-
+        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between group hover:border-amber-300 transition">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">Low Stock Variants</span>
+            <h3 className="text-2xl font-black text-amber-600">{lowStockCount} Variants</h3>
+            <p className="text-[11px] text-stone-500 font-medium">Items with stock count ≤ 5</p>
           </div>
-
-          {/* LOW STOCK */}
-
-          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1">
-
-            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-amber-400">
-
-              <AlertTriangle size={14} />
-
-              Low Stock Alerts
-
-            </div>
-
-            <p className="text-emerald-100/90">
-
-              <strong className="text-white">
-                {lowStockCount}
-              </strong>
-
-              {' '}products have variants
-              with stock ≤ 5.
-
-            </p>
-
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center font-bold border border-amber-200 group-hover:scale-110 transition-transform">
+            <AlertTriangle size={24} />
           </div>
-
-          {/* APPROVAL */}
-
-          <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1">
-
-            <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
-
-              <CheckCircle2 size={14} />
-
-              Moderation Queue
-
-            </div>
-
-            <p className="text-emerald-100/90">
-
-              <strong className="text-white">
-                {pendingCount}
-              </strong>
-
-              {' '}store listings awaiting review.
-
-            </p>
-
-          </div>
-
         </div>
 
-        {/* ===================================================
-            TABS
-        =================================================== */}
+        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Pending Approvals</span>
+            <h3 className="text-2xl font-black text-slate-900">{pendingCount} Listings</h3>
+            <p className="text-[11px] text-stone-500 font-medium">Awaiting administrator verification</p>
+          </div>
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200 group-hover:scale-110 transition-transform">
+            <CheckCircle2 size={24} />
+          </div>
+        </div>
+      </div>
 
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-800/80">
+      {/* =====================================================
+          NAVIGATION TABS & SEARCH BAR
+      ===================================================== */}
 
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm">
+        
+        {/* TABS */}
+        <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
           <button
-            onClick={() =>
-              setActiveTab('inventory')
-            }
-            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+            onClick={() => setActiveTab('inventory')}
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-xs font-black uppercase transition cursor-pointer flex items-center justify-center gap-2 ${
               activeTab === 'inventory'
-                ? 'bg-emerald-500 text-slate-950 shadow-md'
-                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-stone-50 text-stone-600 hover:bg-emerald-50 hover:text-emerald-800'
             }`}
           >
-
             <Package size={14} />
-
-            All Inventory ({products.length})
-
+            <span>All Inventory ({products.length})</span>
           </button>
 
           <button
-            onClick={() =>
-              setActiveTab('approvals')
-            }
-            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+            onClick={() => setActiveTab('approvals')}
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-xs font-black uppercase transition cursor-pointer flex items-center justify-center gap-2 ${
               activeTab === 'approvals'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                : 'bg-stone-50 text-stone-600 hover:bg-amber-50 hover:text-amber-800'
             }`}
           >
-
             <AlertOctagon size={14} />
-
-            Pending Approvals
-
+            <span>Pending Approvals</span>
             {pendingCount > 0 && (
-
-              <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full">
-
+              <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
                 {pendingCount}
-
               </span>
-
             )}
-
           </button>
 
           <button
-            onClick={() =>
-              setActiveTab('lowStock')
-            }
-            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+            onClick={() => setActiveTab('lowStock')}
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-xs font-black uppercase transition cursor-pointer flex items-center justify-center gap-2 ${
               activeTab === 'lowStock'
-                ? 'bg-amber-400 text-slate-950 shadow-md'
-                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                : 'bg-stone-50 text-stone-600 hover:bg-amber-50 hover:text-amber-800'
             }`}
           >
-
             <AlertTriangle size={14} />
-
-            Low Stock
-
+            <span>Low Stock</span>
             {lowStockCount > 0 && (
-
-              <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full">
-
+              <span className="bg-amber-700 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
                 {lowStockCount}
-
               </span>
-
             )}
-
           </button>
 
           <button
-            onClick={() =>
-              setActiveTab('topSelling')
-            }
-            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+            onClick={() => setActiveTab('topSelling')}
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-xs font-black uppercase transition cursor-pointer flex items-center justify-center gap-2 ${
               activeTab === 'topSelling'
-                ? 'bg-emerald-400 text-slate-950 shadow-md'
-                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+                ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                : 'bg-stone-50 text-stone-600 hover:bg-teal-50 hover:text-teal-800'
             }`}
           >
-
             <TrendingUp size={14} />
-
-            Most Orders / Top Selling
-
+            <span>Top Selling</span>
           </button>
+        </div>
 
+        {/* SEARCH BAR */}
+        <div className="relative w-full sm:w-72">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-emerald-200 rounded-2xl text-xs font-bold text-stone-900 outline-none focus:border-emerald-600 transition"
+          />
         </div>
 
       </div>
 
       {/* =====================================================
-          INVENTORY TABLE
+          INVENTORY TABLE (Designed for clarity and elegance)
       ================================================     */}
 
-      <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] border border-emerald-100 shadow-sm overflow-hidden">
 
         <div className="overflow-x-auto">
 
@@ -1911,35 +1779,15 @@ export default function ProductManager() {
 
             <thead>
 
-              <tr className="bg-emerald-50/50 border-b border-emerald-100 text-xs uppercase text-slate-500 font-semibold">
+              <tr className="bg-emerald-50/50 border-b border-emerald-100 text-[11px] uppercase text-emerald-900 font-black tracking-wider">
 
-                <th className="p-4">
-                  Product & Store
-                </th>
-
-                <th className="p-4">
-                  Images
-                </th>
-
-                <th className="p-4">
-                  Variants
-                </th>
-
-                <th className="p-4">
-                  Inventory
-                </th>
-
-                <th className="p-4">
-                  Ratings & Reviews
-                </th>
-
-                <th className="p-4">
-                  Status
-                </th>
-
-                <th className="p-4 text-right">
-                  Actions
-                </th>
+                <th className="p-4 sm:p-5">Product & Store</th>
+                <th className="p-4 sm:p-5">Images</th>
+                <th className="p-4 sm:p-5">Variants & Pricing</th>
+                <th className="p-4 sm:p-5">Inventory Stock</th>
+                <th className="p-4 sm:p-5">Ratings</th>
+                <th className="p-4 sm:p-5">Status</th>
+                <th className="p-4 sm:p-5 text-right">Actions</th>
 
               </tr>
 
@@ -1950,27 +1798,17 @@ export default function ProductManager() {
               {loading ? (
 
                 <tr>
-
-                  <td
-                    colSpan="7"
-                    className="p-8 text-center text-slate-500 font-medium"
-                  >
-                    Loading inventory...
+                  <td colSpan="7" className="p-16 text-center text-stone-500 font-bold">
+                    Loading inventory data...
                   </td>
-
                 </tr>
 
               ) : filteredProducts.length === 0 ? (
 
                 <tr>
-
-                  <td
-                    colSpan="7"
-                    className="p-8 text-center text-slate-400 italic"
-                  >
-                    No products found in this section.
+                  <td colSpan="7" className="p-16 text-center text-stone-400 italic font-medium">
+                    No products found matching your current filter.
                   </td>
-
                 </tr>
 
               ) : (
@@ -1994,53 +1832,42 @@ export default function ProductManager() {
 
                     <tr
                       key={product.id}
-                      className="hover:bg-emerald-50/30 transition"
+                      className="hover:bg-emerald-50/20 transition-colors"
                     >
 
-                      {/* PRODUCT */}
+                      {/* PRODUCT & STORE */}
 
-                      <td className="p-4">
+                      <td className="p-4 sm:p-5">
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3.5">
 
-                          <div className="w-10 h-10 bg-emerald-50 rounded-xl overflow-hidden shrink-0 border border-emerald-200">
+                          <div className="w-12 h-12 bg-white rounded-2xl overflow-hidden shrink-0 border border-emerald-200 shadow-2xs flex items-center justify-center p-1">
 
-                            {product.image_url ||
-                            imgList.length > 0 ? (
+                            {product.image_url || imgList.length > 0 ? (
 
                               <img
-                                src={
-                                  product.image_url ||
-                                  imgList[0]
-                                }
+                                src={product.image_url || imgList[0]}
                                 alt=""
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                               />
 
                             ) : (
 
-                              <Package
-                                size={18}
-                                className="text-slate-400 m-2"
-                              />
+                              <Package size={20} className="text-stone-300" />
 
                             )}
 
                           </div>
 
-                          <div>
+                          <div className="min-w-0 max-w-[200px]">
 
-                            <span className="font-bold text-slate-900 block">
+                            <span className="font-black text-slate-900 block truncate text-sm">
                               {product.name}
                             </span>
 
-                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full mt-0.5 border border-emerald-200">
-
-                              <Store size={10} />
-
-                              {product.shopkeeper_profiles?.store_name ||
-                                'Admin Store'}
-
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full mt-1 border border-emerald-200 truncate max-w-full">
+                              <Store size={10} className="shrink-0" />
+                              <span className="truncate">{product.shopkeeper_profiles?.store_name || 'Admin Store'}</span>
                             </span>
 
                           </div>
@@ -2051,135 +1878,76 @@ export default function ProductManager() {
 
                       {/* IMAGES */}
 
-                      <td className="p-4 text-slate-600 font-medium">
-
-                        {imgList.length} loaded
-
+                      <td className="p-4 sm:p-5 text-stone-600 font-bold">
+                        <span className="bg-stone-100 px-2.5 py-1 rounded-xl">{imgList.length} loaded</span>
                       </td>
 
                       {/* VARIANTS */}
 
-                      <td className="p-4">
+                      <td className="p-4 sm:p-5">
 
                         {variantCount > 0 ? (
 
-                          <div className="space-y-1.5 min-w-[280px]">
+                          <div className="space-y-2 min-w-[280px]">
 
-                            {product.variants.map(
-                              (variant, index) => {
+                            {product.variants.map((variant, index) => {
 
-                                const price =
-                                  Number(
-                                    variant.price || 0
-                                  );
+                              const price = Number(variant.price || 0);
+                              const mrp = Number(variant.mrp || 0);
+                              const stock = Number(variant.stock || 0);
 
-                                const mrp =
-                                  Number(
-                                    variant.mrp || 0
-                                  );
+                              const discount =
+                                mrp > 0
+                                  ? Math.round(((mrp - price) / mrp) * 100)
+                                  : 0;
 
-                                const stock =
-                                  Number(
-                                    variant.stock || 0
-                                  );
+                              return (
 
-                                const discount =
-                                  mrp > 0
-                                    ? Math.round(
-                                        (
-                                          (
-                                            mrp -
-                                            price
-                                          ) /
-                                          mrp
-                                        ) *
-                                        100
-                                      )
-                                    : 0;
+                                <div
+                                  key={variant.id || index}
+                                  className={`rounded-2xl p-2.5 border transition ${
+                                    stock <= 5
+                                      ? 'bg-amber-50/80 border-amber-300'
+                                      : 'bg-emerald-50/40 border-emerald-200/80'
+                                  }`}
+                                >
 
-                                return (
-
-                                  <div
-                                    key={
-                                      variant.id ||
-                                      index
-                                    }
-                                    className={`rounded-xl p-2 border ${
-                                      stock <= 5
-                                        ? 'bg-amber-50 border-amber-300'
-                                        : 'bg-emerald-50 border-emerald-200'
-                                    }`}
-                                  >
-
-                                    <div className="flex justify-between items-center gap-2">
-
-                                      <span className="font-black text-emerald-900">
-
-                                        {variant.unit_label ||
-                                          variant.label ||
-                                          'Variant'}
-
-                                      </span>
-
-                                      <span className="font-black text-slate-900">
-
-                                        ₹
-                                        {price.toFixed(2)}
-
-                                      </span>
-
-                                    </div>
-
-                                    <div className="flex justify-between items-center mt-1 text-[10px]">
-
-                                      <span className="text-slate-500">
-
-                                        MRP: ₹
-                                        {mrp.toFixed(2)}
-
-                                        {discount > 0 && (
-                                          <span className="ml-1 text-emerald-700 font-bold">
-                                            ({discount}% OFF)
-                                          </span>
-                                        )}
-
-                                      </span>
-
-                                      <span
-                                        className={
-                                          stock <= 5
-                                            ? 'font-bold text-amber-600'
-                                            : 'text-slate-500'
-                                        }
-                                      >
-
-                                        Stock: {stock}
-
-                                      </span>
-
-                                    </div>
-
+                                  <div className="flex justify-between items-center gap-2">
+                                    <span className="font-black text-emerald-950">
+                                      {variant.unit_label || variant.label || 'Variant'}
+                                    </span>
+                                    <span className="font-black text-slate-900 text-sm">
+                                      ₹{price.toFixed(2)}
+                                    </span>
                                   </div>
 
-                                );
+                                  <div className="flex justify-between items-center mt-1 text-[10px]">
+                                    <span className="text-stone-500 font-medium">
+                                      MRP: ₹{mrp.toFixed(2)}
+                                      {discount > 0 && (
+                                        <span className="ml-1 text-emerald-700 font-black">
+                                          ({discount}% OFF)
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className={stock <= 5 ? 'font-black text-amber-600' : 'text-stone-500 font-bold'}>
+                                      Stock: {stock}
+                                    </span>
+                                  </div>
 
-                              }
-                            )}
+                                </div>
+
+                              );
+
+                            })}
 
                           </div>
 
                         ) : (
 
-                          <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
-
-                            <span className="text-rose-600 font-bold">
-                              No variants
-                            </span>
-
-                            <span className="block text-[10px] text-rose-500 mt-1">
-                              Product cannot be sold until a variant is added.
-                            </span>
-
+                          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 max-w-[220px]">
+                            <span className="text-rose-600 font-black block">No variants</span>
+                            <span className="block text-[10px] text-rose-500 mt-0.5">Product cannot be sold until variant is added.</span>
                           </div>
 
                         )}
@@ -2188,105 +1956,55 @@ export default function ProductManager() {
 
                       {/* INVENTORY */}
 
-                      <td className="p-4">
+                      <td className="p-4 sm:p-5">
 
                         <div className="space-y-1">
 
-                          <span className="font-black text-slate-900 block">
-
-                            {product.totalVariantStock || 0}
-
+                          <span className="font-black text-slate-900 text-sm block">
+                            {product.totalVariantStock || 0} units
                           </span>
 
-                          <span className="text-[10px] text-slate-400 block">
-
-                            Total Variant Stock
-
-                          </span>
-
-                          <span className="text-[10px] text-slate-500 block">
-
-                            {variantCount}
-                            {' '}
-                            {variantCount === 1
-                              ? 'variant'
-                              : 'variants'}
-
+                          <span className="text-[10px] text-stone-400 font-medium block">
+                            {variantCount} {variantCount === 1 ? 'variant' : 'variants'}
                           </span>
 
                           {lowVariantCount > 0 && (
-
-                            <span className="inline-flex items-center gap-1 font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
-
+                            <span className="inline-flex items-center gap-1 font-black text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 text-[10px]">
                               <AlertTriangle size={11} />
-
-                              {lowVariantCount}
-                              {' '}
-                              low stock
-
+                              {lowVariantCount} low stock
                             </span>
-
                           )}
 
-                          {activeTab ===
-                            'topSelling' && (
-
-                            <span className="block font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
-
-                              🔥 {product.totalSold || 0}
-                              {' '}Sold
-
+                          {activeTab === 'topSelling' && (
+                            <span className="inline-block font-black text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 text-[10px]">
+                              🔥 {product.totalSold || 0} Sold
                             </span>
-
                           )}
 
                         </div>
 
                       </td>
 
-                      {/* REVIEWS */}
+                      {/* RATINGS */}
 
-                      <td className="p-4">
+                      <td className="p-4 sm:p-5">
 
-                        {product.avgRating !==
-                        'No ratings' ? (
+                        {product.avgRating !== 'No ratings' ? (
 
                           <button
                             onClick={() => {
-
-                              setSelectedProductForReviews(
-                                product
-                              );
-
-                              setProductReviewsList(
-                                product.reviews ||
-                                []
-                              );
-
+                              setSelectedProductForReviews(product);
+                              setProductReviewsList(product.reviews || []);
                             }}
-                            className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full font-black border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
+                            className="flex items-center gap-1.5 bg-amber-50 text-amber-900 px-3 py-1.5 rounded-full font-black border border-amber-200 hover:bg-amber-100 transition cursor-pointer shadow-2xs"
                           >
-
-                            <Star
-                              size={12}
-                              className="fill-amber-500 text-amber-500"
-                            />
-
-                            <span>
-
-                              {product.avgRating}
-                              {' '}
-                              ({product.reviewCount})
-
-                            </span>
-
+                            <Star size={13} className="fill-amber-500 text-amber-500" />
+                            <span>{product.avgRating} ({product.reviewCount})</span>
                           </button>
 
                         ) : (
 
-                          <span className="text-slate-400 italic">
-                            No ratings
-                          </span>
+                          <span className="text-stone-400 italic font-medium">No ratings</span>
 
                         )}
 
@@ -2294,35 +2012,32 @@ export default function ProductManager() {
 
                       {/* STATUS & VISIBILITY */}
 
-                      <td className="p-4 space-y-1">
+                      <td className="p-4 sm:p-5 space-y-2">
 
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
-                            product.approval_status ===
-                            'approved'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : product.approval_status ===
-                                'rejected'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-
-                          {product.approval_status ||
-                            'pending'}
-
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-black uppercase text-[9px] tracking-wider ${
+                          product.approval_status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : product.approval_status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}>
+                          {product.approval_status || 'pending'}
                         </span>
 
-                        <div className="pt-1">
+                        <div>
                           <button
                             onClick={() => handleToggleProductStatus(product.id, isProductActive)}
                             className="inline-flex items-center gap-1 text-[10px] font-black cursor-pointer transition"
                             title={isProductActive ? 'Disable product from customer view' : 'Enable product for customer view'}
                           >
                             {isProductActive ? (
-                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Active</span>
+                              <span className="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" /> Active
+                              </span>
                             ) : (
-                              <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">Disabled</span>
+                              <span className="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-600" /> Disabled
+                              </span>
                             )}
                           </button>
                         </div>
@@ -2331,54 +2046,33 @@ export default function ProductManager() {
 
                       {/* ACTIONS */}
 
-                      <td className="p-4 text-right">
+                      <td className="p-4 sm:p-5 text-right">
 
                         <div className="flex justify-end items-center gap-2">
 
-                          {(
-                            !product.approval_status ||
-                            product.approval_status ===
-                              'pending'
-                          ) && (
-
+                          {(!product.approval_status || product.approval_status === 'pending') && (
                             <button
-                              onClick={() =>
-                                handleUpdateApproval(
-                                  product.id,
-                                  'approved'
-                                )
-                              }
-                              className="bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold hover:bg-emerald-800 transition cursor-pointer"
+                              onClick={() => handleUpdateApproval(product.id, 'approved')}
+                              className="bg-emerald-600 text-white px-3 py-2 rounded-xl font-black hover:bg-emerald-700 transition cursor-pointer shadow-xs text-xs"
                             >
                               Approve
                             </button>
-
                           )}
 
                           <button
-                            onClick={() =>
-                              openEditModal(product)
-                            }
-                            className="text-blue-600 hover:text-blue-800 p-1.5 cursor-pointer"
-                            title="Edit"
+                            onClick={() => openEditModal(product)}
+                            className="p-2 bg-stone-100 hover:bg-emerald-100 text-stone-700 hover:text-emerald-800 rounded-xl transition cursor-pointer"
+                            title="Edit Product"
                           >
-
-                            <Edit size={16} />
-
+                            <Edit size={15} />
                           </button>
 
                           <button
-                            onClick={() =>
-                              handleDeleteProduct(
-                                product.id
-                              )
-                            }
-                            className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer"
-                            title="Delete"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer"
+                            title="Delete Product"
                           >
-
-                            <Trash2 size={16} />
-
+                            <Trash2 size={15} />
                           </button>
 
                         </div>
@@ -2407,152 +2101,79 @@ export default function ProductManager() {
 
       {selectedProductForReviews && (
 
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
 
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-5 max-h-[90vh] overflow-y-auto">
 
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-4">
 
-              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-
-                <MessageSquare
-                  size={16}
-                  className="text-emerald-700"
-                />
-
-                Customer Reviews for
-
-                {' '}
-
-                {selectedProductForReviews.name}
-
+              <h3 className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-2.5 truncate">
+                <MessageSquare size={18} className="text-emerald-700 shrink-0" />
+                <span className="truncate">Reviews for {selectedProductForReviews.name}</span>
               </h3>
 
               <button
-                onClick={() =>
-                  setSelectedProductForReviews(
-                    null
-                  )
-                }
-                className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"
+                onClick={() => setSelectedProductForReviews(null)}
+                className="p-2 bg-emerald-50 rounded-full text-stone-600 hover:bg-emerald-100 cursor-pointer shrink-0"
+                title="Close"
               >
-
                 <X size={16} />
-
               </button>
 
             </div>
 
             <div className="space-y-3">
 
-              {productReviewsList.length ===
-              0 ? (
+              {productReviewsList.length === 0 ? (
 
-                <p className="text-xs text-slate-400 italic py-6 text-center">
-
-                  No customer reviews submitted
-                  for this product yet.
-
+                <p className="text-xs text-stone-400 italic py-8 text-center font-medium">
+                  No customer reviews submitted for this product yet.
                 </p>
 
               ) : (
 
-                productReviewsList.map(
-                  review => (
+                productReviewsList.map(review => (
 
-                    <div
-                      key={review.id}
-                      className="p-3.5 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-2 text-xs"
-                    >
+                  <div
+                    key={review.id}
+                    className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100 space-y-2 text-xs"
+                  >
 
-                      <div className="flex justify-between items-center">
-
-                        <span className="font-bold text-slate-900">
-
-                          {review.user_email ||
-                            'Customer'}
-
-                        </span>
-
-                        <div className="flex items-center gap-1 text-amber-500">
-
-                          {[
-                            ...Array(
-                              Number(
-                                review.rating || 0
-                              )
-                            )
-                          ].map(
-                            (_, i) => (
-
-                              <Star
-                                key={i}
-                                size={12}
-                                className="fill-amber-500"
-                              />
-
-                            )
-                          )}
-
-                        </div>
-
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="font-bold text-slate-900 truncate">{review.user_email || 'Customer'}</span>
+                      <div className="flex items-center gap-1 text-amber-500 shrink-0">
+                        {[...Array(Number(review.rating || 0))].map((_, i) => (
+                          <Star key={i} size={12} className="fill-amber-500" />
+                        ))}
                       </div>
-
-                      <p className="text-slate-600">
-
-                        {review.review_text}
-
-                      </p>
-
-                      <div className="flex justify-between items-center pt-2 border-t border-emerald-100 text-[10px] text-slate-400 font-mono">
-
-                        <span>
-
-                          {review.created_at
-                            ? new Date(
-                                review.created_at
-                              ).toLocaleString()
-                            : ''}
-
-                        </span>
-
-                        <button
-                          onClick={() =>
-                            handleDeleteReview(
-                              review.id
-                            )
-                          }
-                          className="text-rose-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-
-                          <Trash2 size={11} />
-
-                          Delete Review
-
-                        </button>
-
-                      </div>
-
                     </div>
 
-                  )
-                )
+                    <p className="text-stone-600 leading-relaxed">{review.review_text}</p>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-emerald-100 text-[10px] text-stone-400 font-mono">
+                      <span>{review.created_at ? new Date(review.created_at).toLocaleString() : ''}</span>
+                      <button
+                        onClick={() => handleDeleteReview(review.id)}
+                        className="text-rose-600 font-black hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 size={11} />
+                        Delete Review
+                      </button>
+                    </div>
+
+                  </div>
+
+                ))
 
               )}
 
             </div>
 
             <button
-              onClick={() =>
-                setSelectedProductForReviews(
-                  null
-                )
-              }
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase cursor-pointer"
+              onClick={() => setSelectedProductForReviews(null)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-2xl font-black text-xs uppercase cursor-pointer transition shadow-md"
             >
-
               Close
-
             </button>
 
           </div>
@@ -2567,105 +2188,63 @@ export default function ProductManager() {
 
       {isModalOpen && (
 
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
 
-          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full shadow-2xl border border-emerald-100 space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-3xl w-full shadow-2xl border border-emerald-100 space-y-6 my-8 max-h-[92vh] overflow-y-auto animate-fadeIn">
 
             {/* MODAL HEADER */}
 
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-4">
 
               <div>
-
-                <h3 className="font-black text-base text-slate-900">
-
-                  {editingProduct
-                    ? 'Edit Product'
-                    : 'Add Product'}
-
+                <h3 className="font-black text-lg text-slate-900">
+                  {editingProduct ? 'Edit Product & Variants' : 'Add New Product'}
                 </h3>
-
-                <p className="text-[10px] text-slate-400 mt-1">
-
-                  Price, MRP and stock are managed
-                  separately for each variant.
-
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Price, MRP and stock are managed separately for each variant pack size.
                 </p>
-
               </div>
 
               <button
-                onClick={() =>
-                  setIsModalOpen(false)
-                }
-                className="p-2 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer"
+                onClick={() => setIsModalOpen(false)}
+                className="p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer transition"
+                title="Close"
               >
-
                 <X size={18} />
-
               </button>
 
             </div>
 
-            <form
-              onSubmit={handleSaveProduct}
-              className="space-y-5 text-xs"
-            >
+            <form onSubmit={handleSaveProduct} className="space-y-6 text-xs">
 
-              {/* =================================================
-                  PRODUCT NAME
-              ================================================     */}
+              {/* PRODUCT NAME */}
 
-              <div>
-
-                <label className="block font-bold text-slate-700 mb-1">
+              <div className="space-y-1.5">
+                <label className="block font-black text-stone-700 uppercase tracking-wider text-[11px]">
                   Product Name
                 </label>
-
                 <input
                   type="text"
                   required
-                  placeholder="Aashirvaad Atta / Fresh Milk"
-                  className="w-full border border-emerald-200 p-3 rounded-2xl outline-none focus:border-emerald-600 text-sm bg-emerald-50/20 font-medium"
+                  placeholder="e.g. Aashirvaad Superior MP Atta"
+                  className="w-full border border-emerald-200 p-3.5 rounded-2xl outline-none focus:border-emerald-600 text-xs bg-emerald-50/20 font-bold text-stone-900"
                   value={form.name}
-                  onChange={e =>
-                    setForm({
-                      ...form,
-                      name: e.target.value
-                    })
-                  }
+                  onChange={e => setForm({ ...form, name: e.target.value })}
                 />
-
               </div>
 
-              {/* =================================================
-                  CATEGORY & SUBCATEGORY HIERARCHICAL SELECTOR
-              ================================================     */}
+              {/* CATEGORY & SUBCATEGORY HIERARCHICAL SELECTOR */}
 
-              <div>
-
-                <label className="block font-bold text-slate-700 mb-1">
+              <div className="space-y-1.5">
+                <label className="block font-black text-stone-700 uppercase tracking-wider text-[11px]">
                   Category / Subcategory
                 </label>
-
                 <select
-                  className="w-full border border-emerald-200 p-3 rounded-2xl text-sm bg-emerald-50/20 font-bold text-slate-800 cursor-pointer"
-                  value={
-                    form.category_id
-                  }
-                  onChange={e =>
-                    setForm({
-                      ...form,
-                      category_id:
-                        e.target.value
-                    })
-                  }
+                  className="w-full border border-emerald-200 p-3.5 rounded-2xl text-xs bg-emerald-50/20 font-bold text-stone-900 cursor-pointer outline-none focus:border-emerald-600"
+                  value={form.category_id}
+                  onChange={e => setForm({ ...form, category_id: e.target.value })}
                 >
-
-                  <option value="">
-                    Select Category
-                  </option>
-
+                  <option value="">Select Category</option>
                   {parentCategories.map(parent => {
                     const subs = getSubcategories(parent.id);
                     return (
@@ -2679,528 +2258,240 @@ export default function ProductManager() {
                       </optgroup>
                     );
                   })}
-
                 </select>
-
               </div>
 
-              <div className="flex items-center gap-3 bg-emerald-50/40 p-4 rounded-2xl border border-emerald-200">
+              <div className="flex items-center gap-3 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200">
                 <input
                   type="checkbox"
                   id="form_is_active"
                   checked={form.is_active}
                   onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                  className="w-4 h-4 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500"
+                  className="w-4 h-4 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500 cursor-pointer"
                 />
-                <label htmlFor="form_is_active" className="font-bold text-slate-800 cursor-pointer">
+                <label htmlFor="form_is_active" className="font-bold text-stone-800 cursor-pointer text-xs">
                   Make Product Active / Visible to Customers on Storefront
                 </label>
               </div>
 
-              {/* =================================================
-                  IMAGES
-              ================================================     */}
+              {/* IMAGES */}
 
-              <div>
-
-                <label className="block font-bold text-slate-700 mb-1">
+              <div className="space-y-2">
+                <label className="block font-black text-stone-700 uppercase tracking-wider text-[11px]">
                   Product Images
                 </label>
 
-                <div className="border-2 border-dashed border-emerald-200 p-4 rounded-2xl text-center bg-emerald-50/30">
-
+                <div className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 p-6 rounded-3xl text-center bg-emerald-50/20 transition relative">
                   <input
                     type="file"
                     multiple
                     accept="image/*"
-                    onChange={e =>
-                      setImageFiles(
-                        Array.from(
-                          e.target.files ||
-                          []
-                        )
-                      )
-                    }
-                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-100 file:text-emerald-800 hover:file:bg-emerald-200 cursor-pointer"
+                    onChange={e => setImageFiles(Array.from(e.target.files || []))}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
-
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Select multiple images for the product gallery.
-                  </p>
-
+                  <div className="space-y-1 pointer-events-none">
+                    <p className="font-black text-stone-800 text-xs">Click to browse or drag & drop images</p>
+                    <p className="text-[10px] text-stone-400">Supports PNG, JPG, WebP formats</p>
+                  </div>
                 </div>
 
-                {/* EXISTING IMAGES */}
-
-                {existingImages.length >
-                  0 && (
-
-                  <div className="flex gap-2 mt-3 flex-wrap">
-
-                    {existingImages.map(
-                      (url, index) => (
-
-                        <div
-                          key={index}
-                          className="w-16 h-16 rounded-2xl border border-emerald-200 relative overflow-hidden bg-white shadow-sm"
+                {existingImages.length > 0 && (
+                  <div className="flex gap-2.5 mt-3 flex-wrap">
+                    {existingImages.map((url, index) => (
+                      <div
+                        key={index}
+                        className="w-16 h-16 rounded-2xl border border-emerald-200 relative overflow-hidden bg-white shadow-xs"
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setExistingImages(prev => prev.filter((_, i) => i !== index))}
+                          className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 shadow cursor-pointer"
                         >
-
-                          <img
-                            src={url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExistingImages(
-                                prev =>
-                                  prev.filter(
-                                    (_, i) =>
-                                      i !== index
-                                  )
-                              )
-                            }
-                            className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-0.5 shadow cursor-pointer"
-                          >
-
-                            <X size={12} />
-
-                          </button>
-
-                        </div>
-
-                      )
-                    )}
-
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-
                 )}
-
               </div>
 
-              {/* =================================================
-                  DESCRIPTION
-              ================================================     */}
+              {/* DESCRIPTION WITH AI & RICH TOOLBAR */}
 
-              <div>
-
-                <div className="flex justify-between items-center mb-1">
-
-                  <label className="font-bold text-slate-700">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="font-black text-stone-700 uppercase tracking-wider text-[11px]">
                     Description
                   </label>
 
                   <button
                     type="button"
-                    onClick={
-                      handleGenerateAiDescription
-                    }
-                    disabled={
-                      generatingAiDesc
-                    }
-                    className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black px-3 py-1 rounded-xl text-[10px] flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50"
+                    onClick={handleGenerateAiDescription}
+                    disabled={generatingAiDesc}
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black px-3.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1.5 transition shadow-xs cursor-pointer disabled:opacity-50"
                   >
-
-                    <Sparkles
-                      size={12}
-                      className="text-amber-300 fill-amber-300"
-                    />
-
-                    {generatingAiDesc
-                      ? 'Generating...'
-                      : 'Generate with AI'}
-
+                    <Sparkles size={13} className="text-amber-300 fill-amber-300" />
+                    {generatingAiDesc ? 'Generating...' : 'Generate with AI'}
                   </button>
-
                 </div>
 
-                <div className="border border-emerald-200 rounded-2xl overflow-hidden bg-white">
-
-                  {/* TOOLBAR */}
-
-                  <div className="bg-emerald-50/50 px-3 py-2 border-b border-emerald-100 flex items-center gap-1.5">
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleFormatText(
-                          '<b>',
-                          '</b>'
-                        )
-                      }
-                      className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer"
-                    >
+                <div className="border border-emerald-200 rounded-3xl overflow-hidden bg-white shadow-2xs">
+                  <div className="bg-emerald-50/60 px-3 py-2 border-b border-emerald-100 flex items-center gap-1">
+                    <button type="button" onClick={() => handleFormatText('<b>', '</b>')} className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer" title="Bold">
                       <Bold size={14} />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleFormatText(
-                          '<i>',
-                          '</i>'
-                        )
-                      }
-                      className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer"
-                    >
+                    <button type="button" onClick={() => handleFormatText('<i>', '</i>')} className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer" title="Italic">
                       <Italic size={14} />
                     </button>
-
                     <div className="h-4 w-[1px] bg-emerald-200 mx-1" />
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleFormatText(
-                          '<ul>\n  <li>',
-                          '</li>\n</ul>'
-                        )
-                      }
-                      className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer"
-                    >
+                    <button type="button" onClick={() => handleFormatText('<ul>\n  <li>', '</li>\n</ul>')} className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer" title="List">
                       <List size={14} />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleFormatText(
-                          '<p>',
-                          '</p>'
-                        )
-                      }
-                      className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer"
-                    >
+                    <button type="button" onClick={() => handleFormatText('<p>', '</p>')} className="p-1.5 hover:bg-emerald-200/50 rounded-lg cursor-pointer" title="Paragraph">
                       <AlignLeft size={14} />
                     </button>
-
                   </div>
 
                   <textarea
                     id="product-rich-description"
-                    rows="5"
-                    placeholder="Enter product description..."
-                    className="w-full p-3 text-sm bg-emerald-50/10 outline-none font-medium resize-y"
-                    value={
-                      form.description
-                    }
-                    onChange={e =>
-                      setForm({
-                        ...form,
-                        description:
-                          e.target.value
-                      })
-                    }
+                    rows="4"
+                    placeholder="Enter product description or specifications..."
+                    className="w-full p-3.5 text-xs bg-emerald-50/10 outline-none font-medium resize-y text-stone-900"
+                    value={form.description}
+                    onChange={e => setForm({ ...form, description: e.target.value })}
                   />
-
                 </div>
-
               </div>
 
-              {/* =================================================
-                  VARIANTS
-              ================================================     */}
+              {/* VARIANTS SECTION */}
 
               <div className="pt-4 border-t border-emerald-100 space-y-4">
 
-                {/* VARIANT HEADER */}
-
                 <div className="flex justify-between items-center">
-
                   <div>
-
-                    <div className="flex items-center gap-2">
-
-                      <Layers
-                        size={18}
-                        className="text-emerald-700"
-                      />
-
-                      <span className="font-black text-slate-900 text-sm">
-                        Product Variants
-                      </span>
-
-                    </div>
-
-                    <p className="text-[10px] text-slate-400 mt-1 ml-6">
-                      Each variant has its own pack size,
-                      selling price, MRP and stock.
-                    </p>
-
+                    <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers size={15} className="text-emerald-700" /> Product Variants (Pack Sizes & Pricing)
+                    </h4>
+                    <p className="text-[10px] text-stone-500 font-medium">Each variant requires its own pack size, selling price, MRP, and stock level.</p>
                   </div>
-
                   <button
                     type="button"
-                    onClick={
-                      addVariantRow
-                    }
-                    className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-2 rounded-xl text-xs transition cursor-pointer"
+                    onClick={addVariantRow}
+                    className="bg-emerald-900 hover:bg-emerald-950 text-white font-black px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                   >
-                    + Add Variant
+                    <Plus size={14} /> Add Variant Tier
                   </button>
-
                 </div>
 
-                {/* VARIANT LIST */}
-
-                {variants.length ===
-                0 ? (
-
-                  <div className="text-center py-6 bg-amber-50 rounded-2xl border border-amber-200">
-
-                    <Layers
-                      size={24}
-                      className="mx-auto text-amber-500 mb-2"
-                    />
-
-                    <p className="text-amber-700 font-bold">
-                      No variants added.
-                    </p>
-
-                    <p className="text-[10px] text-amber-600 mt-1">
-                      Add at least one variant before publishing.
-                    </p>
-
+                {variants.length === 0 ? (
+                  <div className="text-center py-8 bg-amber-50/80 rounded-2xl border border-amber-200">
+                    <p className="text-amber-800 font-black text-xs">No variants added yet.</p>
+                    <p className="text-[10px] text-amber-700 font-medium mt-1">Please add at least one variant configuration.</p>
                   </div>
-
                 ) : (
-
                   <div className="space-y-3">
-
-                    {variants.map(
-                      (variant, index) => (
-
-                        <div
-                          key={
-                            variant.id ||
-                            index
-                          }
-                          className="bg-emerald-50/40 p-4 rounded-2xl border border-emerald-200"
-                        >
-
-                          {/* VARIANT NUMBER */}
-
-                          <div className="flex justify-between items-center mb-3">
-
-                            <span className="font-black text-emerald-800">
-                              Variant #{index + 1}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeVariantRow(
-                                  index
-                                )
-                              }
-                              className="text-rose-500 hover:text-rose-700 p-1.5 cursor-pointer"
-                            >
-
-                              <Trash2 size={16} />
-
-                            </button>
-
-                          </div>
-
-                          {/* VARIANT FIELDS */}
-
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-
-                            {/* UNIT */}
-
-                            <div>
-
-                              <label className="block font-bold text-slate-600 mb-1">
-                                Unit / Pack Size
-                              </label>
-
-                              <input
-                                type="text"
-                                required
-                                placeholder="500 g / 1 kg / 5 L"
-                                className="w-full border border-emerald-200 p-2.5 rounded-xl text-xs bg-white font-medium"
-                                value={
-                                  variant.unit_label ||
-                                  ''
-                                }
-                                onChange={e =>
-                                  updateVariantRow(
-                                    index,
-                                    'unit_label',
-                                    e.target.value
-                                  )
-                                }
-                              />
-
-                            </div>
-
-                            {/* PRICE */}
-
-                            <div>
-
-                              <label className="block font-bold text-slate-600 mb-1">
-                                Selling Price (₹)
-                              </label>
-
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                required
-                                placeholder="55.00"
-                                className="w-full border border-emerald-200 p-2.5 rounded-xl text-xs bg-white font-medium"
-                                value={
-                                  variant.price ??
-                                  ''
-                                }
-                                onChange={e =>
-                                  updateVariantRow(
-                                    index,
-                                    'price',
-                                    e.target.value
-                                  )
-                                }
-                              />
-
-                            </div>
-
-                            {/* MRP */}
-
-                            <div>
-
-                              <label className="block font-bold text-slate-600 mb-1">
-                                MRP (₹)
-                              </label>
-
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                required
-                                placeholder="60.00"
-                                className="w-full border border-emerald-200 p-2.5 rounded-xl text-xs bg-white font-medium"
-                                value={
-                                  variant.mrp ??
-                                  ''
-                                }
-                                onChange={e =>
-                                  updateVariantRow(
-                                    index,
-                                    'mrp',
-                                    e.target.value
-                                  )
-                                }
-                              />
-
-                            </div>
-
-                            {/* STOCK */}
-
-                            <div>
-
-                              <label className="block font-bold text-slate-600 mb-1">
-                                Stock
-                              </label>
-
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                required
-                                placeholder="100"
-                                className="w-full border border-emerald-200 p-2.5 rounded-xl text-xs bg-white font-medium"
-                                value={
-                                  variant.stock ??
-                                  ''
-                                }
-                                onChange={e =>
-                                  updateVariantRow(
-                                    index,
-                                    'stock',
-                                    e.target.value
-                                  )
-                                }
-                              />
-
-                            </div>
-
-                          </div>
-
-                          {/* DISCOUNT */}
-
-                          <div className="mt-3 flex items-center justify-between bg-white border border-emerald-100 rounded-xl px-3 py-2">
-
-                            <span className="text-[10px] text-slate-500">
-                              Discount
-                            </span>
-
-                            <span className="text-xs font-black text-emerald-700">
-
-                              {Number(
-                                variant.mrp || 0
-                              ) > 0
-                                ? Math.max(
-                                    0,
-                                    Math.round(
-                                      (
-                                        (
-                                          Number(
-                                            variant.mrp
-                                          ) -
-                                          Number(
-                                            variant.price ||
-                                              0
-                                          )
-                                        ) /
-                                        Number(
-                                          variant.mrp
-                                        )
-                                      ) *
-                                      100
-                                    )
-                                  )
-                                : 0}
-
-                              % OFF
-
-                            </span>
-
-                          </div>
-
+                    {variants.map((variant, index) => (
+                      <div
+                        key={variant.id || index}
+                        className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-200/80 space-y-3"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-black text-emerald-900 text-xs uppercase">Variant #{index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeVariantRow(index)}
+                            className="text-rose-600 hover:text-rose-800 p-1 bg-white rounded-lg border border-rose-200 cursor-pointer shadow-2xs"
+                            title="Remove"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
 
-                      )
-                    )}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Unit / Pack Size</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. 1 kg"
+                              className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
+                              value={variant.unit_label || ''}
+                              onChange={e => updateVariantRow(index, 'unit_label', e.target.value)}
+                            />
+                          </div>
 
+                          <div>
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Selling Price (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              required
+                              placeholder="55.00"
+                              className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
+                              value={variant.price ?? ''}
+                              onChange={e => updateVariantRow(index, 'price', e.target.value)}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">MRP (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              required
+                              placeholder="60.00"
+                              className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
+                              value={variant.mrp ?? ''}
+                              onChange={e => updateVariantRow(index, 'mrp', e.target.value)}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-black text-stone-600 uppercase mb-1">Stock</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              required
+                              placeholder="100"
+                              className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
+                              value={variant.stock ?? ''}
+                              onChange={e => updateVariantRow(index, 'stock', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white border border-emerald-100 rounded-xl px-3 py-1.5 text-[11px]">
+                          <span className="text-stone-500 font-bold">Calculated Discount</span>
+                          <span className="font-black text-emerald-700">
+                            {Number(variant.mrp || 0) > 0
+                              ? Math.max(0, Math.round(((Number(variant.mrp) - Number(variant.price || 0)) / Number(variant.mrp)) * 100))
+                              : 0}% OFF
+                          </span>
+                        </div>
+
+                      </div>
+                    ))}
                   </div>
-
                 )}
 
               </div>
 
-              {/* =================================================
-                  SAVE
-              ================================================     */}
+              {/* SAVE BUTTON */}
 
               <button
                 type="submit"
-                disabled={
-                  submitting ||
-                  variants.length === 0
-                }
-                className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-2xl transition text-xs uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
+                disabled={submitting || variants.length === 0}
+                className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:bg-stone-300 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl transition text-xs uppercase tracking-wider shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 mt-4 cursor-pointer active:scale-95"
               >
-
                 <Plus size={16} />
-
                 {submitting
-                  ? 'Uploading & Saving...'
+                  ? 'Saving Product...'
                   : editingProduct
                   ? 'Update Product & Variants'
                   : 'Publish Product'}
-
               </button>
 
             </form>
