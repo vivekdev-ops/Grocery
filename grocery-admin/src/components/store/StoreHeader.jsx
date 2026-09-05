@@ -8,7 +8,7 @@ import NotificationBell from '../NotificationBell';
 
 export default function StoreHeader({
   session, customerProfile, searchQuery, setSearchQuery,
-  totalItemsCount, onOpenProfile, onOpenCart
+  totalItemsCount, onOpenProfile, onOpenCart, showSearch = true
 }) {
   const [locationName, setLocationName] = useState('Detecting location...');
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
@@ -167,7 +167,7 @@ export default function StoreHeader({
             </div>
           </button>
 
-          {/* Search bar — visible on desktop everywhere, hidden on mobile home if required, but fully functional on standard catalog views */}
+          {/* Search bar — desktop ONLY */}
           <div className="flex-1 max-w-2xl hidden md:block">
             <div className="relative group">
               <Search
@@ -334,8 +334,8 @@ export default function StoreHeader({
           </div>
         </div>
 
-        {/* Mobile Search Bar: Visible on standard storefront pages via props, but hidden on orders/account page context */}
-        {setSearchQuery && (
+        {/* Mobile Search Bar: Renders on mobile store view when showSearch is true */}
+        {showSearch && setSearchQuery && (
           <div className="px-4 pb-3 md:hidden">
             <div className="relative">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
@@ -359,6 +359,51 @@ export default function StoreHeader({
           </div>
         )}
       </header>
+
+      {/* ── MOBILE BOTTOM NAVIGATION BAR (Global Storefront) ── */}
+      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl">
+        <div className="flex items-center justify-around px-4 py-2.5">
+          <button
+            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <Home size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Home</span>
+          </button>
+
+          <button
+            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <Package size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Orders</span>
+          </button>
+
+          <button
+            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <MapPin size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Addresses</span>
+          </button>
+
+          <button
+            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center overflow-hidden transition-colors">
+              <User size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Profile</span>
+          </button>
+        </div>
+      </div>
     </>
   );
 }

@@ -1907,6 +1907,54 @@ const CustomerOrdersPage = () => {
       </main>
 
 
+      {/* =========================================================
+          MOBILE BOTTOM NAV BAR (Restored)
+      ========================================================= */}
+      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl">
+        <div className="flex items-center justify-around px-4 py-2.5">
+          <button
+            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <Home size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Home</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/account/orders')}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-green-50 group-active:bg-green-100 rounded-xl flex items-center justify-center transition-colors">
+              <Package size={18} className="text-green-600" />
+            </div>
+            <span className="text-[9px] font-black text-green-700 uppercase tracking-wider">Orders</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('addresses')}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
+              <MapPin size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Addresses</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className="flex flex-col items-center gap-0.5 cursor-pointer group"
+          >
+            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center overflow-hidden transition-colors">
+              <User size={18} className="text-stone-500" />
+            </div>
+            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Profile</span>
+          </button>
+        </div>
+      </div>
+
+
       <Footer />
 
 
