@@ -4,22 +4,18 @@ import { supabase } from '../supabaseClient';
 import { FileSpreadsheet, Upload, CheckCircle, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-export default function ExcelProductUpload({ onUploadSuccess }) {
+export default function ExcelProductUpload({ onUploadSuccess, shopkeeperId = null }) {
   const [uploading, setUploading] = useState(false);
   const [resultMessage, setResultMessage] = useState(null);
 
-  // Download a template Excel file featuring variant syntax
   const downloadTemplate = () => {
     const templateData = [
       {
         name: "Aashirvaad Atta",
         description: "Superior quality whole wheat flour",
-        price: 220,
-        mrp: 250,
-        stock: 50,
         category_name: "Grocery & Staples",
         image_url: "https://example.com/atta.jpg",
-        variants: "5kg:220:250:50|10kg:420:480:30" // Format: UnitLabel:Price:MRP:Stock separated by |
+        variants: "5kg:220:250:50|10kg:420:480:30"
       }
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -50,7 +46,6 @@ export default function ExcelProductUpload({ onUploadSuccess }) {
           return;
         }
 
-        // Fetch existing categories to map names to IDs
         const { data: categories } = await supabase.from('categories').select('*');
         const categoryMap = {};
         categories?.forEach(cat => {
@@ -61,37 +56,20 @@ export default function ExcelProductUpload({ onUploadSuccess }) {
         let failCount = 0;
 
         for (const row of jsonRows) {
-          const catName = (row.category_name || '').toLowerCase().trim();
-          const categoryId = categoryMap[catName] || (categories?.[0]?.id);
-
-          const productPayload = {
-            name: row.name,
-            description: row.description || '',
-            price: parseFloat(row.price) || 0,
-            mrp: parseFloat(row.mrp) || parseFloat(row.price) || 0,
-            stock: parseInt(row.stock) || 0,
-            category_id: categoryId,
-            image_url: row.image_url || '',
-            approval_status: 'approved'
-          };
-
-          // 1. Insert Product
-          const { data: insertedProduct, error: prodError } = await supabase
-            .from('products')
-            .insert([productPayload])
-            .select()
-            .single();
-
-          if (prodError || !insertedProduct) {
+          if (!row.name) {
             failCount++;
             continue;
           }
 
-          // 2. Parse & Insert Variants if provided (e.g. "500g:40:45:10|1kg:75:90:20")
+          const catName = (row.category_name || '').toLowerCase().trim();
+          const categoryId = categoryMap[catName] || (categories?.[0]?.id || null);
+
+          // Parse variants string: "Unit:Price:MRP:Stock|Unit:Price:MRP:Stock"
+          const variantPayloads = [];
+          const jsonVariants = [];
+
           if (row.variants && typeof row.variants === 'string') {
             const variantItems = row.variants.split('|');
-            const variantPayloads = [];
-
             for (const item of variantItems) {
               const parts = item.split(':');
               if (parts.length >= 2) {
@@ -100,19 +78,63 @@ export default function ExcelProductUpload({ onUploadSuccess }) {
                 const mrp = parts[2] ? parseFloat(parts[2]) : price;
                 const stock = parts[3] ? parseInt(parts[3]) : 10;
 
-                variantPayloads.push({
-                  product_id: insertedProduct.id,
-                  unit_label,
-                  price,
-                  mrp,
-                  stock
-                });
+                jsonVariants.push({ unit_label, price, mrp, stock });
               }
             }
+          }
 
-            if (variantPayloads.length > 0) {
-              await supabase.from('product_variants').insert(variantPayloads);
-            }
+          // Fallback single variant if variants column is missing or empty
+          if (jsonVariants.length === 0) {
+            const price = parseFloat(row.price) || 0;
+            const mrp = parseFloat(row.mrp) || price || 0;
+            const stock = parseInt(row.stock) || 10;
+            jsonVariants.push({ unit_label: row.unit_label || 'Standard', price, mrp, stock });
+          }
+
+          const productPayload = {
+            name: String(row.name).trim(),
+            description: row.description || '',
+            category_id: categoryId,
+            image_url: row.image_url || '',
+            images: row.image_url ? [row.image_url] : [],
+            gallery: row.image_url ? [row.image_url] : [],
+            variants: jsonVariants,
+            approval_status: 'approved',
+            is_active: true
+          };
+
+          if (shopkeeperId) {
+            productPayload.shopkeeper_id = shopkeeperId;
+          }
+
+          const { data: insertedProduct, error: prodError } = await supabase
+            .from('products')
+            .insert([productPayload])
+            .select()
+            .single();
+
+          if (prodError || !insertedProduct) {
+            console.error('Excel row product insertion error:', prodError);
+            failCount++;
+            continue;
+          }
+
+          const relationalVariantPayloads = jsonVariants.map(v => ({
+            product_id: insertedProduct.id,
+            unit_label: v.unit_label,
+            price: v.price,
+            mrp: v.mrp,
+            stock: v.stock
+          }));
+
+          const { error: variantError } = await supabase
+            .from('product_variants')
+            .insert(relationalVariantPayloads);
+
+          if (variantError) {
+            console.error('Excel row variants insertion error:', variantError);
+            failCount++;
+            continue;
           }
 
           successCount++;
@@ -137,11 +159,11 @@ export default function ExcelProductUpload({ onUploadSuccess }) {
           <h3 className="text-lg font-black text-stone-900 flex items-center gap-2">
             <FileSpreadsheet className="text-emerald-600" /> Bulk Upload Products & Variants via Excel
           </h3>
-          <p className="text-xs text-stone-500 mt-0.5">Upload an Excel file. Use format <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700">Unit:Price:MRP:Stock|Unit:Price:MRP:Stock</code> for variants.</p>
+          <p className="text-xs text-stone-500 mt-0.5">Upload an Excel file. Use format <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700">Unit:Price:MRP:Stock|Unit:Price:MRP:Stock</code> in the variants column.</p>
         </div>
         <button 
           onClick={downloadTemplate}
-          className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 border"
+          className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 border cursor-pointer"
         >
           <Download size={14} /> Download Excel Template
         </button>

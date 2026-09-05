@@ -17,7 +17,7 @@ export default function StoreHeader({
   const [prevCount, setPrevCount] = useState(totalItemsCount);
   const [cartBounce, setCartBounce] = useState(false);
   
-  // Blinkit style account dropdown menu state
+  // Account dropdown state
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
 
@@ -60,6 +60,11 @@ export default function StoreHeader({
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) { setLocationName('New Delhi, India'); return; }
     setIsFetchingLocation(true);
@@ -97,7 +102,6 @@ export default function StoreHeader({
   const displayName = customerProfile?.full_name
     ? customerProfile.full_name.split(' ')[0]
     : session?.user?.email?.split('@')[0];
-  const avatarUrl = customerProfile?.avatar_url;
   const userPhone = customerProfile?.phone || session?.user?.email || '8955782853';
 
   return (
@@ -108,12 +112,9 @@ export default function StoreHeader({
           {[...Array(4)].map((_, i) => (
             <span key={i} className="flex items-center gap-3 px-6 text-[10px] font-black uppercase tracking-widest shrink-0">
               <Zap size={11} className="text-amber-400 fill-amber-400" />
-              Lightning Fast Delivery in 10 Minutes
+              Sab Kuch Milega
               <span className="w-1 h-1 rounded-full bg-brand-500 inline-block" />
               Free Delivery on Orders above ₹500
-              <span className="w-1 h-1 rounded-full bg-brand-500 inline-block" />
-              Fresh Products Daily
-              <span className="w-1 h-1 rounded-full bg-brand-500 inline-block" />
             </span>
           ))}
         </div>
@@ -138,7 +139,6 @@ export default function StoreHeader({
               </div>
             </button>
 
-            {/* Mobile Logged-in User Name display */}
             {session && (
               <div className="sm:hidden flex flex-col leading-tight">
                 <span className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Hello,</span>
@@ -198,19 +198,19 @@ export default function StoreHeader({
 
           {/* Right actions */}
           <div className="flex items-center gap-2 relative">
-            {/* Profile / Account Dropdown Trigger */}
+            {/* Account Dropdown Trigger Button */}
             {session ? (
               <div className="relative" ref={accountMenuRef}>
                 <button
                   onClick={handleProfileClick}
-                  className="hidden sm:flex items-center gap-2 h-9 px-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl transition-all duration-200 cursor-pointer btn-press group"
+                  className="flex items-center gap-2 h-9 px-3.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl transition-all duration-200 cursor-pointer btn-press group shadow-2xs"
                   title="Account Menu"
                 >
-                  <span className="text-xs font-bold text-stone-800">Account</span>
+                  <span className="text-xs font-black text-stone-800">Account</span>
                   <ChevronDown size={13} className={`text-stone-500 transition-transform duration-200 ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Blinkit Style Account Dropdown Menu */}
+                {/* Account Dropdown Menu */}
                 <AnimatePresence>
                   {isAccountMenuOpen && (
                     <motion.div
@@ -228,7 +228,7 @@ export default function StoreHeader({
                         <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
                       </div>
 
-                      {/* Menu Items List matching reference */}
+                      {/* Menu Options */}
                       <div className="py-1">
                         <button
                           onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }}
@@ -243,12 +243,6 @@ export default function StoreHeader({
                           <MapPin size={15} className="text-stone-400" /> Saved Addresses
                         </button>
                         <button
-                          onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }}
-                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
-                        >
-                          <FileText size={15} className="text-stone-400" /> My Prescriptions
-                        </button>
-                        <button
                           onClick={() => { setIsAccountMenuOpen(false); alert('E-Gift Cards feature coming soon!'); }}
                           className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
                         >
@@ -260,36 +254,16 @@ export default function StoreHeader({
                         >
                           <HelpCircle size={15} className="text-stone-400" /> FAQ's
                         </button>
-                        <button
-                          onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy-policy'); }}
-                          className="w-full text-left px-5 py-2.5 text-stone-700 hover:bg-stone-50 font-medium flex items-center gap-3 transition cursor-pointer"
-                        >
-                          <Shield size={15} className="text-stone-400" /> Account Privacy
-                        </button>
                       </div>
 
                       {/* Logout option */}
                       <div className="border-t border-stone-100 pt-1 mt-1">
                         <button
-                          onClick={() => { setIsAccountMenuOpen(false); supabase.auth.signOut(); }}
+                          onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }}
                           className="w-full text-left px-5 py-2.5 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-3 transition cursor-pointer"
                         >
                           <LogOut size={15} /> Log Out
                         </button>
-                      </div>
-
-                      {/* App Download QR footer widget matching Blinkit style reference */}
-                      <div className="mx-3 mt-2 p-3 bg-stone-50 rounded-2xl border border-stone-100 flex items-center gap-3">
-                        <div className="w-12 h-12 bg-white p-1 rounded-xl shadow-xs shrink-0 flex items-center justify-center border border-stone-200">
-                          <div className="w-full h-full bg-stone-900 rounded-lg flex items-center justify-center text-[8px] text-white font-mono">
-                            QR
-                          </div>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-stone-900 text-[11px] leading-tight">Simple way to get groceries</p>
-                          <p className="text-brand-600 font-black text-[11px] leading-tight mt-0.5">at your doorstep</p>
-                          <p className="text-[9px] text-stone-400 truncate mt-0.5">Scan QR code & download app</p>
-                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -298,13 +272,13 @@ export default function StoreHeader({
             ) : (
               <Link
                 to="/login"
-                className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white rounded-xl text-[11px] font-black shadow-md shadow-brand-500/25 transition-all btn-press"
+                className="inline-flex items-center gap-1.5 h-9 px-4 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white rounded-xl text-[11px] font-black shadow-md shadow-brand-500/25 transition-all btn-press"
               >
                 Login
               </Link>
             )}
 
-            {/* Notification bell — shown when logged in */}
+            {/* Notification Bell */}
             {session && <NotificationBell session={session} size={16} />}
 
             {/* Cart button */}
@@ -334,7 +308,7 @@ export default function StoreHeader({
           </div>
         </div>
 
-        {/* Mobile Search Bar: Renders on mobile store view when showSearch is true */}
+        {/* Mobile Search Bar */}
         {showSearch && setSearchQuery && (
           <div className="px-4 pb-3 md:hidden">
             <div className="relative">
@@ -359,51 +333,6 @@ export default function StoreHeader({
           </div>
         )}
       </header>
-
-      {/* ── MOBILE BOTTOM NAVIGATION BAR (Global Storefront) ── */}
-      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-100 shadow-2xl">
-        <div className="flex items-center justify-around px-4 py-2.5">
-          <button
-            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
-              <Home size={18} className="text-stone-500" />
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Home</span>
-          </button>
-
-          <button
-            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
-              <Package size={18} className="text-stone-500" />
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Orders</span>
-          </button>
-
-          <button
-            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center transition-colors">
-              <MapPin size={18} className="text-stone-500" />
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Addresses</span>
-          </button>
-
-          <button
-            onClick={() => { navigate('/account/orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-0.5 cursor-pointer group"
-          >
-            <div className="w-9 h-9 bg-stone-50 group-active:bg-stone-100 rounded-xl flex items-center justify-center overflow-hidden transition-colors">
-              <User size={18} className="text-stone-500" />
-            </div>
-            <span className="text-[9px] font-black text-stone-500 uppercase tracking-wider">Profile</span>
-          </button>
-        </div>
-      </div>
     </>
   );
 }

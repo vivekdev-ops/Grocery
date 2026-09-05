@@ -1,6 +1,6 @@
 // src/components/store/ProductGrid.jsx
 import { useState, useRef } from 'react';
-import { Heart, Sparkles, Clock, Package, ChevronRight, ChevronLeft, Zap } from 'lucide-react';
+import { Heart, Sparkles, Clock, Package, ChevronRight, ChevronLeft, Zap, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /* ─────────────────────────────────────────────
@@ -25,6 +25,10 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
   const stock      = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
   const isWishlisted = wishlistIds?.includes(product.id);
+
+  // Average Rating Support
+  const avgRating = product.avgRating || product.rating || null;
+  const reviewCount = product.reviewCount || product.reviews_count || 0;
 
   const handleVariantChange = (e) => {
     e.stopPropagation();
@@ -106,6 +110,15 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 
       {/* Info */}
       <div className="p-2.5 flex flex-col flex-1 gap-1.5">
+        
+        {/* Rating Badge */}
+        {avgRating && avgRating !== 'No ratings' && Number(avgRating) > 0 && (
+          <div className="flex items-center gap-1 text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md w-max border border-amber-200">
+            <Star size={11} className="fill-amber-500 text-amber-500" />
+            <span>{avgRating} {reviewCount ? `(${reviewCount})` : ''}</span>
+          </div>
+        )}
+
         <p className="font-bold text-stone-900 text-[11px] line-clamp-2 leading-snug flex-1">{product.name}</p>
         
         {/* Variant Dropdown Selector */}
@@ -266,14 +279,20 @@ export default function ProductGrid({
     'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop&q=80',
   ];
 
-  const activeCategoryObj = categories.find(c => c.id === activeCategory);
+  // Filter out disabled categories and products
+  const activeCategories = (categories || []).filter(c => c.is_active !== false);
+  const activeProducts = (products || []).filter(p => p.is_active !== false);
+  const activeFilteredProducts = (filteredProducts || []).filter(p => p.is_active !== false);
+  const activeCurrentProducts = (currentProducts || []).filter(p => p.is_active !== false);
+
+  const activeCategoryObj = activeCategories.find(c => c.id === activeCategory);
   const displayCategoryTitle = activeCategory === 'All'
     ? 'All Products & Daily Essentials'
     : (activeCategoryObj?.name ?? 'Category Products');
 
-  const sourceProducts = activeCategory === 'All' ? (products || []) : (filteredProducts || []);
+  const sourceProducts = activeCategory === 'All' ? activeProducts : activeFilteredProducts;
 
-  const productsByCategory = categories
+  const productsByCategory = activeCategories
     .map(cat => ({
       ...cat,
       items: sourceProducts.filter(p =>
@@ -348,7 +367,7 @@ export default function ProductGrid({
         <div className="flex justify-between items-center">
           <h3 className="font-black text-base md:text-lg text-stone-900">Shop by Category</h3>
           <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-            {categories.length} categories
+            {activeCategories.length} categories
           </span>
         </div>
 
@@ -370,7 +389,7 @@ export default function ProductGrid({
             </span>
           </button>
 
-          {categories.map((cat, index) => {
+          {activeCategories.map((cat, index) => {
             const isSelected = activeCategory === cat.id;
             const catImage = cat.image_url || fallbackCategoryImages[index % fallbackCategoryImages.length];
             return (
@@ -444,10 +463,10 @@ export default function ProductGrid({
           {productsByCategory.length === 0 ? (
             <div className="bg-white rounded-2xl p-16 border border-stone-100 text-center shadow-sm">
               <Package size={32} className="text-stone-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-stone-500">No products found in the catalog</p>
+              <p className="text-sm font-bold text-stone-500">No active products found in the catalog</p>
             </div>
           ) : (
-            productsByCategory.map((catSection, sIdx) => (
+            productsByCategory.map((catSection) => (
               <motion.div
                 key={catSection.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -495,17 +514,17 @@ export default function ProductGrid({
               <div className="w-1 h-5 bg-gradient-to-b from-brand-500 to-brand-700 rounded-full" />
               <h3 className="text-base font-black text-stone-900">{displayCategoryTitle}</h3>
             </div>
-            <span className="text-[10px] font-bold text-stone-400">{currentProducts.length} items</span>
+            <span className="text-[10px] font-bold text-stone-400">{activeCurrentProducts.length} items</span>
           </div>
 
-          {currentProducts.length === 0 ? (
+          {activeCurrentProducts.length === 0 ? (
             <div className="bg-white rounded-2xl p-16 border border-stone-100 text-center shadow-sm">
               <Package size={32} className="text-stone-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-stone-500">No products in this category</p>
+              <p className="text-sm font-bold text-stone-500">No active products in this category</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {currentProducts.map((product, idx) => (
+              {activeCurrentProducts.map((product, idx) => (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 14 }}

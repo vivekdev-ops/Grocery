@@ -1,10 +1,17 @@
 // src/components/ShopkeeperPortal.jsx
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, FileText, Truck, Calendar, Printer, Filter, Bell, Search } from 'lucide-react';
+import { 
+  Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, 
+  CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, 
+  FileText, Truck, Calendar, Printer, Filter, Bell, Search, Layers, 
+  TrendingUp, ArrowUpRight, BarChart3, Download, ShieldCheck, Sparkles, CreditCard, FileSpreadsheet, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { registerPushToken } from '../utils/notifications';
+import { motion, AnimatePresence } from 'framer-motion';
+import { registerPushToken, notifyCustomerOrderStatus, notifyAdminDeliveryUpdate } from '../utils/notifications';
 import NotificationBell from './NotificationBell';
+import ExcelProductUpload from './ExcelProductUpload';
 
 const getApplicableCommissionPct = (profile, rules, roleType, cartAmount) => {
   if (profile?.custom_commission_pct !== null && profile?.custom_commission_pct !== undefined && profile?.custom_commission_pct !== '') {
@@ -47,14 +54,13 @@ export default function ShopkeeperPortal() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Excel Bulk Upload Drawer State
+  const [isExcelUploadExpanded, setIsExcelUploadExpanded] = useState(false);
+
   const [productForm, setProductForm] = useState({ 
     name: '', 
-    price: '', 
-    mrp: '', 
-    stock: '', 
     category_id: '', 
-    description: '',
-    image_url: '' 
+    description: ''
   });
   
   const [galleryImages, setGalleryImages] = useState([]);
@@ -113,7 +119,6 @@ export default function ShopkeeperPortal() {
     }
   }, [datePreset, startDate, endDate, commissionRules, shopkeeperProfile?.id]);
 
-  // Initialize interactive OpenStreetMap (Leaflet) when location tab is active
   useEffect(() => {
     if (activeTab === 'location') {
       const timer = setTimeout(() => {
@@ -139,7 +144,7 @@ export default function ShopkeeperPortal() {
 
       const marker = window.L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
 
-      marker.on('dragend', function (e) {
+      marker.on('dragend', function () {
         const coords = marker.getLatLng();
         setLocationForm(prev => ({
           ...prev,
@@ -196,7 +201,7 @@ export default function ShopkeeperPortal() {
       } else {
         alert("Pincode not found. Please try searching by nearby city or landmark.");
       }
-    } catch (err) {
+    } catch {
       alert("Error searching location by pincode.");
     } finally {
       setSearchingPin(false);
@@ -250,10 +255,34 @@ export default function ShopkeeperPortal() {
   const fetchStoreData = async (storeId) => {
     const { data: prodData } = await supabase
       .from('products')
-      .select('*, categories(name)')
+      .select('*, categories(name), product_variants(*)')
       .eq('shopkeeper_id', storeId)
       .order('name');
-    setProducts(prodData || []);
+    
+    const formattedProducts = (prodData || []).map(p => {
+      const variantsList = Array.isArray(p.product_variants) && p.product_variants.length > 0 
+        ? p.product_variants 
+        : (Array.isArray(p.variants) ? p.variants : []);
+      
+      let mergedImages = [];
+      if (Array.isArray(p.images)) mergedImages = p.images;
+      else if (Array.isArray(p.gallery)) mergedImages = p.gallery;
+      else if (typeof p.gallery === 'string') {
+        try {
+          const parsed = JSON.parse(p.gallery);
+          if (Array.isArray(parsed)) mergedImages = parsed;
+        } catch {}
+      }
+      if (mergedImages.length === 0 && p.image_url) mergedImages = [p.image_url];
+
+      return {
+        ...p,
+        images: mergedImages,
+        variants: variantsList
+      };
+    });
+
+    setProducts(formattedProducts);
 
     const productIds = (prodData || []).map(p => p.id);
     if (productIds.length > 0) {
@@ -319,9 +348,6 @@ export default function ShopkeeperPortal() {
     }
 
     setGalleryImages(uploadedUrls);
-    if (!productForm.image_url && uploadedUrls.length > 0) {
-      setProductForm(prev => ({ ...prev, image_url: uploadedUrls[0] }));
-    }
   };
 
   const addVariantTier = () => {
@@ -346,6 +372,31 @@ export default function ShopkeeperPortal() {
       return;
     }
 
+    if (variants.length === 0) {
+      alert("Please add at least one product variant (pack size, price, MRP, stock).");
+      return;
+    }
+
+    for (let i = 0; i < variants.length; i++) {
+      const v = variants[i];
+      if (!v.unit_label?.trim()) {
+        alert(`Please enter Unit / Pack Size for Variant #${i + 1}`);
+        return;
+      }
+      if (v.price === '' || isNaN(Number(v.price))) {
+        alert(`Please enter a valid selling price for Variant #${i + 1}`);
+        return;
+      }
+      if (v.mrp === '' || isNaN(Number(v.mrp))) {
+        alert(`Please enter a valid MRP for Variant #${i + 1}`);
+        return;
+      }
+      if (v.stock === '' || isNaN(Number(v.stock))) {
+        alert(`Please enter valid stock for Variant #${i + 1}`);
+        return;
+      }
+    }
+
     let { data: profileCheck } = await supabase
       .from('shopkeeper_profiles')
       .select('id')
@@ -353,50 +404,75 @@ export default function ShopkeeperPortal() {
       .maybeSingle();
 
     let targetShopkeeperId = profileCheck?.id || session.user.id;
+    const primaryImage = galleryImages.length > 0 ? galleryImages[0] : null;
 
-    const payload = {
-      name: productForm.name,
-      price: parseFloat(productForm.price),
-      mrp: productForm.mrp ? parseFloat(productForm.mrp) : null,
-      stock: parseInt(productForm.stock),
+    const normalizedVariants = variants.map(v => ({
+      unit_label: v.unit_label.trim(),
+      price: Number(v.price),
+      mrp: Number(v.mrp),
+      stock: Number(v.stock)
+    }));
+
+    const productPayload = {
+      name: productForm.name.trim(),
       category_id: productForm.category_id || null,
       description: productForm.description || null,
-      image_url: productForm.image_url || galleryImages[0] || null,
-      gallery: galleryImages,
+      image_url: primaryImage,
       images: galleryImages,
-      variants: variants,
+      gallery: galleryImages,
+      variants: normalizedVariants,
       shopkeeper_id: targetShopkeeperId,
       approval_status: 'pending' 
     };
 
+    let productId = editingId;
+
     if (editingId) {
-      const { error } = await supabase.from('products').update(payload).eq('id', editingId);
-      if (error) alert('Failed to update product: ' + error.message);
-      else {
-        resetForm();
-        fetchStoreData(targetShopkeeperId);
-        alert('Product updated successfully!');
+      const { error } = await supabase.from('products').update(productPayload).eq('id', editingId);
+      if (error) {
+        alert('Failed to update product: ' + error.message);
+        return;
       }
+
+      await supabase.from('product_variants').delete().eq('product_id', editingId);
     } else {
-      const { error } = await supabase.from('products').insert([payload]);
-      if (error) alert('Failed to add product: ' + error.message);
-      else {
-        resetForm();
-        fetchStoreData(targetShopkeeperId);
-        alert('Product submitted successfully! Pending admin approval.');
+      const { data: newProd, error } = await supabase.from('products').insert([productPayload]).select().single();
+      if (error) {
+        alert('Failed to add product: ' + error.message);
+        return;
       }
+      productId = newProd.id;
     }
+
+    const variantPayloads = normalizedVariants.map(v => ({
+      product_id: productId,
+      unit_label: v.unit_label,
+      price: v.price,
+      mrp: v.mrp,
+      stock: v.stock
+    }));
+
+    const { error: variantError } = await supabase.from('product_variants').insert(variantPayloads);
+    if (variantError) {
+      alert('Failed to save variants: ' + variantError.message);
+      return;
+    }
+
+    resetForm();
+    fetchStoreData(targetShopkeeperId);
+    alert(editingId ? 'Product updated successfully!' : 'Product submitted successfully! Pending admin approval.');
   };
 
   const resetForm = () => {
     setEditingId(null);
-    setProductForm({ name: '', price: '', mrp: '', stock: '', category_id: '', description: '', image_url: '' });
+    setProductForm({ name: '', category_id: '', description: '' });
     setGalleryImages([]);
     setVariants([]);
   };
 
   const handleDeleteProduct = async (id) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("Are you sure you want to delete this product and its variants?")) return;
+    await supabase.from('product_variants').delete().eq('product_id', id);
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (!error && session) fetchStoreData(shopkeeperProfile?.id || session.user.id);
   };
@@ -597,35 +673,36 @@ export default function ShopkeeperPortal() {
 
         {activeTab === 'products' && (
           <div className="space-y-6 print:hidden">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Manage My Products</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Add, edit, or remove items belonging exclusively to your store.</p>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Manage My Products</h2>
+                <p className="text-xs text-stone-500 mt-0.5">Add, edit, or remove items belonging exclusively to your store with multi-tier variants.</p>
+              </div>
+              <button
+                onClick={() => setIsExcelUploadExpanded(!isExcelUploadExpanded)}
+                className="bg-stone-100 hover:bg-stone-200 text-stone-800 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition cursor-pointer border border-stone-200 shadow-2xs"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-700" />
+                Bulk Excel Upload
+                {isExcelUploadExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
+
+            {isExcelUploadExpanded && (
+              <div className="bg-white p-6 rounded-3xl border border-emerald-200 shadow-md">
+                <ExcelProductUpload onUploadSuccess={() => shopkeeperProfile?.id && fetchStoreData(shopkeeperProfile.id)} />
+              </div>
+            )}
 
             <form onSubmit={handleSaveProduct} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-6">
               <h3 className="font-bold text-xs text-slate-900 flex items-center gap-2 border-b pb-3 uppercase tracking-wider">
                 <Plus size={16} /> {editingId ? 'Edit Product & Gallery' : 'Add Product & Gallery'}
               </h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Product Name</label>
                   <input type="text" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="e.g. Organic Milk" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Base Price (₹)</label>
-                  <input type="number" step="0.01" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="0.00" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">MRP (₹)</label>
-                  <input type="number" step="0.01" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="0.00" value={productForm.mrp} onChange={e => setProductForm({...productForm, mrp: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Base Stock</label>
-                  <input type="number" required className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="Available units" value={productForm.stock} onChange={e => setProductForm({...productForm, stock: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider mb-1">Select Category</label>
@@ -666,11 +743,14 @@ export default function ShopkeeperPortal() {
                 <textarea rows="3" className="w-full border border-stone-200 p-3 rounded-2xl text-xs bg-stone-50/50 outline-none focus:border-emerald-600 font-medium" placeholder="Product details, ingredients, or specifications..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
               </div>
 
-              <div className="space-y-3 pt-2 border-t">
+              {/* VARIANT SECTION */}
+              <div className="space-y-3 pt-4 border-t">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider">Product Variants (e.g. 500g, 1kg, 5L)</h4>
-                    <p className="text-[10px] text-stone-400">Add custom packaging sizes with individual pricing and stock.</p>
+                    <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers size={14} className="text-emerald-700" /> Product Variants (e.g. 500g, 1kg, 5L)
+                    </h4>
+                    <p className="text-[10px] text-stone-400">Each variant requires its own pack size, selling price, MRP, and stock level.</p>
                   </div>
                   <button type="button" onClick={addVariantTier} className="bg-stone-900 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-2xs hover:bg-stone-800 transition cursor-pointer">
                     <Plus size={14} /> Add Variant Tier
@@ -678,16 +758,36 @@ export default function ShopkeeperPortal() {
                 </div>
 
                 {variants.length === 0 ? (
-                  <p className="text-xs text-stone-400 italic bg-stone-50 p-4 rounded-2xl border text-center">No pack variants added.</p>
+                  <div className="text-center py-6 bg-amber-50 rounded-2xl border border-amber-200">
+                    <p className="text-amber-700 font-bold text-xs">No variants added yet.</p>
+                    <p className="text-[10px] text-amber-600 mt-1">Please add at least one variant configuration.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {variants.map((v, index) => (
-                      <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center bg-stone-50 p-3 rounded-2xl border">
-                        <input type="text" placeholder="Size (e.g. 500g)" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.unit_label} onChange={e => updateVariant(index, 'unit_label', e.target.value)} />
-                        <input type="number" step="0.01" placeholder="Price (₹)" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} />
-                        <input type="number" step="0.01" placeholder="MRP (₹)" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.mrp} onChange={e => updateVariant(index, 'mrp', e.target.value)} />
-                        <input type="number" placeholder="Stock" className="border bg-white p-2 rounded-xl text-xs font-medium outline-none" value={v.stock} onChange={e => updateVariant(index, 'stock', e.target.value)} />
-                        <button type="button" onClick={() => removeVariant(index)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-xl text-xs font-bold text-center cursor-pointer">Remove</button>
+                      <div key={index} className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="font-black text-emerald-800 text-xs">Variant #{index + 1}</span>
+                          <button type="button" onClick={() => removeVariant(index)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 size={14}/></button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Unit / Pack Size</label>
+                            <input type="text" placeholder="e.g. 1 kg" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.unit_label} onChange={e => updateVariant(index, 'unit_label', e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Selling Price (₹)</label>
+                            <input type="number" step="0.01" min="0" placeholder="55.00" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-stone-500 mb-1">MRP (₹)</label>
+                            <input type="number" step="0.01" min="0" placeholder="60.00" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.mrp} onChange={e => updateVariant(index, 'mrp', e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-stone-500 mb-1">Stock</label>
+                            <input type="number" min="0" step="1" placeholder="100" className="w-full border bg-white p-2.5 rounded-xl text-xs font-medium outline-none" value={v.stock} onChange={e => updateVariant(index, 'stock', e.target.value)} />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -725,16 +825,15 @@ export default function ShopkeeperPortal() {
                               {prod.approval_status || 'pending'}
                             </span>
                           </div>
-                          <span className="text-stone-500">Stock: {prod.stock} | Price: ₹{prod.price?.toFixed(2)}</span>
-                          {prod.variants?.length > 0 && (
-                            <span className="block text-[10px] text-emerald-700 font-bold mt-0.5">{prod.variants.length} variant tier(s)</span>
-                          )}
+                          <span className="text-stone-500">
+                            {prod.variants?.length > 0 ? `${prod.variants.length} variant tier(s)` : 'No variants'}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => { 
                           setEditingId(prod.id); 
-                          setProductForm({ name: prod.name, price: prod.price, mrp: prod.mrp || '', stock: prod.stock, category_id: prod.category_id || '', description: prod.description || '', image_url: prod.image_url || '' }); 
+                          setProductForm({ name: prod.name, category_id: prod.category_id || '', description: prod.description || '' }); 
                           setGalleryImages(prod.gallery || prod.images || []);
                           setVariants(prod.variants || []);
                         }} className="p-2 bg-stone-200 hover:bg-stone-300 rounded-xl text-stone-700 cursor-pointer"><Edit size={14}/></button>

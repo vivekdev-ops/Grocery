@@ -1,7 +1,7 @@
 // src/components/CategoryManager.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { FolderTree, Plus, Trash2, Edit, X, Upload, Image as ImageIcon, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FolderTree, Plus, Trash2, Edit, X, Upload, Image as ImageIcon, Sparkles, CheckCircle2, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 export default function CategoryManager() {
   const [categories, setCategories] = useState([]);
@@ -12,6 +12,7 @@ export default function CategoryManager() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryName, setCategoryName] = useState('');
   const [categoryImageUrl, setCategoryImageUrl] = useState('');
+  const [categoryIsActive, setCategoryIsActive] = useState(true);
   
   // Local File Upload State
   const [uploading, setUploading] = useState(false);
@@ -34,6 +35,7 @@ export default function CategoryManager() {
     setEditingCategory(null);
     setCategoryName('');
     setCategoryImageUrl('');
+    setCategoryIsActive(true);
     setIsModalOpen(true);
   };
 
@@ -41,7 +43,23 @@ export default function CategoryManager() {
     setEditingCategory(cat);
     setCategoryName(cat.name || '');
     setCategoryImageUrl(cat.image_url || '');
+    setCategoryIsActive(cat.is_active !== false);
     setIsModalOpen(true);
+  };
+
+  // Toggle active/inactive status inline
+  const handleToggleStatus = async (catId, currentStatus) => {
+    const nextStatus = currentStatus === false ? true : false;
+    const { error } = await supabase
+      .from('categories')
+      .update({ is_active: nextStatus })
+      .eq('id', catId);
+
+    if (error) {
+      alert('Failed to update visibility: ' + error.message);
+    } else {
+      fetchCategories();
+    }
   };
 
   // Handle local file upload to Supabase Storage bucket
@@ -86,7 +104,8 @@ export default function CategoryManager() {
           .from('categories')
           .update({ 
             name: categoryName.trim(),
-            image_url: categoryImageUrl.trim() 
+            image_url: categoryImageUrl.trim(),
+            is_active: categoryIsActive
           })
           .eq('id', editingCategory.id);
 
@@ -97,7 +116,8 @@ export default function CategoryManager() {
           .from('categories')
           .insert([{ 
             name: categoryName.trim(),
-            image_url: categoryImageUrl.trim() 
+            image_url: categoryImageUrl.trim(),
+            is_active: categoryIsActive
           }]);
 
         if (error) throw error;
@@ -125,6 +145,7 @@ export default function CategoryManager() {
   };
 
   const categoriesWithIcons = categories.filter(c => c.image_url && c.image_url.trim() !== '').length;
+  const activeCategoriesCount = categories.filter(c => c.is_active !== false).length;
 
   return (
     <div className="space-y-6 font-sans">
@@ -133,11 +154,11 @@ export default function CategoryManager() {
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
             <FolderTree size={24} className="text-emerald-700" /> Category Management
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Create, update, or remove store categories and bucket icons for customer storefront navigation.</p>
+          <p className="text-xs text-slate-500 mt-0.5">Create, update, toggle visibility, or remove store categories and bucket icons.</p>
         </div>
         <button 
           onClick={openAddModal}
-          className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/25 active:scale-95 shrink-0"
+          className="bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4.5 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-700/25 active:scale-95 shrink-0 cursor-pointer"
         >
           <Plus size={16} /> Add Category
         </button>
@@ -158,9 +179,9 @@ export default function CategoryManager() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
             <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
-              <CheckCircle2 size={14} className="text-emerald-400" /> Total Active Taxonomies
+              <CheckCircle2 size={14} className="text-emerald-400" /> Storefront Visible Taxonomies
             </div>
-            <p className="text-emerald-100/90">Your storefront features <strong className="text-white">{categories.length}</strong> main shopping categories optimized for mobile discovery.</p>
+            <p className="text-emerald-100/90">Your storefront features <strong className="text-white">{activeCategoriesCount}</strong> active categories (<strong className="text-emerald-300">{categories.length} total</strong>) optimized for mobile discovery.</p>
           </div>
 
           <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1 backdrop-blur-md">
@@ -179,38 +200,59 @@ export default function CategoryManager() {
               <th className="p-4">Icon</th>
               <th className="p-4">Category Name</th>
               <th className="p-4">Category ID</th>
+              <th className="p-4">Storefront Visibility</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-emerald-50 text-xs">
             {loading ? (
-              <tr><td colSpan="4" className="p-8 text-center text-slate-500 font-medium">Loading categories...</td></tr>
+              <tr><td colSpan="5" className="p-8 text-center text-slate-500 font-medium">Loading categories...</td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="4" className="p-8 text-center text-slate-400 italic">No categories created yet.</td></tr>
+              <tr><td colSpan="5" className="p-8 text-center text-slate-400 italic">No categories created yet.</td></tr>
             ) : (
-              categories.map(cat => (
-                <tr key={cat.id} className="hover:bg-emerald-50/40 transition">
-                  <td className="p-4">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 overflow-hidden flex items-center justify-center">
-                      {cat.image_url ? (
-                        <img src={cat.image_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon size={18} className="text-slate-400" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 font-bold text-slate-900 text-sm">{cat.name}</td>
-                  <td className="p-4 font-mono text-slate-400 text-[11px]">{cat.id}</td>
-                  <td className="p-4 text-right space-x-2">
-                    <button onClick={() => openEditModal(cat)} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-emerald-200" title="Edit">
-                      <Edit size={14} />
-                    </button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-rose-200" title="Delete">
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              categories.map(cat => {
+                const isActive = cat.is_active !== false;
+                return (
+                  <tr key={cat.id} className="hover:bg-emerald-50/40 transition">
+                    <td className="p-4">
+                      <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 overflow-hidden flex items-center justify-center">
+                        {cat.image_url ? (
+                          <img src={cat.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon size={18} className="text-slate-400" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 font-bold text-slate-900 text-sm">{cat.name}</td>
+                    <td className="p-4 font-mono text-slate-400 text-[11px]">{cat.id}</td>
+                    <td className="p-4">
+                      <button 
+                        onClick={() => handleToggleStatus(cat.id, isActive)}
+                        className="inline-flex items-center gap-1.5 cursor-pointer font-black text-xs transition"
+                        title={isActive ? 'Click to hide category from customers' : 'Click to show category on storefront'}
+                      >
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                            <ToggleRight size={16} /> Active / Visible
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
+                            <ToggleLeft size={16} /> Disabled / Hidden
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                    <td className="p-4 text-right space-x-2">
+                      <button onClick={() => openEditModal(cat)} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-emerald-200 cursor-pointer" title="Edit">
+                        <Edit size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteCategory(cat.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2.5 rounded-2xl transition inline-flex items-center gap-1 border border-rose-200 cursor-pointer" title="Delete">
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -221,7 +263,7 @@ export default function CategoryManager() {
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4">
             <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-lg text-slate-900">{editingCategory ? 'Edit Category' : 'Add New Category'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-full hover:bg-emerald-50 text-slate-500"><X size={18} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-full hover:bg-emerald-50 text-slate-500 cursor-pointer"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleSaveCategory} className="space-y-4 text-xs">
@@ -256,9 +298,22 @@ export default function CategoryManager() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-3 bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-200">
+                <input
+                  type="checkbox"
+                  id="category_active_status"
+                  checked={categoryIsActive}
+                  onChange={e => setCategoryIsActive(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="category_active_status" className="font-bold text-slate-800 cursor-pointer">
+                  Display Category on Customer Storefront
+                </label>
+              </div>
+
               <button 
                 type="submit" disabled={submitting || uploading}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-sm uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-3.5 rounded-2xl transition text-sm uppercase tracking-wider shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
               </button>

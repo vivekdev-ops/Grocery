@@ -29,6 +29,9 @@ import {
   Clock,
   ArrowRight,
   Flame,
+  LogOut,
+  KeyRound,
+  Ban,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -437,11 +440,8 @@ const CustomerOrdersPage = () => {
   const [ratingOrder, setRatingOrder] =
     useState(null);
 
-  const [ratingValue, setRatingValue] =
-    useState(0);
-
-  const [ratingComment, setRatingComment] =
-    useState('');
+  // Per-product rating state map: { [productId]: { rating: number, comment: string } }
+  const [productRatingsMap, setProductRatingsMap] = useState({});
 
   const [savingRating, setSavingRating] =
     useState(false);
@@ -451,6 +451,8 @@ const CustomerOrdersPage = () => {
 
   const [reorderingOrderId, setReorderingOrderId] =
     useState(null);
+
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
 
   /* =======================================================
@@ -671,6 +673,51 @@ const CustomerOrdersPage = () => {
       ...prev,
       [orderId]: !prev[orderId],
     }));
+  };
+
+
+  /* =======================================================
+     CANCEL ORDER
+  ======================================================= */
+
+  const handleCancelOrder = async (order) => {
+    if (!order) return;
+    const orderId = getOrderId(order);
+    const status = String(getOrderStatus(order)).toLowerCase().trim();
+
+    if (status !== 'pending' && status !== 'placed') {
+      alert('Orders can only be cancelled while their status is Pending.');
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to cancel this order?');
+    if (!confirmed) return;
+
+    try {
+      setCancellingOrderId(orderId);
+
+      const customerName = user?.full_name || authUser?.user_metadata?.full_name || authUser?.email?.split('@')[0] || 'Customer';
+      const cancelRemark = `Cancelled by :${customerName}:`;
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'cancelled',
+          remark: cancelRemark
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      alert('Order cancelled successfully.');
+      setSelectedOrder(null);
+      await loadOrders();
+    } catch (error) {
+      console.error('Cancel order error:', error);
+      alert(`Unable to cancel order: ${error?.message || 'Something went wrong.'}`);
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
 
@@ -1362,71 +1409,80 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     RATING
+     RATING (PER PRODUCT)
   ======================================================= */
 
   const openRatingModal = (order) => {
     setRatingOrder(order);
-    setRatingValue(0);
-    setRatingComment('');
+    const initialMap = {};
+    const items = Array.isArray(order?.order_items) ? order.order_items : [];
+    items.forEach((item) => {
+      const prodId = item?.products?.id;
+      if (prodId) {
+        initialMap[prodId] = { rating: 5, comment: '' };
+      }
+    });
+    setProductRatingsMap(initialMap);
   };
 
-  const handleSubmitRating = async () => {
+  const handleProductRatingChange = (productId, field, value) => {
+    setProductRatingsMap((prev) => ({
+      ...prev,
+      [productId]: {
+        ...(prev[productId] || { rating: 5, comment: '' }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSubmitAllProductRatings = async () => {
     if (!ratingOrder) return;
 
-    if (
-      !ratingValue ||
-      ratingValue < 1
-    ) {
-      alert(
-        'Please select a rating.'
-      );
+    const userId = authUser?.id || user?.id;
+    const userEmail = authUser?.email || user?.email || 'customer@hub.com';
+
+    if (!userId) {
+      alert('Please log in to submit product reviews.');
       return;
     }
 
     try {
       setSavingRating(true);
 
-      const orderId =
-        getOrderId(ratingOrder);
+      const items = Array.isArray(ratingOrder?.order_items) ? ratingOrder.order_items : [];
+      const insertPayloads = [];
 
-      const {
-        error,
-      } = await supabase
-        .from('order_ratings')
-        .insert({
-          order_id: orderId,
-          customer_email:
-            authUser?.email ||
-            user?.email ||
-            null,
-          rating: ratingValue,
-          comment:
-            ratingComment?.trim() ||
-            null,
-        });
+      items.forEach((item) => {
+        const prodId = item?.products?.id;
+        if (prodId && productRatingsMap[prodId]) {
+          const entry = productRatingsMap[prodId];
+          insertPayloads.push({
+            product_id: prodId,
+            user_id: userId,
+            user_email: userEmail,
+            rating: Number(entry.rating || 5),
+            review_text: entry.comment?.trim() || null,
+          });
+        }
+      });
+
+      if (insertPayloads.length === 0) {
+        alert('No ratings provided.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('product_reviews')
+        .insert(insertPayloads);
 
       if (error) throw error;
 
-      alert(
-        'Thank you for your feedback!'
-      );
-
+      alert('Thank you! Product reviews submitted successfully.');
       setRatingOrder(null);
-      setRatingValue(0);
-      setRatingComment('');
+      setProductRatingsMap({});
     } catch (error) {
-      console.error(
-        'Rating submission error:',
-        error
-      );
-
-      alert(
-        `Unable to submit rating: ${
-          error?.message ||
-          'Something went wrong.'
-        }`
-      );
+      console.error('Product review submission error:', error);
+      alert(`Unable to submit reviews: ${error?.message || 'Something went wrong.'}`);
     } finally {
       setSavingRating(false);
     }
@@ -1466,44 +1522,6 @@ const CustomerOrdersPage = () => {
       <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-        {/* =================================================
-            HEADER & GREETING BANNER WITH VIBRANT COLORS
-        ================================================= */}
-        <motion.div 
-          initial={{ opacity: 0, y: -15 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: 0.3 }}
-          className="bg-gradient-to-r from-emerald-600 via-teal-700 to-cyan-900 rounded-3xl p-6 sm:p-8 text-white shadow-2xl mb-8 relative overflow-hidden"
-        >
-          <div className="absolute -right-12 -top-12 w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute right-20 -bottom-10 w-32 h-32 bg-amber-400/20 rounded-full blur-xl pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-amber-300 text-xs font-black uppercase tracking-wider mb-3 border border-white/20 shadow-xs">
-                <Flame size={14} className="text-amber-300 fill-amber-300 animate-pulse" /> Express Account Hub
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white drop-shadow-xs">
-                Welcome back, {user?.full_name ? user.full_name.split(' ')[0] : 'Valued Customer'}! 🚀
-              </h1>
-              <p className="text-emerald-100 text-xs sm:text-sm mt-1.5 font-medium max-w-xl">
-                Track lightning-fast 10-minute grocery shipments, manage saved drop-off zones, and edit your profile credentials.
-              </p>
-            </div>
-
-            <button
-              onClick={() => loadOrders()}
-              disabled={loadingOrders}
-              className="self-start sm:self-center inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-stone-900 disabled:opacity-50 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-400/25 active:scale-95"
-              title="Sync Account Data"
-            >
-              <RefreshCw className={`w-4 h-4 ${loadingOrders ? 'animate-spin' : ''}`} />
-              <span>Refresh Orders</span>
-            </button>
-          </div>
-        </motion.div>
-
 
         {/* =================================================
             VIBRANT INTERACTIVE TAB NAVIGATION BUTTONS
@@ -1848,6 +1866,7 @@ const CustomerOrdersPage = () => {
                     const total = getOrderTotal(order);
                     const expanded = Boolean(expandedOrders[orderId]);
                     const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
+                    const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
 
                     return (
                       <div
@@ -1879,6 +1898,17 @@ const CustomerOrdersPage = () => {
                             </div>
 
                             <div className="flex items-center gap-2.5 self-end sm:self-auto w-full sm:w-auto justify-end pt-3 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+                              {isPending && (
+                                <button
+                                  onClick={() => handleCancelOrder(order)}
+                                  disabled={cancellingOrderId === orderId}
+                                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-black text-rose-700 disabled:opacity-50 cursor-pointer transition shadow-2xs inline-flex items-center gap-1"
+                                >
+                                  {cancellingOrderId === orderId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                                  <span>Cancel Order</span>
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => setSelectedOrder(order)}
                                 className="px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-xs font-black text-stone-800 cursor-pointer transition shadow-2xs"
@@ -1992,48 +2022,48 @@ const CustomerOrdersPage = () => {
 
 
       {/* =========================================================
-          VIBRANT MOBILE BOTTOM NAVIGATION BAR
+          VIBRANT MOBILE BOTTOM NAVIGATION BAR (Icons Only on Mobile)
       ========================================================= */}
       <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
-        <div className="flex items-center justify-around px-2 py-2">
+        <div className="flex items-center justify-around px-2 py-2.5">
           <button
             onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 p-2 cursor-pointer group"
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Home"
           >
             <div className="w-11 h-11 bg-stone-100 group-active:bg-stone-200 rounded-2xl flex items-center justify-center transition-colors">
-              <Home size={20} className="text-stone-700" />
+              <Home size={22} className="text-stone-700" />
             </div>
-            <span className="text-[10px] font-black text-stone-700 uppercase tracking-wider">Home</span>
           </button>
 
           <button
             onClick={() => { setActiveTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 p-2 cursor-pointer group"
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Orders"
           >
             <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'orders' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <Package size={20} />
+              <Package size={22} />
             </div>
-            <span className={`text-[10px] font-black uppercase tracking-wider ${activeTab === 'orders' ? 'text-emerald-800' : 'text-stone-700'}`}>Orders</span>
           </button>
 
           <button
             onClick={() => { setActiveTab('addresses'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 p-2 cursor-pointer group"
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Addresses"
           >
             <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'addresses' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <MapPin size={20} />
+              <MapPin size={22} />
             </div>
-            <span className={`text-[10px] font-black uppercase tracking-wider ${activeTab === 'addresses' ? 'text-blue-800' : 'text-stone-700'}`}>Addresses</span>
           </button>
 
           <button
             onClick={() => { setActiveTab('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 p-2 cursor-pointer group"
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Profile"
           >
             <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'profile' ? 'bg-purple-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <User size={20} />
+              <User size={22} />
             </div>
-            <span className={`text-[10px] font-black uppercase tracking-wider ${activeTab === 'profile' ? 'text-purple-800' : 'text-stone-700'}`}>Profile</span>
           </button>
         </div>
       </div>
@@ -2349,7 +2379,7 @@ const CustomerOrdersPage = () => {
                           {variant && (
                             <p className="text-xs text-stone-500 font-medium">{getVariantLabel(variant)}</p>
                           )}
-                          <p className="text-xs text-stone-500 font-bold mt-0.5">Qty: {Number(item?.quantity) || 1}</p>
+                          <p className="text-xs text-stone-500 font-black mt-0.5">Qty: {Number(item?.quantity) || 1}</p>
                         </div>
 
                         <div className="text-right shrink-0">
@@ -2362,7 +2392,7 @@ const CustomerOrdersPage = () => {
                 </div>
               </div>
 
-              {/* ADDRESS & PAYMENT INFO */}
+              {/* ADDRESS & PAYMENT INFO (COD Only) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70">
                   <h4 className="font-black text-stone-900 mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-stone-500">
@@ -2377,8 +2407,10 @@ const CustomerOrdersPage = () => {
                   <h4 className="font-black text-stone-900 mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-stone-500">
                     <CreditCard className="w-4 h-4 text-emerald-600" /> Payment Summary
                   </h4>
-                  <p className="font-extrabold text-stone-900 text-sm">{selectedOrder?.payment_method || 'Online Payment'}</p>
-                  <p className="text-emerald-700 font-black text-xs mt-1">Status: {selectedOrder?.payment_status || 'Paid Successfully'}</p>
+                  <p className="font-extrabold text-stone-900 text-sm">Cash on Delivery (COD)</p>
+                  <p className={`font-black text-xs mt-1 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid' : 'Pending Payment'}
+                  </p>
                 </div>
               </div>
 
@@ -2429,7 +2461,7 @@ const CustomerOrdersPage = () => {
                       onClick={() => openRatingModal(selectedOrder)}
                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100/60 text-xs font-bold cursor-pointer"
                     >
-                      <Star className="w-4 h-4 fill-amber-400 text-amber-500" /> Rate Experience
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-500" /> Rate Products
                     </button>
 
                     <button
@@ -2454,16 +2486,16 @@ const CustomerOrdersPage = () => {
 
 
       {/* ===================================================
-          RATING MODAL
+          PER-PRODUCT RATING MODAL
       =================================================== */}
 
       {ratingOrder && (
         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-stone-100">
-            <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50/50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100">
+            <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50/50 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="font-black text-stone-900 text-base">Rate Your Order</h2>
-                <p className="text-xs text-stone-500 font-medium">{getDisplayOrderId(ratingOrder)}</p>
+                <h2 className="font-black text-stone-900 text-base">Rate Ordered Products</h2>
+                <p className="text-xs text-stone-500 font-medium">Order {getDisplayOrderId(ratingOrder)}</p>
               </div>
 
               <button
@@ -2474,50 +2506,80 @@ const CustomerOrdersPage = () => {
               </button>
             </div>
 
-            <div className="p-6">
-              <p className="text-xs sm:text-sm text-stone-600 text-center font-bold mb-4">
-                How was the delivery speed and product freshness?
+            <div className="p-6 space-y-6">
+              <p className="text-xs text-stone-500 font-medium">
+                Please provide a rating and review for each product included in this delivery.
               </p>
 
-              <div className="flex justify-center gap-2.5 mb-5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRatingValue(star)}
-                    className="p-1.5 cursor-pointer transition transform hover:scale-125"
-                  >
-                    <Star
-                      className={`w-8 h-8 ${
-                        star <= ratingValue ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
-                      }`}
-                    />
-                  </button>
-                ))}
+              <div className="space-y-5">
+                {(Array.isArray(ratingOrder?.order_items) ? ratingOrder.order_items : []).map((item, index) => {
+                  const product = item?.products;
+                  const prodId = product?.id;
+                  if (!prodId) return null;
+
+                  const currentData = productRatingsMap[prodId] || { rating: 5, comment: '' };
+                  const image = product?.image_url || product?.image || product?.images?.[0] || '';
+
+                  return (
+                    <div key={prodId || index} className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-stone-200">
+                          {image ? (
+                            <img src={image} alt="" className="w-full h-full object-contain" />
+                          ) : (
+                            <Package className="w-5 h-5 text-stone-300" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-black text-stone-900 text-sm">{product?.name || 'Product'}</p>
+                          <p className="text-xs text-stone-400 font-bold">Qty: {item.quantity}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => handleProductRatingChange(prodId, 'rating', star)}
+                            className="cursor-pointer transition transform hover:scale-110"
+                          >
+                            <Star
+                              className={`w-6 h-6 ${
+                                star <= currentData.rating ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                        <span className="ml-2 text-xs font-black text-stone-700">{currentData.rating} / 5</span>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={currentData.comment}
+                        onChange={(e) => handleProductRatingChange(prodId, 'comment', e.target.value)}
+                        placeholder="Write a quick review for this item..."
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
-              <textarea
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-                rows={3}
-                placeholder="Write your feedback..."
-                className="w-full border border-stone-200 bg-stone-50 rounded-2xl p-3.5 text-xs sm:text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-              />
-
-              <div className="flex justify-end gap-3 mt-5">
+              <div className="flex justify-end gap-3 pt-4 border-t border-stone-100">
                 <button
                   onClick={() => setRatingOrder(null)}
-                  className="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmitRating}
-                  disabled={savingRating || !ratingValue}
+                  onClick={handleSubmitAllProductRatings}
+                  disabled={savingRating}
                   className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
                 >
                   {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Submit Review
+                  Submit All Product Reviews
                 </button>
               </div>
             </div>

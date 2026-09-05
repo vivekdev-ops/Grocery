@@ -26,7 +26,10 @@ import {
   Bold,
   Italic,
   List,
-  AlignLeft
+  AlignLeft,
+  ToggleLeft,
+  ToggleRight,
+  FolderTree
 } from 'lucide-react';
 
 import ExcelProductUpload from './ExcelProductUpload';
@@ -59,7 +62,8 @@ export default function ProductManager() {
   const [form, setForm] = useState({
     name: '',
     category_id: '',
-    description: ''
+    description: '',
+    is_active: true
   });
 
   // =========================================================
@@ -495,6 +499,38 @@ export default function ProductManager() {
   };
 
   // =========================================================
+  // TOGGLE STATUS
+  // =========================================================
+
+  const handleToggleProductStatus = async (productId, currentStatus) => {
+    const nextStatus = currentStatus === false ? true : false;
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: nextStatus })
+      .eq('id', productId);
+
+    if (error) {
+      alert(error.message);
+    } else {
+      await fetchData();
+    }
+  };
+
+  const handleToggleCategoryStatus = async (categoryId, currentStatus) => {
+    const nextStatus = currentStatus === false ? true : false;
+    const { error } = await supabase
+      .from('categories')
+      .update({ is_active: nextStatus })
+      .eq('id', categoryId);
+
+    if (error) {
+      alert(error.message);
+    } else {
+      await fetchData();
+    }
+  };
+
+  // =========================================================
   // APPROVAL
   // =========================================================
 
@@ -763,7 +799,8 @@ export default function ProductManager() {
     setForm({
       name: '',
       category_id: '',
-      description: ''
+      description: '',
+      is_active: true
     });
 
     setImageFiles([]);
@@ -792,7 +829,10 @@ export default function ProductManager() {
         product.category_id || '',
 
       description:
-        product.description || ''
+        product.description || '',
+
+      is_active:
+        product.is_active !== false
     });
 
     setExistingImages(
@@ -1198,11 +1238,6 @@ export default function ProductManager() {
 
         // =====================================================
         // PRODUCT PAYLOAD
-        //
-        // NO price
-        // NO mrp
-        // NO stock
-        //
         // =====================================================
 
         const productPayload = {
@@ -1222,7 +1257,6 @@ export default function ProductManager() {
           gallery:
             allImageUrls,
 
-          // Keep JSON variants synchronized
           variants:
             jsonVariants,
 
@@ -1230,7 +1264,10 @@ export default function ProductManager() {
             form.description || '',
 
           approval_status:
-            'approved'
+            'approved',
+
+          is_active:
+            form.is_active
 
         };
 
@@ -1389,7 +1426,8 @@ export default function ProductManager() {
         setForm({
           name: '',
           category_id: '',
-          description: ''
+          description: '',
+          is_active: true
         });
 
         await fetchData();
@@ -1566,7 +1604,7 @@ export default function ProductManager() {
 
           <p className="text-xs text-slate-500 mt-0.5">
             Manage products, pack variants, pricing,
-            MRP, stock, reviews and approvals.
+            MRP, stock, reviews and store visibility.
           </p>
 
         </div>
@@ -1786,7 +1824,7 @@ export default function ProductManager() {
 
         {/* ===================================================
             TABS
-        =================================================== */}
+        ================================================   */}
 
         <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-800/80">
 
@@ -1804,6 +1842,23 @@ export default function ProductManager() {
             <Package size={14} />
 
             All Inventory ({products.length})
+
+          </button>
+
+          <button
+            onClick={() =>
+              setActiveTab('categories')
+            }
+            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'categories'
+                ? 'bg-emerald-500 text-slate-950 shadow-md'
+                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
+            }`}
+          >
+
+            <FolderTree size={14} />
+
+            Manage Categories ({categories.length})
 
           </button>
 
@@ -1883,9 +1938,45 @@ export default function ProductManager() {
       </div>
 
       {/* =====================================================
-          INVENTORY TABLE
+          CATEGORIES MANAGEMENT TAB
       ===================================================== */}
-
+      {activeTab === 'categories' ? (
+        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4">
+          <div className="flex justify-between items-center border-b pb-3">
+            <h3 className="font-black text-sm text-slate-900 uppercase">Category Visibility Control</h3>
+            <span className="text-xs text-slate-400">Enable or disable entire categories from displaying on storefront.</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {categories.map(cat => {
+              const isActive = cat.is_active !== false;
+              return (
+                <div key={cat.id} className="p-4 bg-emerald-50/40 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                  <div>
+                    <span className="font-black text-slate-900 text-sm block">{cat.name}</span>
+                    <span className={`text-[10px] font-bold uppercase ${isActive ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {isActive ? 'Visible to Customer' : 'Hidden from Customer'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleCategoryStatus(cat.id, isActive)}
+                    className="p-2 cursor-pointer transition"
+                    title={isActive ? 'Disable Category' : 'Enable Category'}
+                  >
+                    {isActive ? (
+                      <ToggleRight size={28} className="text-emerald-600" />
+                    ) : (
+                      <ToggleLeft size={28} className="text-stone-400" />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+      /* =====================================================
+          INVENTORY TABLE
+      ================================================     */
       <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
 
         <div className="overflow-x-auto">
@@ -1917,7 +2008,7 @@ export default function ProductManager() {
                 </th>
 
                 <th className="p-4">
-                  Status
+                  Status & Visibility
                 </th>
 
                 <th className="p-4 text-right">
@@ -1970,6 +2061,8 @@ export default function ProductManager() {
 
                   const lowVariantCount =
                     product.lowStockVariants?.length || 0;
+
+                  const isProductActive = product.is_active !== false;
 
                   return (
 
@@ -2273,9 +2366,9 @@ export default function ProductManager() {
 
                       </td>
 
-                      {/* STATUS */}
+                      {/* STATUS & VISIBILITY */}
 
-                      <td className="p-4">
+                      <td className="p-4 space-y-1">
 
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
@@ -2293,6 +2386,20 @@ export default function ProductManager() {
                             'pending'}
 
                         </span>
+
+                        <div className="pt-1">
+                          <button
+                            onClick={() => handleToggleProductStatus(product.id, isProductActive)}
+                            className="inline-flex items-center gap-1 text-[10px] font-black cursor-pointer transition"
+                            title={isProductActive ? 'Disable product from customer view' : 'Enable product for customer view'}
+                          >
+                            {isProductActive ? (
+                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Active</span>
+                            ) : (
+                              <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">Disabled</span>
+                            )}
+                          </button>
+                        </div>
 
                       </td>
 
@@ -2367,10 +2474,11 @@ export default function ProductManager() {
         </div>
 
       </div>
+      )}
 
       {/* =====================================================
           REVIEWS MODAL
-      ===================================================== */}
+      ================================================     */}
 
       {selectedProductForReviews && (
 
@@ -2530,7 +2638,7 @@ export default function ProductManager() {
 
       {/* =====================================================
           ADD / EDIT PRODUCT MODAL
-      ===================================================== */}
+      ================================================     */}
 
       {isModalOpen && (
 
@@ -2581,7 +2689,7 @@ export default function ProductManager() {
 
               {/* =================================================
                   PRODUCT NAME
-              ================================================= */}
+              ================================================     */}
 
               <div>
 
@@ -2607,7 +2715,7 @@ export default function ProductManager() {
 
               {/* =================================================
                   CATEGORY
-              ================================================= */}
+              ================================================     */}
 
               <div>
 
@@ -2650,9 +2758,22 @@ export default function ProductManager() {
 
               </div>
 
+              <div className="flex items-center gap-3 bg-emerald-50/40 p-4 rounded-2xl border border-emerald-200">
+                <input
+                  type="checkbox"
+                  id="form_is_active"
+                  checked={form.is_active}
+                  onChange={e => setForm({ ...form, is_active: e.target.checked })}
+                  className="w-4 h-4 text-emerald-600 rounded border-emerald-300 focus:ring-emerald-500"
+                />
+                <label htmlFor="form_is_active" className="font-bold text-slate-800 cursor-pointer">
+                  Make Product Active / Visible to Customers on Storefront
+                </label>
+              </div>
+
               {/* =================================================
                   IMAGES
-              ================================================= */}
+              ================================================     */}
 
               <div>
 
@@ -2735,7 +2856,7 @@ export default function ProductManager() {
 
               {/* =================================================
                   DESCRIPTION
-              ================================================= */}
+              ================================================     */}
 
               <div>
 
@@ -2854,7 +2975,7 @@ export default function ProductManager() {
 
               {/* =================================================
                   VARIANTS
-              ================================================= */}
+              ================================================     */}
 
               <div className="pt-4 border-t border-emerald-100 space-y-4">
 
@@ -3135,7 +3256,7 @@ export default function ProductManager() {
 
               {/* =================================================
                   SAVE
-              ================================================= */}
+              ================================================     */}
 
               <button
                 type="submit"
