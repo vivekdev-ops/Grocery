@@ -1209,12 +1209,6 @@ export default function ProductManager() {
 
         // =====================================================
         // JSON VARIANT DATA
-        //
-        // Kept synchronized for backward compatibility.
-        //
-        // IMPORTANT:
-        // The relational product_variants table remains the
-        // actual source of truth.
         // =====================================================
 
         const jsonVariants =
@@ -1387,9 +1381,6 @@ export default function ProductManager() {
 
         if (variantError) {
 
-          // If this was a newly-created product,
-          // remove it so we don't leave an orphan product.
-
           if (!editingProduct && productId) {
 
             await supabase
@@ -1462,10 +1453,6 @@ export default function ProductManager() {
 
         let matchesTab = true;
 
-        // -----------------------------------------------------
-        // PENDING APPROVALS
-        // -----------------------------------------------------
-
         if (
           activeTab === 'approvals'
         ) {
@@ -1476,10 +1463,6 @@ export default function ProductManager() {
             !product.approval_status;
 
         }
-
-        // -----------------------------------------------------
-        // LOW STOCK
-        // -----------------------------------------------------
 
         else if (
           activeTab === 'lowStock'
@@ -1495,10 +1478,6 @@ export default function ProductManager() {
 
         }
 
-        // -----------------------------------------------------
-        // TOP SELLING
-        // -----------------------------------------------------
-
         else if (
           activeTab === 'topSelling'
         ) {
@@ -1509,10 +1488,6 @@ export default function ProductManager() {
             ) > 0;
 
         }
-
-        // -----------------------------------------------------
-        // SHOPKEEPER
-        // -----------------------------------------------------
 
         const matchesShopkeeper =
           selectedShopkeeperFilter ===
@@ -1581,6 +1556,10 @@ export default function ProductManager() {
             ) <= 5
         )
     ).length;
+
+  // Separate parent categories and subcategories for structured dropdowns & management
+  const parentCategories = categories.filter(c => !c.parent_id);
+  const getSubcategories = (parentId) => categories.filter(c => c.parent_id === parentId);
 
   // =========================================================
   // RENDER
@@ -1824,7 +1803,7 @@ export default function ProductManager() {
 
         {/* ===================================================
             TABS
-        ================================================   */}
+        =================================================== */}
 
         <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-800/80">
 
@@ -1842,23 +1821,6 @@ export default function ProductManager() {
             <Package size={14} />
 
             All Inventory ({products.length})
-
-          </button>
-
-          <button
-            onClick={() =>
-              setActiveTab('categories')
-            }
-            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'categories'
-                ? 'bg-emerald-500 text-slate-950 shadow-md'
-                : 'bg-emerald-950/80 text-emerald-200 hover:bg-emerald-900 border border-emerald-800'
-            }`}
-          >
-
-            <FolderTree size={14} />
-
-            Manage Categories ({categories.length})
 
           </button>
 
@@ -1938,45 +1900,9 @@ export default function ProductManager() {
       </div>
 
       {/* =====================================================
-          CATEGORIES MANAGEMENT TAB
-      ===================================================== */}
-      {activeTab === 'categories' ? (
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4">
-          <div className="flex justify-between items-center border-b pb-3">
-            <h3 className="font-black text-sm text-slate-900 uppercase">Category Visibility Control</h3>
-            <span className="text-xs text-slate-400">Enable or disable entire categories from displaying on storefront.</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {categories.map(cat => {
-              const isActive = cat.is_active !== false;
-              return (
-                <div key={cat.id} className="p-4 bg-emerald-50/40 rounded-2xl border border-emerald-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-black text-slate-900 text-sm block">{cat.name}</span>
-                    <span className={`text-[10px] font-bold uppercase ${isActive ? 'text-emerald-700' : 'text-rose-600'}`}>
-                      {isActive ? 'Visible to Customer' : 'Hidden from Customer'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleToggleCategoryStatus(cat.id, isActive)}
-                    className="p-2 cursor-pointer transition"
-                    title={isActive ? 'Disable Category' : 'Enable Category'}
-                  >
-                    {isActive ? (
-                      <ToggleRight size={28} className="text-emerald-600" />
-                    ) : (
-                      <ToggleLeft size={28} className="text-stone-400" />
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-      /* =====================================================
           INVENTORY TABLE
-      ================================================     */
+      ================================================     */}
+
       <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
 
         <div className="overflow-x-auto">
@@ -2008,7 +1934,7 @@ export default function ProductManager() {
                 </th>
 
                 <th className="p-4">
-                  Status & Visibility
+                  Status
                 </th>
 
                 <th className="p-4 text-right">
@@ -2474,11 +2400,10 @@ export default function ProductManager() {
         </div>
 
       </div>
-      )}
 
       {/* =====================================================
           REVIEWS MODAL
-      ================================================     */}
+      ===================================================== */}
 
       {selectedProductForReviews && (
 
@@ -2638,7 +2563,7 @@ export default function ProductManager() {
 
       {/* =====================================================
           ADD / EDIT PRODUCT MODAL
-      ================================================     */}
+      ===================================================== */}
 
       {isModalOpen && (
 
@@ -2714,13 +2639,13 @@ export default function ProductManager() {
               </div>
 
               {/* =================================================
-                  CATEGORY
+                  CATEGORY & SUBCATEGORY HIERARCHICAL SELECTOR
               ================================================     */}
 
               <div>
 
                 <label className="block font-bold text-slate-700 mb-1">
-                  Category
+                  Category / Subcategory
                 </label>
 
                 <select
@@ -2741,18 +2666,19 @@ export default function ProductManager() {
                     Select Category
                   </option>
 
-                  {categories.map(
-                    category => (
-
-                      <option
-                        key={category.id}
-                        value={category.id}
-                      >
-                        {category.name}
-                      </option>
-
-                    )
-                  )}
+                  {parentCategories.map(parent => {
+                    const subs = getSubcategories(parent.id);
+                    return (
+                      <optgroup key={parent.id} label={`📁 ${parent.name}`}>
+                        <option value={parent.id}>📂 {parent.name} (Main Category)</option>
+                        {subs.map(sub => (
+                          <option key={sub.id} value={sub.id}>
+                            &nbsp;&nbsp;&nbsp;&nbsp;└─ {sub.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
 
                 </select>
 
