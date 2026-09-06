@@ -8,19 +8,6 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
 
-  // Fallback dummy grocery/store images for blank entries
-  const dummyImages = [
-    "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=80", // Fresh groceries
-    "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=500&q=80", // Supermarket items
-    "https://images.unsplash.com/photo-1563536316-33923d83832d?auto=format&fit=crop&w=500&q=80", // Fresh fruits & veg
-    "https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?auto=format&fit=crop&w=500&q=80"  // Snacks & packaged goods
-  ];
-
-  const getRandomDummyImage = () => {
-    const randomIndex = Math.floor(Math.random() * dummyImages.length);
-    return dummyImages[randomIndex];
-  };
-
   const downloadTemplate = () => {
     const templateData = [
       {
@@ -30,7 +17,6 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
         mrp: 50,
         stock: 100,
         unit: "1 kg",
-        image_url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=500&q=80",
         description: "Freshly harvested organic tomatoes from local farms."
       },
       {
@@ -40,7 +26,6 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
         mrp: 34,
         stock: 50,
         unit: "500 ml",
-        image_url: "", // Leave blank to test automatic dummy image fallback
         description: "Pasteurised fresh toned milk."
       }
     ];
@@ -91,11 +76,6 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
           const mrp = Number(row.mrp || row.MRP || price);
           const stock = Number(row.stock || row.Stock || 10);
           const unit = row.unit || row.Unit || '1 unit';
-          
-          // Check if image_url is provided, otherwise assign a random dummy image
-          const rawImageUrl = row.image_url || row.Image_Url || row.Image || '';
-          const finalImageUrl = String(rawImageUrl).trim() !== '' ? String(rawImageUrl).trim() : getRandomDummyImage();
-
           const description = row.description || row.Description || '';
 
           if (!productName) {
@@ -109,14 +89,13 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
             categoryId = categoryMap[String(categoryName).trim().toLowerCase()] || null;
           }
 
-          // 1. Insert parent product with 'approved' status by default & fallback dummy image
+          // 1. Insert parent product with 'pending' approval status for admin verification
           const productPayload = {
             shopkeeper_id: shopkeeperId,
             name: String(productName).trim(),
             category_id: categoryId,
             description: String(description),
-            image_url: finalImageUrl,
-            approval_status: 'approved',
+            approval_status: 'pending',
             is_active: true
           };
 
@@ -132,7 +111,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
             continue;
           }
 
-          // 2. Insert variant details
+          // 2. Insert variant details including unit_label, price, mrp, and stock
           const variantPayload = {
             product_id: insertedProduct.id,
             unit_label: String(unit),
@@ -173,7 +152,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
             <FileSpreadsheet className="text-emerald-600" size={20} />
             Bulk Product Upload via Excel
           </h3>
-          <p className="text-xs text-stone-500 mt-0.5">Upload products instantly with automatic dummy image fallback.</p>
+          <p className="text-xs text-stone-500 mt-0.5">Upload an Excel spreadsheet to submit items for admin approval.</p>
         </div>
 
         <button
@@ -206,7 +185,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
               </div>
               <div>
                 <p className="text-xs font-black text-stone-800">Click to upload or drag & drop your Excel file</p>
-                <p className="text-[10px] text-stone-400 mt-0.5">Blank image cells will automatically use a dummy store placeholder</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">Supports .xlsx, .xls and .csv formats</p>
               </div>
             </>
           )}
@@ -219,7 +198,7 @@ export default function ExcelProductUpload({ shopkeeperId, onUploadSuccess }) {
         }`}>
           <div className="flex items-center gap-2 font-black text-sm">
             {uploadResult.failCount === 0 ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertCircle size={18} className="text-amber-600" />}
-            <span>Upload Completed: {uploadResult.successCount} Added Successfully, {uploadResult.failCount} Failed</span>
+            <span>Upload Completed: {uploadResult.successCount} Submitted for Approval, {uploadResult.failCount} Failed</span>
           </div>
 
           {uploadResult.errorsList.length > 0 && (

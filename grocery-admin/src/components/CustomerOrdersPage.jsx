@@ -1866,6 +1866,7 @@ const CustomerOrdersPage = () => {
                     const total = getOrderTotal(order);
                     const expanded = Boolean(expandedOrders[orderId]);
                     const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
+                    const isCancelled = normalizeOrderStatus(status) === 'CANCELLED';
                     const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
 
                     return (
@@ -1886,7 +1887,7 @@ const CustomerOrdersPage = () => {
                                     {getDisplayOrderId(order)}
                                   </h3>
                                   <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-wider shadow-2xs ${
-                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 animate-pulse'
+                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800 animate-pulse'
                                   }`}>
                                     {formatStatus(status)}
                                   </span>
@@ -1932,6 +1933,21 @@ const CustomerOrdersPage = () => {
                               )}
                             </div>
                           </div>
+
+                          {/* ── DELIVERY VERIFICATION OTP BANNER ON CARD ── */}
+                          {!isDelivered && !isCancelled && (
+                            <div className="mt-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
+                              <div>
+                                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block">
+                                  Delivery Verification OTP
+                                </span>
+                                <p className="text-[10px] text-stone-500 font-medium">Show this code to the delivery partner upon arrival</p>
+                              </div>
+                              <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-2xs">
+                                {order?.otp || '----'}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-4 border-t border-stone-100 text-xs bg-stone-50/70 p-4 rounded-2xl border border-stone-100">
                             <div>
@@ -2326,6 +2342,23 @@ const CustomerOrdersPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* ── DELIVERY VERIFICATION OTP BANNER IN MODAL ── */}
+              {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
+                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-800 block">
+                      Delivery Verification OTP
+                    </span>
+                    <p className="text-[11px] text-stone-600 font-medium">
+                      Share this code with the delivery partner upon arrival
+                    </p>
+                  </div>
+                  <div className="bg-white px-4 py-2 rounded-2xl border border-emerald-300 font-mono font-black text-xl text-emerald-700 tracking-[0.2em] shadow-sm">
+                    {selectedOrder?.otp || '----'}
+                  </div>
+                </div>
+              )}
 
               {/* FULFILLMENT DURATION BANNER (When Delivered) */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (

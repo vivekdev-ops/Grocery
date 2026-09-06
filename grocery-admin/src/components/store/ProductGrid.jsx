@@ -1,12 +1,30 @@
 // src/components/store/ProductGrid.jsx
 import { useState } from 'react';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct }) {
   const [addedFlash, setAddedFlash] = useState(false);
 
-  const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+  // Fallback dummy images (cats, dogs, and cute store items) for blank images
+  const fallbackDummyImages = [
+    'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=300&auto=format&fit=crop&q=80', // Dog
+    'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=300&auto=format&fit=crop&q=80', // Cat
+    'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?w=300&auto=format&fit=crop&q=80', // Puppy
+    'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=300&auto=format&fit=crop&q=80', // Cute cat
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop&q=80'  // Grocery fallback
+  ];
+
+  const getProductImage = () => {
+    const images = product.images || product.gallery || [product.image_url].filter(Boolean);
+    if (images.length > 0 && images[0]) {
+      return images[0];
+    }
+    const charCodeSum = (product.id || product.name || 'default').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return fallbackDummyImages[charCodeSum % fallbackDummyImages.length];
+  };
+
+  const displayImage = getProductImage();
   const variants = product.variants || product.product_variants || [];
   const hasVariants = variants.length > 0;
 
@@ -25,7 +43,6 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 
   const avgRating = product.avgRating || product.rating || null;
 
-  // Unique cart item key based on specific variant
   const variantIdentifier = activeVariant ? (activeVariant.id || activeVariant.unit_label || activeVariant.label || 'default') : 'default';
   const cartItemId = `${product.id}-${variantIdentifier}`;
   const cartItem = (cart || []).find(item => item.cartItemId === cartItemId);
@@ -67,11 +84,15 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
       )}
 
       <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-stone-50 to-emerald-50/20 overflow-hidden flex items-center justify-center p-4">
-        {pImages[0] ? (
-          <img src={pImages[0]} alt={product.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm" />
-        ) : (
-          <Package size={36} className="text-stone-300" />
-        )}
+        <img 
+          src={displayImage} 
+          alt={product.name} 
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = fallbackDummyImages[0];
+          }}
+          className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm" 
+        />
 
         <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-xl text-[9px] font-black text-stone-700 shadow-2xs border border-stone-100">
           <Clock size={11} className="text-emerald-600" />
@@ -117,7 +138,6 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
           )}
         </div>
 
-        {/* Price & Cart/Quantity Counter Row */}
         <div className="flex items-center justify-between pt-3 border-t border-emerald-50 mt-auto" onClick={e => e.stopPropagation()}>
           <div>
             <span className="font-black text-base text-stone-900 block leading-tight">₹{price.toFixed(0)}</span>
@@ -182,6 +202,8 @@ export default function ProductGrid({
   const activeProducts = (products || []).filter(p => p.is_active !== false);
 
   const [activeSubcategoryId, setActiveSubcategoryId] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const productsPerPage = 12;
 
   const parentCategories = activeCategories.filter(c => !c.parent_id);
   const getSubcategories = (parentId) => activeCategories.filter(c => c.parent_id === parentId);
@@ -204,6 +226,11 @@ export default function ProductGrid({
     }
     return p.category_id === activeCategory || p.category === activeCategory || subIds.includes(p.category_id);
   });
+
+  const indexOfLastProduct = currentPage * productsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
+  const currentProducts = sourceProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(sourceProducts.length / productsPerPage);
 
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
 
@@ -234,7 +261,7 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* ── HOMEPAGE CATEGORY CARDS (Mobile Responsive with smooth horizontal scrolling & icon focus) ── */}
+      {/* ── HOMEPAGE CATEGORY CARDS ── */}
       {!isAnyCategorySelected && (
         <div className="space-y-4 mb-10">
           <div className="flex items-center justify-between">
@@ -244,7 +271,7 @@ export default function ProductGrid({
           
           <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-3.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
             <button
-              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); }}
+              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
               className={`flex flex-col items-center p-3.5 rounded-3xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
                 ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-50 to-teal-50 ring-4 ring-emerald-600/20 shadow-md scale-105' : 'border-emerald-100 bg-white hover:border-emerald-400 hover:bg-emerald-50/40 shadow-xs'}`}
             >
@@ -260,7 +287,7 @@ export default function ProductGrid({
               return (
                 <button
                   key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); }}
+                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
                   className={`flex flex-col items-center p-3.5 rounded-3xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
                     ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-50 to-teal-50 ring-4 ring-emerald-600/20 shadow-md scale-105' : 'border-emerald-100 bg-white hover:border-emerald-400 hover:bg-emerald-50/40 shadow-xs'}`}
                 >
@@ -282,7 +309,7 @@ export default function ProductGrid({
           {!query && currentSubcategories.length > 0 && (
             <div className="w-full md:w-64 shrink-0 bg-white rounded-[2rem] border border-emerald-100 p-3.5 space-y-2 shadow-sm">
               <button
-                onClick={() => setActiveSubcategoryId('All')}
+                onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
                 className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
                   activeSubcategoryId === 'All' 
                     ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
@@ -301,7 +328,7 @@ export default function ProductGrid({
                 return (
                   <button
                     key={sub.id}
-                    onClick={() => setActiveSubcategoryId(sub.id)}
+                    onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
                     className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
                       isSubSelected 
                         ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
@@ -333,22 +360,61 @@ export default function ProductGrid({
                 <p className="text-xs text-stone-400 mt-1">Try exploring another category or search query.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                {sourceProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    wishlistIds={wishlistIds}
-                    toggleWishlist={toggleWishlist}
-                    selectedVariants={selectedVariants}
-                    setSelectedVariants={setSelectedVariants}
-                    cart={cart}
-                    addToCart={addToCart}
-                    updateQuantity={updateQuantity}
-                    onSelectProduct={onSelectProduct}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {currentProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      wishlistIds={wishlistIds}
+                      toggleWishlist={toggleWishlist}
+                      selectedVariants={selectedVariants}
+                      setSelectedVariants={setSelectedVariants}
+                      cart={cart}
+                      addToCart={addToCart}
+                      updateQuantity={updateQuantity}
+                      onSelectProduct={onSelectProduct}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 pt-6">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className="p-3 bg-white rounded-2xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    
+                    <div className="flex gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                        <button
+                          key={num}
+                          onClick={() => setCurrentPage(num)}
+                          className={`w-10 h-10 rounded-2xl font-black text-xs transition cursor-pointer ${
+                            currentPage === num 
+                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' 
+                              : 'bg-white text-stone-600 hover:bg-emerald-50 border border-emerald-100'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className="p-3 bg-white rounded-2xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -369,7 +435,7 @@ export default function ProductGrid({
                 <div className="flex items-center justify-between bg-white px-6 py-3.5 rounded-2xl border border-emerald-100/60 shadow-2xs">
                   <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">{parent.name}</h3>
                   <button
-                    onClick={() => setActiveCategory(parent.id)}
+                    onClick={() => { setActiveCategory(parent.id); setCurrentPage(1); }}
                     className="text-xs font-black text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase tracking-wider flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition"
                   >
                     <span>See All</span> <ChevronRight size={14} />

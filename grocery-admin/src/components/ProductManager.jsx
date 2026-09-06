@@ -502,6 +502,69 @@ export default function ProductManager() {
   };
 
   // =========================================================
+  // EXPORT PRODUCTS TO EXCEL / CSV (Import-Compatible Format)
+  // =========================================================
+
+  const exportProductsToExcel = () => {
+    if (!products || products.length === 0) {
+      alert("No products available to export.");
+      return;
+    }
+
+    const headers = [
+      "Product Name", 
+      "Category", 
+      "Description", 
+      "Image URL", 
+      "Variant 1 Unit", 
+      "Variant 1 Price", 
+      "Variant 1 MRP", 
+      "Variant 1 Stock",
+      "Variant 2 Unit", 
+      "Variant 2 Price", 
+      "Variant 2 MRP", 
+      "Variant 2 Stock"
+    ];
+
+    const rows = products.map(p => {
+      const primaryImage = p.image_url || (Array.isArray(p.images) ? p.images[0] : '') || '';
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      
+      const v1 = variants[0] || {};
+      const v2 = variants[1] || {};
+
+      return [
+        `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${(p.categories?.name || '').replace(/"/g, '""')}"`,
+        `"${(p.description || '').replace(/"/g, '""').replace(/(\r\n|\n|\r)/gm, " ")}"`,
+        `"${primaryImage}"`,
+        `"${(v1.unit_label || v1.label || '').replace(/"/g, '""')}"`,
+        v1.price ?? 0,
+        v1.mrp ?? 0,
+        v1.stock ?? 0,
+        `"${(v2.unit_label || v2.label || '').replace(/"/g, '""')}"`,
+        v2.price ?? '',
+        v2.mrp ?? '',
+        v2.stock ?? ''
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `kd_store_products_template_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // =========================================================
   // TOGGLE STATUS
   // =========================================================
 
@@ -1615,6 +1678,15 @@ export default function ProductManager() {
             </select>
           </div>
 
+          {/* EXCEL EXPORT BUTTON */}
+          <button
+            onClick={exportProductsToExcel}
+            className="bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-black px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 transition cursor-pointer border border-emerald-600/50 shadow-sm"
+          >
+            <FileSpreadsheet size={16} className="text-emerald-300" />
+            Export to Excel
+          </button>
+
           {/* EXCEL UPLOAD TOGGLE */}
           <button
             onClick={() => setIsExcelUploadExpanded(!isExcelUploadExpanded)}
@@ -1688,7 +1760,7 @@ export default function ProductManager() {
 
       {/* =====================================================
           NAVIGATION TABS & SEARCH BAR
-      ===================================================== */}
+      ================================================     */}
 
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm">
         

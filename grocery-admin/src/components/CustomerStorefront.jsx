@@ -678,7 +678,7 @@ export default function CustomerStorefront() {
   const fetchMyOrders = async (email) => {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*, products(*, product_variants(*)))')
+      .select('id, customer_id, total_amount, status, created_at, delivery_boy_id, customer_email, delivery_address, phone, otp, order_items(*, products(*, product_variants(*)))')
       .eq('customer_email', email)
       .order('created_at', { ascending: false });
 
@@ -1499,6 +1499,7 @@ export default function CustomerStorefront() {
 
                   const renderOrderCard = (order) => {
                     const complaintTicket = myComplaintsMap[order.id];
+                    const showOtp = order.status !== 'delivered' && order.status !== 'cancelled';
 
                     return (
                       <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
@@ -1509,15 +1510,19 @@ export default function CustomerStorefront() {
                             order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                           }`}>{order.status}</span>
                         </div>
-                         
-                        {complaintTicket && (
-                          <div className={`p-2 rounded-xl text-[10px] font-bold flex items-center justify-between border gap-2 ${
-                            complaintTicket.status === 'resolved' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}>
-                            <span className="flex items-center gap-1 truncate">
-                              <LifeBuoy size={12} className="shrink-0" /> <span className="truncate">Status: <strong className="uppercase">{complaintTicket.status || 'open'}</strong></span>
-                            </span>
-                            <span className="font-mono text-[9px] shrink-0">Ticket Active</span>
+
+                        {/* ── DIRECT OTP BANNER ON ORDER CARD ── */}
+                        {showOtp && (
+                          <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-2.5 flex items-center justify-between">
+                            <div>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block">
+                                Delivery OTP
+                              </span>
+                              <p className="text-[9px] text-stone-500">Show to delivery partner</p>
+                            </div>
+                            <div className="bg-white px-3 py-1 rounded-xl border border-emerald-300 font-mono font-black text-sm text-emerald-700 tracking-widest shadow-2xs">
+                              {order.otp || '----'}
+                            </div>
                           </div>
                         )}
 
@@ -1525,35 +1530,14 @@ export default function CustomerStorefront() {
                           <span>{new Date(order.created_at).toLocaleDateString()}</span>
                           <span className="font-black text-slate-900 text-sm">₹{order.total_amount}</span>
                         </div>
-                        <div className="flex gap-1.5 pt-1 flex-wrap">
+                        <div className="flex gap-1.5 pt-1">
                           <button 
                             onClick={() => setSelectedProfileOrder(order)}
-                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
-                            title="Details"
+                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
                           >
                             <FileText size={14} className="shrink-0" />
-                            <span className="inline sm:inline">Details</span>
+                            <span>Details</span>
                           </button>
-                          {order.status === 'delivered' && (
-                            <button 
-                              onClick={() => handleReorder(order)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white py-2 px-3 rounded-xl font-black transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                              title="Reorder"
-                            >
-                              <RotateCcw size={14} className="shrink-0" />
-                              <span className="inline sm:inline">Reorder</span>
-                            </button>
-                          )}
-                          {order.status === 'delivered' && (
-                            <button 
-                              onClick={() => setSelectedInvoiceOrder(order)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-800 py-2 px-3 rounded-xl font-bold transition border border-slate-200 cursor-pointer flex items-center justify-center gap-1.5"
-                              title="Bill"
-                            >
-                              <FileText size={14} className="shrink-0" />
-                              <span className="inline sm:inline">Bill</span>
-                            </button>
-                          )}
                         </div>
                       </div>
                     );
@@ -1766,6 +1750,24 @@ export default function CustomerStorefront() {
                 }`}>{selectedProfileOrder.status}</span>
               </div>
 
+              {/* ── ORDER ACTIVITY HISTORY OTP BANNER ── */}
+{order.status !== 'delivered' && order.status !== 'cancelled' && (
+  <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
+    <div>
+      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
+        Delivery Verification OTP
+      </span>
+      <p className="text-[10px] text-stone-600 font-medium">
+        Share this code with the delivery partner
+      </p>
+    </div>
+    <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
+      {order.otp || '----'}
+    </div>
+  </div>
+)}
+              {/* ────────────────────────────────────── */}
+
               {myComplaintsMap[selectedProfileOrder.id] && (
                 <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -1793,10 +1795,14 @@ export default function CustomerStorefront() {
                 </div>
               )}
 
-              {selectedProfileOrder.otp && selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
-                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 flex justify-between items-center">
-                  <span className="text-emerald-900 font-bold">Delivery Verification OTP:</span>
-                  <span className="font-mono font-black text-emerald-700 text-sm tracking-widest bg-white px-3 py-1 rounded-xl border border-emerald-200">{selectedProfileOrder.otp}</span>
+              {/* Rest of your modal items list, address grid, and total summary */}
+
+              {selectedProfileOrder.status === 'cancelled' && (
+                <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1">
+                  <span className="text-rose-900 font-black uppercase text-[10px] tracking-wider block">Cancellation Reason</span>
+                  <p className="text-rose-700 font-medium leading-snug">
+                    {selectedProfileOrder.cancellation_remark || 'No specific remark provided.'}
+                  </p>
                 </div>
               )}
 
@@ -1922,7 +1928,7 @@ export default function CustomerStorefront() {
                   onClick={() => handleCancelOrder(selectedProfileOrder.id)}
                   className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  <Ban size={15} /> Cancel Order
+                  <Ban size5={15} /> Cancel Order
                 </button>
               )}
               <button 
