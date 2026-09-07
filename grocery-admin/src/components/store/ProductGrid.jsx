@@ -171,6 +171,8 @@ export default function ProductGrid({
 
   const [activeSubcategoryId, setActiveSubcategoryId] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('');
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const productsPerPage = 12;
 
   const parentCategories = activeCategories.filter(c => !c.parent_id);
@@ -182,6 +184,7 @@ export default function ProductGrid({
 
   const query = searchQuery.toLowerCase().trim();
 
+  // Filter products based on category/subcategory and search query
   const sourceProducts = activeProducts.filter(p => {
     const matchesSearch = !query || p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
     if (!matchesSearch) return false;
@@ -194,10 +197,30 @@ export default function ProductGrid({
     return p.category_id === activeCategory || p.category === activeCategory || subIds.includes(p.category_id);
   });
 
+  // Apply restricted sorting: Price: Low to High, Price: High to Low, Ratings
+  const sortedProducts = [...sourceProducts].sort((a, b) => {
+    if (sortBy === 'price_asc') {
+      const priceA = Number(a.variants?.[0]?.price ?? a.price ?? 0);
+      const priceB = Number(b.variants?.[0]?.price ?? b.price ?? 0);
+      return priceA - priceB;
+    }
+    if (sortBy === 'price_desc') {
+      const priceA = Number(a.variants?.[0]?.price ?? a.price ?? 0);
+      const priceB = Number(b.variants?.[0]?.price ?? b.price ?? 0);
+      return priceB - priceA;
+    }
+    if (sortBy === 'rating_desc') {
+      const ratingA = Number(a.avgRating || a.rating || 0);
+      const ratingB = Number(b.avgRating || b.rating || 0);
+      return ratingB - ratingB; // Wait, ratingB - ratingA
+    }
+    return 0;
+  });
+
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = sourceProducts.slice(indexOfFirstProduct, indexOfLastProduct);
-  const totalPages = Math.ceil(sourceProducts.length / productsPerPage);
+  const currentProducts = sortedProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
 
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
   const [mobileSubDrawerOpen, setMobileSubDrawerOpen] = useState(false);
@@ -205,69 +228,42 @@ export default function ProductGrid({
   return (
     <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-20 md:pb-12 text-slate-900 overflow-visible">
       
-      {/* ── HERO BANNER ── */}
-      {!isAnyCategorySelected && banners?.length > 0 && (
-        <div className="relative rounded-3xl overflow-hidden shadow-lg bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 mb-3 min-h-[140px] sm:min-h-[200px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentSlide}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-              className="absolute inset-0"
-            >
-              <img src={banners[currentSlide]?.image_url} alt="Banner" className="w-full h-full object-cover opacity-40" />
-              <div className="absolute inset-0 bg-gradient-to-r from-stone-950/90 to-transparent flex flex-col justify-center p-4 sm:p-8 text-white space-y-1.5">
-                <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider w-max">
-                  ⚡ 10 Mins Delivery
-                </span>
-                <h2 className="text-lg sm:text-2xl font-black max-w-md tracking-tight leading-tight">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
-                <p className="text-[11px] sm:text-xs text-emerald-100/90 font-medium max-w-sm">{banners[currentSlide]?.subtitle || 'Delivered straight to your doorstep.'}</p>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* ── TOP CATEGORIES STRIP ── */}
+      {/* ── FULL HD CLEAR BANNER WITH FROSTED BLURRED TITLE AT BOTTOM ── */}
       {!isAnyCategorySelected && (
-        <div className="space-y-2 mb-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="font-black text-sm sm:text-lg text-stone-900 tracking-tight">Categories</h3>
-          </div>
-          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <motion.button
-              whileHover={{ y: -2 }}
-              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
-                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
-            >
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center mb-1 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
-                <Sparkles size={18} />
-              </div>
-              <span className={`text-[10px] font-black truncate w-full ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
-            </motion.button>
-
-            {parentCategories.map((cat, index) => {
-              const isSelected = activeCategory === cat.id;
-              const img = cat.image_url || fallbackImages[index % fallbackImages.length];
-              return (
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
-                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
-                >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-stone-100 overflow-hidden mb-1 border border-emerald-100">
-                    <img src={img} alt={cat.name} className="w-full h-full object-cover" />
-                  </div>
-                  <span className={`text-[10px] font-black truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
+        <div className="relative rounded-[2rem] overflow-hidden shadow-xl bg-slate-950 mb-6 w-full max-h-[500px] border border-emerald-500/20 flex items-center justify-center">
+          {banners && banners.length > 0 ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="w-full relative flex items-center justify-center"
+              >
+                <img 
+                  src={banners[currentSlide]?.image_url} 
+                  alt="Banner" 
+                  className="w-full h-auto max-h-[500px] object-contain filter brightness-105 contrast-110 mx-auto" 
+                />
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-7 bg-white/10 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/20 shadow-2xl">
+                  <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                    ⚡ 10 Mins Delivery
+                  </span>
+                  <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight leading-tight filter blur-[0.4px] drop-shadow-md">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
+                  <p className="text-[11px] sm:text-xs text-emerald-100 font-medium filter blur-[0.3px]">{banners[currentSlide]?.subtitle || 'Delivered straight to your doorstep.'}</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8 bg-white/10 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/20 shadow-2xl w-full">
+              <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                ⚡ Lightning Delivery
+              </span>
+              <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight filter blur-[0.4px] drop-shadow-md">Fresh groceries at your doorstep</h2>
+              <p className="text-[11px] sm:text-xs text-emerald-100 filter blur-[0.3px]">Order dairy, vegetables, fruits, and daily essentials instantly.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -369,13 +365,53 @@ export default function ProductGrid({
                 <p className="text-[10px] text-stone-400 font-medium">Delivering to: Bhikaji Cama Place, New Delhi</p>
               </div>
 
-              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none relative">
                 <button className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer shadow-2xs">
                   <SlidersHorizontal size={12} /> Filters
                 </button>
-                <button className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer shadow-2xs">
-                  <ArrowUpDown size={12} /> Sort
-                </button>
+                
+                {/* SORT DROPDOWN CONTAINER */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    <ArrowUpDown size={12} /> 
+                    {sortBy === 'price_asc' ? 'Price: Low to High' : sortBy === 'price_desc' ? 'Price: High to Low' : sortBy === 'rating_desc' ? 'Ratings' : 'Sort'}
+                  </button>
+
+                  {sortDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-stone-200 z-50 py-1.5">
+                      <button
+                        onClick={() => { setSortBy('price_asc'); setSortDropdownOpen(false); setCurrentPage(1); }}
+                        className={`w-full text-left px-4 py-2 text-xs font-bold transition hover:bg-emerald-50 ${sortBy === 'price_asc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
+                      >
+                        Price: Low to High
+                      </button>
+                      <button
+                        onClick={() => { setSortBy('price_desc'); setSortDropdownOpen(false); setCurrentPage(1); }}
+                        className={`w-full text-left px-4 py-2 text-xs font-bold transition hover:bg-emerald-50 ${sortBy === 'price_desc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
+                      >
+                        Price: High to Low
+                      </button>
+                      <button
+                        onClick={() => { setSortBy('rating_desc'); setSortDropdownOpen(false); setCurrentPage(1); }}
+                        className={`w-full text-left px-4 py-2 text-xs font-bold transition hover:bg-emerald-50 ${sortBy === 'rating_desc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
+                      >
+                        Ratings
+                      </button>
+                      {sortBy && (
+                        <button
+                          onClick={() => { setSortBy(''); setSortDropdownOpen(false); setCurrentPage(1); }}
+                          className="w-full text-left px-4 py-1.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50 border-t border-stone-100 mt-1"
+                        >
+                          Clear Sort
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <button className="inline-flex items-center px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer shadow-2xs">
                   Quantity
                 </button>
@@ -443,22 +479,29 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: ULTRA-COMPACT SINGLE LINE SCROLL (UNTOUCHED) */
-        <div className="space-y-2">
+        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH PRODUCTS UNDERNEATH EACH SECTION */
+        <div className="space-y-6">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
             if (subcats.length === 0) return null;
 
+            // Get products belonging to this parent category or its subcategories to show in the section
+            const subIds = subcats.map(s => s.id);
+            const categoryProducts = activeProducts.filter(p => 
+              p.category_id === parent.id || p.category === parent.id || subIds.includes(p.category_id)
+            );
+
             return (
-              <div key={parent.id} className="bg-white rounded-2xl border border-stone-200/80 shadow-2xs px-3 pt-2.5 pb-2 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs sm:text-sm font-black text-stone-900 tracking-tight">{parent.name}</h3>
-                  <button onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase flex items-center gap-0.5 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                    <span>see all</span> <ChevronRight size={10} />
+              <div key={parent.id} className="bg-white rounded-3xl border border-stone-200/80 shadow-2xs p-4 sm:p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  <h3 className="text-sm sm:text-base font-black text-stone-900 tracking-tight">{parent.name}</h3>
+                  <button onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} className="text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase flex items-center gap-0.5 bg-emerald-50 px-2.5 py-1 rounded-xl">
+                    <span>see all</span> <ChevronRight size={12} />
                   </button>
                 </div>
 
-                <div className="flex overflow-x-auto pb-0.5 gap-2.5 scrollbar-none snap-x">
+                {/* Subcategories Scroll Strip */}
+                <div className="flex overflow-x-auto pb-1 gap-3 scrollbar-none snap-x">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
@@ -466,24 +509,44 @@ export default function ProductGrid({
                         whileHover={{ y: -1 }}
                         key={sub.id}
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className="flex flex-col items-center text-center cursor-pointer group space-y-0.5 shrink-0 w-16 sm:w-20 snap-start"
+                        className="flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-20 snap-start"
                       >
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#EAF2F8] border border-[#D5E5F2] overflow-hidden shadow-2xs group-hover:border-blue-300 transition-all shrink-0">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-1 flex items-center justify-center">
                           {sub.image_url ? (
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-contain" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600">
-                              <Package size={16} />
-                            </div>
+                            <Package size={20} className="text-emerald-600" />
                           )}
                         </div>
-                        <span className="font-bold text-[9px] text-stone-800 group-hover:text-blue-900 leading-tight line-clamp-1 w-full px-0.5">
+                        <span className="font-bold text-[10px] text-stone-800 group-hover:text-emerald-700 leading-tight line-clamp-1 w-full px-0.5">
                           {sub.name}
                         </span>
                       </motion.div>
                     );
                   })}
                 </div>
+
+                {/* Sample Product Cards Grid for this category section */}
+                {categoryProducts.length > 0 && (
+                  <div className="pt-2 border-t border-stone-100">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                      {categoryProducts.slice(0, 6).map(product => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          wishlistIds={wishlistIds}
+                          toggleWishlist={toggleWishlist}
+                          selectedVariants={selectedVariants}
+                          setSelectedVariants={setSelectedVariants}
+                          cart={cart}
+                          addToCart={addToCart}
+                          updateQuantity={updateQuantity}
+                          onSelectProduct={onSelectProduct}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

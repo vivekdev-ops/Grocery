@@ -156,7 +156,7 @@ export default function StoreHeader({
               <div className="hidden sm:block leading-tight">
                 <p className="text-xs font-black text-slate-900 tracking-tight">KD Store</p>
                 <span className="inline-flex items-center gap-1 text-[9px] text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> 13 mins
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> Fastest Store
                 </span>
               </div>
             </button>
