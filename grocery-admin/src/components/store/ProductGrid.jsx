@@ -212,7 +212,7 @@ export default function ProductGrid({
     if (sortBy === 'rating_desc') {
       const ratingA = Number(a.avgRating || a.rating || 0);
       const ratingB = Number(b.avgRating || b.rating || 0);
-      return ratingB - ratingB; // Wait, ratingB - ratingA
+      return ratingB - ratingA;
     }
     return 0;
   });
@@ -228,6 +228,47 @@ export default function ProductGrid({
   return (
     <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-20 md:pb-12 text-slate-900 overflow-visible">
       
+      {/* ── TOP CATEGORIES STRIP (EXPLORE BY CATEGORY) ── -->[cite: 1] */}
+      {!isAnyCategorySelected && (
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="font-black text-sm sm:text-lg text-stone-900 tracking-tight">Explore Categories</h3>
+          </div>
+          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <motion.button
+              whileHover={{ y: -2 }}
+              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+              className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
+                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
+            >
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center mb-1 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
+                <Sparkles size={18} />
+              </div>
+              <span className={`text-[10px] font-black truncate w-full ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
+            </motion.button>
+
+            {parentCategories.map((cat, index) => {
+              const isSelected = activeCategory === cat.id;
+              const img = cat.image_url || fallbackImages[index % fallbackImages.length];
+              return (
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  key={cat.id}
+                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                  className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
+                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-stone-100 overflow-hidden mb-1 border border-emerald-100">
+                    <img src={img} alt={cat.name} className="w-full h-full object-cover" />
+                  </div>
+                  <span className={`text-[10px] font-black truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── FULL HD CLEAR BANNER WITH FROSTED BLURRED TITLE AT BOTTOM ── */}
       {!isAnyCategorySelected && (
         <div className="relative rounded-[2rem] overflow-hidden shadow-xl bg-slate-950 mb-6 w-full max-h-[500px] border border-emerald-500/20 flex items-center justify-center">
@@ -247,11 +288,8 @@ export default function ProductGrid({
                   className="w-full h-auto max-h-[500px] object-contain filter brightness-105 contrast-110 mx-auto" 
                 />
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-7 bg-white/10 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/20 shadow-2xl">
-                  <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-md">
-                    ⚡ 10 Mins Delivery
-                  </span>
-                  <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight leading-tight filter blur-[0.4px] drop-shadow-md">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
-                  <p className="text-[11px] sm:text-xs text-emerald-100 font-medium filter blur-[0.3px]">{banners[currentSlide]?.subtitle || 'Delivered straight to your doorstep.'}</p>
+                  
+                  <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight leading-tight filter blur-[0.4px] drop-shadow-sm">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -260,7 +298,7 @@ export default function ProductGrid({
               <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-md">
                 ⚡ Lightning Delivery
               </span>
-              <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight filter blur-[0.4px] drop-shadow-md">Fresh groceries at your doorstep</h2>
+              <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight filter blur-[0.4px] drop-shadow-sm">Fresh groceries at your doorstep</h2>
               <p className="text-[11px] sm:text-xs text-emerald-100 filter blur-[0.3px]">Order dairy, vegetables, fruits, and daily essentials instantly.</p>
             </div>
           )}
