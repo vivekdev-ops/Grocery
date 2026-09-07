@@ -27,7 +27,7 @@ export default function Footer({ onSelectCategory, onNavigate }) {
   };
 
   return (
-    <footer className="bg-gradient-to-b from-white to-emerald-50/40 border-t border-emerald-100 font-sans pt-16 pb-12 mt-20 text-slate-700">
+    <footer className="bg-gradient-to-b from-white to-emerald-50/40 border-t border-emerald-100 font-sans pt-16 pb-28 md:pb-12 mt-20 text-slate-700">
       <div className="max-w-7xl mx-auto px-4 space-y-12">
         
         {/* Top Feature Badges */}
