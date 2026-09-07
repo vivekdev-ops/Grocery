@@ -34,6 +34,8 @@ import {
   Ban,
   ShieldCheck,
   ExternalLink,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -434,7 +436,11 @@ const CustomerOrdersPage = () => {
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     phone: '',
+    interests: '',
+    avatar_url: '',
   });
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [savingProfile, setSavingProfile] =
     useState(false);
@@ -485,20 +491,23 @@ const CustomerOrdersPage = () => {
         setAuthUser(currentUser);
 
         const { data: profileData } = await supabase
-          .from('profiles')
+          .from('customer_profiles')
           .select('*')
-          .eq('id', currentUser.id)
+          .eq('user_id', currentUser.id)
           .maybeSingle();
 
         if (!mounted) return;
 
         const profile = profileData || {
-          id: currentUser.id,
-          email: currentUser.email,
+          user_id: currentUser.id,
           full_name:
             currentUser.user_metadata?.full_name || '',
           phone:
             currentUser.user_metadata?.phone || '',
+          interests:
+            currentUser.user_metadata?.interests || '',
+          avatar_url:
+            currentUser.user_metadata?.avatar_url || '',
         };
 
         setUser(profile);
@@ -511,6 +520,14 @@ const CustomerOrdersPage = () => {
           phone:
             profile.phone ||
             currentUser.user_metadata?.phone ||
+            '',
+          interests:
+            profile.interests ||
+            currentUser.user_metadata?.interests ||
+            '',
+          avatar_url:
+            profile.avatar_url ||
+            currentUser.user_metadata?.avatar_url ||
             '',
         });
 
@@ -597,7 +614,7 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   const loadAddresses = async (overrideUserId = null) => {
-    const ownerUserId = overrideUserId || authUser?.id || user?.id;
+    const ownerUserId = overrideUserId || authUser?.id || user?.user_id;
 
     if (!ownerUserId) {
       setAddresses([]);
@@ -618,6 +635,50 @@ const CustomerOrdersPage = () => {
     } catch (error) {
       console.error('Error loading addresses:', error);
       setAddresses([]);
+    }
+  };
+
+
+  /* =======================================================
+     AVATAR UPLOAD
+  ======================================================= */
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !authUser?.id) return;
+
+    try {
+      setUploadingAvatar(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${authUser.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64String = reader.result;
+          setProfileForm((prev) => ({ ...prev, avatar_url: base64String }));
+          setUploadingAvatar(false);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const { data: publicURLData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicURLData?.publicUrl || '';
+      setProfileForm((prev) => ({ ...prev, avatar_url: publicUrl }));
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      alert('Upload failed.');
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -994,7 +1055,7 @@ const CustomerOrdersPage = () => {
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
 
-    const ownerUserId = authUser?.id || user?.id;
+    const ownerUserId = authUser?.id || user?.user_id;
 
     if (!ownerUserId) {
       alert('Login required.');
@@ -1165,7 +1226,7 @@ const CustomerOrdersPage = () => {
 
     if (!confirmed) return;
 
-    const ownerUserId = authUser?.id || user?.id;
+    const ownerUserId = authUser?.id || user?.user_id;
 
     try {
       setDeletingAddressId(
@@ -1259,7 +1320,7 @@ const CustomerOrdersPage = () => {
       return;
     }
 
-    const ownerUserId = authUser?.id || user?.id;
+    const ownerUserId = authUser?.id || user?.user_id;
 
     try {
       const {
@@ -1328,15 +1389,16 @@ const CustomerOrdersPage = () => {
       setSavingProfile(true);
 
       const payload = {
-        id: authUser.id,
-        email: authUser.email,
+        user_id: authUser.id,
         full_name: profileForm.full_name?.trim() || null,
         phone: profileForm.phone?.trim() || null,
+        interests: profileForm.interests?.trim() || null,
+        avatar_url: profileForm.avatar_url?.trim() || null,
       };
 
       const { data, error } = await supabase
-        .from('profiles')
-        .upsert(payload, { onConflict: 'id' })
+        .from('customer_profiles')
+        .upsert(payload, { onConflict: 'user_id' })
         .select()
         .single();
 
@@ -1389,8 +1451,8 @@ const CustomerOrdersPage = () => {
   const handleSubmitAllProductRatings = async () => {
     if (!ratingOrder) return;
 
-    const userId = authUser?.id || user?.id;
-    const userEmail = authUser?.email || user?.email || 'customer@hub.com';
+    const userId = authUser?.id || user?.user_id;
+    const userEmail = authUser?.email || 'customer@hub.com';
 
     if (!userId) {
       alert('Login required.');
@@ -1520,7 +1582,7 @@ const CustomerOrdersPage = () => {
 
 
         {/* =================================================
-            TAB CONTENT: PROFILE
+            TAB CONTENT: PROFILE (WITH AVATAR & EXTRA SETTINGS)
         ================================================= */}
         <AnimatePresence mode="wait">
           {activeTab === 'profile' && (
@@ -1552,7 +1614,26 @@ const CustomerOrdersPage = () => {
 
               <div className="p-4 sm:p-5">
                 {editingProfile ? (
-                  <div className="space-y-3 max-w-md">
+                  <div className="space-y-4 max-w-md">
+                    {/* AVATAR UPLOAD SECTION */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                        {profileForm.avatar_url ? (
+                          <img src={profileForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="w-8 h-8 text-stone-400" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="inline-flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition shadow-2xs">
+                          <Upload size={12} /> {uploadingAvatar ? 'Uploading...' : 'Upload Picture'}
+                          <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                        </label>
+                        <p className="text-[10px] text-stone-400 font-medium">PNG, JPG up to 5MB</p>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Name</label>
                       <input
@@ -1575,10 +1656,21 @@ const CustomerOrdersPage = () => {
                     </div>
 
                     <div>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Interests</label>
+                      <input
+                        type="text"
+                        value={profileForm.interests}
+                        onChange={(e) => setProfileForm((prev) => ({ ...prev, interests: e.target.value }))}
+                        placeholder="e.g. Groceries, Organic"
+                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
                       <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Email</label>
                       <input
                         type="email"
-                        value={authUser?.email || user?.email || ''}
+                        value={authUser?.email || ''}
                         disabled
                         className="w-full border border-stone-200 bg-stone-100 rounded-xl px-3 py-2 text-xs text-stone-500 cursor-not-allowed font-medium"
                       />
@@ -1602,18 +1694,30 @@ const CustomerOrdersPage = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Name</p>
-                      <p className="font-bold text-stone-900">{user?.full_name || '-'}</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                        {user?.avatar_url ? (
+                          <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="w-8 h-8 text-stone-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-black text-stone-900 text-sm">{user?.full_name || 'Customer'}</p>
+                        <p className="text-[11px] text-stone-400 font-medium">{authUser?.email || '-'}</p>
+                      </div>
                     </div>
-                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Email</p>
-                      <p className="font-bold text-stone-900 truncate">{authUser?.email || user?.email || '-'}</p>
-                    </div>
-                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Phone</p>
-                      <p className="font-bold text-stone-900">{user?.phone || '-'}</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-stone-100">
+                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                        <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Phone</p>
+                        <p className="font-bold text-stone-900">{user?.phone || 'Not provided'}</p>
+                      </div>
+                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                        <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Interests</p>
+                        <p className="font-bold text-stone-900">{user?.interests || 'Not provided'}</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2488,5 +2592,7 @@ const CustomerOrdersPage = () => {
     </div>
   );
 };
+
+CustomerOrdersPage.displayName = 'CustomerOrdersPage';
 
 export default CustomerOrdersPage;

@@ -1,6 +1,6 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect, useRef } from 'react';
-import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree } from 'lucide-react';
+import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree, UserCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -26,6 +26,8 @@ export default function StoreHeader({
   const accountMenuRef = useRef(null);
   const categoryMenuRef = useRef(null);
   const navigate = useNavigate();
+
+  const avatarUrl = customerProfile?.avatar_url || session?.user?.user_metadata?.avatar_url;
 
   useEffect(() => { fetchCurrentLocation(); }, []);
 
@@ -212,7 +214,7 @@ export default function StoreHeader({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
+                            <div className="w-8 h-8 rounded-full bg-stone-100 overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
                               <img src={img} alt="" className="w-full h-full object-cover" />
                             </div>
                             <span className="truncate">{cat.name}</span>
@@ -278,10 +280,18 @@ export default function StoreHeader({
               <div className="relative hidden sm:block" ref={accountMenuRef}>
                 <button
                   onClick={handleProfileClick}
-                  className="flex items-center gap-2 h-11 px-4 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl transition-all cursor-pointer btn-press group shadow-2xs"
+                  className="flex items-center gap-2 h-11 px-3 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl transition-all cursor-pointer btn-press group shadow-2xs"
                 >
-                  <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[10px]">
-                    {customerProfile?.full_name?.[0] || displayName?.[0]?.toUpperCase() || <User size={12} />}
+                  <div className="w-7 h-7 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : customerProfile?.full_name?.[0] || displayName?.[0]?.toUpperCase() ? (
+                      <span className="font-black text-[10px] text-emerald-700">
+                        {customerProfile?.full_name?.[0] || displayName?.[0]?.toUpperCase()}
+                      </span>
+                    ) : (
+                      <UserCircle size={16} className="text-stone-600" />
+                    )}
                   </div>
                   <span className="text-xs font-black text-slate-800 truncate max-w-[90px]">{displayName || 'Account'}</span>
                   <ChevronDown size={13} className={`text-stone-500 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
@@ -295,9 +305,18 @@ export default function StoreHeader({
                       exit={{ opacity: 0, y: 10, scale: 0.98 }}
                       className="absolute right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-stone-100 py-3 z-50 overflow-hidden font-sans text-xs"
                     >
-                      <div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
-                        <p className="font-black text-slate-900 text-sm truncate">{customerProfile?.full_name || 'My Account'}</p>
-                        <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
+                      <div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                          {avatarUrl ? (
+                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <UserCircle size={20} className="text-stone-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-900 text-sm truncate">{customerProfile?.full_name || 'My Account'}</p>
+                          <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
+                        </div>
                       </div>
                       <div className="py-1">
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">

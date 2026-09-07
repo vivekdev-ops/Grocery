@@ -1,11 +1,11 @@
 // src/components/ShopkeeperPortal.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { 
   Package, Plus, DollarSign, ShoppingCart, Store, Trash2, Edit, 
   CheckCircle, Clock, LogOut, Upload, X, MapPin, Phone, Mail, 
   FileText, Truck, Calendar, Printer, Filter, Bell, Search, Layers, 
-  TrendingUp, ArrowUpRight, BarChart3, Download, ShieldCheck, Sparkles, CreditCard, FileSpreadsheet, ChevronDown, ChevronUp
+  TrendingUp, ArrowUpRight, BarChart3, Download, ShieldCheck, Sparkles, CreditCard, FileSpreadsheet, ChevronDown, ChevronUp, LayoutDashboard, Receipt, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,11 +48,21 @@ export default function ShopkeeperPortal() {
   const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'products' | 'orders' | 'payouts' | 'location'
 
   const [datePreset, setDatePreset] = useState('all'); 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Pagination states
+  const [productPage, setProductPage] = useState(1);
+  const productsPerPage = 8;
+
+  const [orderPage, setOrderPage] = useState(1);
+  const ordersPerPage = 6;
+
+  const [payoutPage, setPayoutPage] = useState(1);
+  const payoutsPerPage = 6;
 
   // Excel Bulk Upload Drawer State
   const [isExcelUploadExpanded, setIsExcelUploadExpanded] = useState(false);
@@ -291,25 +301,6 @@ export default function ShopkeeperPortal() {
         .select('*, orders(*), products(name, shopkeeper_id)')
         .in('product_id', productIds);
 
-      const now = new Date();
-      if (datePreset === 'today') {
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-        query = query.gte('orders.created_at', startOfDay);
-      } else if (datePreset === 'week') {
-        const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString();
-        query = query.gte('orders.created_at', startOfWeek);
-      } else if (datePreset === 'month') {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        query = query.gte('orders.created_at', startOfMonth);
-      } else if (datePreset === 'custom') {
-        if (startDate) query = query.gte('orders.created_at', new Date(startDate).toISOString());
-        if (endDate) {
-          const endDateTime = new Date(endDate);
-          endDateTime.setHours(23, 59, 59, 999);
-          query = query.lte('orders.created_at', endDateTime.toISOString());
-        }
-      }
-
       const { data: itemData } = await query;
 
       const uniqueOrdersMap = new Map();
@@ -326,6 +317,78 @@ export default function ShopkeeperPortal() {
       setOrders([]);
     }
   };
+
+  // Filtered orders and payouts calculation based on datePreset
+  const filteredOrders = useMemo(() => {
+    if (datePreset === 'all') return orders;
+    const now = new Date();
+    return orders.filter(order => {
+      const orderDate = new Date(order.created_at);
+      if (datePreset === 'today') {
+        return orderDate.toDateString() === now.toDateString();
+      } else if (datePreset === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(now.getDate() - 7);
+        return orderDate >= weekAgo;
+      } else if (datePreset === 'month') {
+        return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+      } else if (datePreset === 'custom') {
+        if (!startDate && !endDate) return true;
+        const start = startDate ? new Date(startDate) : new Date(0);
+        const end = endDate ? new Date(endDate) : new Date();
+        end.setHours(23, 59, 59, 999);
+        return orderDate >= start && orderDate <= end;
+      }
+      return true;
+    });
+  }, [orders, datePreset, startDate, endDate]);
+
+  const filteredDeliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
+
+  const totalFilteredNetRevenue = filteredDeliveredOrders.reduce((sum, o) => {
+    const cartAmount = Number(o.total_amount || 0);
+    const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+
+    const shopkeeperGross = o.items
+      ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
+      .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
+
+    const adminCut = (shopkeeperGross * tierPct) / 100;
+    return sum + (shopkeeperGross - adminCut);
+  }, 0);
+
+  const totalLifetimeRevenue = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((sum, o) => {
+      const cartAmount = Number(o.total_amount || 0);
+      const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+
+      const shopkeeperGross = o.items
+        ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
+        .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
+
+      const adminCut = (shopkeeperGross * tierPct) / 100;
+      return sum + (shopkeeperGross - adminCut);
+    }, 0);
+
+  // Pagination slice helpers
+  const paginatedProducts = useMemo(() => {
+    const start = (productPage - 1) * productsPerPage;
+    return products.slice(start, start + productsPerPage);
+  }, [products, productPage]);
+  const totalProductPages = Math.ceil(products.length / productsPerPage);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (orderPage - 1) * ordersPerPage;
+    return orders.slice(start, start + ordersPerPage);
+  }, [orders, orderPage]);
+  const totalOrderPages = Math.ceil(orders.length / ordersPerPage);
+
+  const paginatedPayouts = useMemo(() => {
+    const start = (payoutPage - 1) * payoutsPerPage;
+    return filteredDeliveredOrders.slice(start, start + payoutsPerPage);
+  }, [filteredDeliveredOrders, payoutPage]);
+  const totalPayoutPages = Math.ceil(filteredDeliveredOrders.length / payoutsPerPage);
 
   const handleGalleryUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -533,103 +596,169 @@ export default function ShopkeeperPortal() {
     }
   };
 
-  const totalNetRevenue = orders
-    .filter(o => o.status === 'delivered')
-    .reduce((sum, o) => {
-      const cartAmount = Number(o.total_amount || 0);
-      const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
-
-      const shopkeeperGross = o.items
-        ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
-        .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
-
-      const adminCut = (shopkeeperGross * tierPct) / 100;
-      return sum + (shopkeeperGross - adminCut);
-    }, 0);
-
   if (loading) return <div className="flex items-center justify-center min-h-screen text-emerald-800 font-bold bg-[#F0FDF4]">Loading store dashboard...</div>;
   if (!session) return <div className="text-center py-20 bg-[#F0FDF4] min-h-screen"><p className="text-stone-700 font-bold">Please log in as a shopkeeper.</p><button onClick={() => navigate('/login')} className="mt-4 bg-emerald-700 text-white px-6 py-2.5 rounded-2xl font-black shadow-md cursor-pointer hover:bg-emerald-800 transition">Login</button></div>;
 
+  const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'products', label: 'Products', icon: Package, count: products.length },
+    { id: 'orders', label: 'Orders', icon: ShoppingCart, count: orders.length },
+    { id: 'payouts', label: 'Payouts', icon: Receipt, count: filteredDeliveredOrders.length },
+    { id: 'location', label: 'Location', icon: MapPin },
+  ];
+
   return (
-    <div className="flex h-screen bg-[#F0FDF4] overflow-hidden font-sans text-xs selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-[#F0FDF4] font-sans text-stone-900 pb-24 md:pb-8 text-xs selection:bg-emerald-500 selection:text-white">
       
-      {/* Sidebar */}
-      <aside className="w-72 bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950 text-white flex flex-col shadow-xl print:hidden border-r border-emerald-800/40">
-        <div className="p-6 border-b border-emerald-800/50 flex items-center justify-between bg-black/20 backdrop-blur-md">
-          <div className="min-w-0">
-            <h1 className="text-sm font-black text-emerald-300 truncate flex items-center gap-2">
-              <Store size={16} className="text-emerald-400 shrink-0" />
-              {shopkeeperProfile?.store_name || 'My Store'}
-            </h1>
-            <p className="text-[10px] text-emerald-200/70 truncate mt-1 font-mono">{session.user.email}</p>
+      {/* Top Branding Header */}
+      <header className="bg-white border-b border-emerald-100 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs print:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-emerald-600/30 shrink-0">
+            KD
           </div>
-          <NotificationBell session={session} size={16} />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-stone-900 text-sm">KD Store</span>
+              <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">Shopkeeper Portal</span>
+            </div>
+            <p className="text-[11px] text-stone-500 font-bold">{shopkeeperProfile?.store_name || session.user.email}</p>
+          </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <NotificationBell session={session} size={18} />
+          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-2 rounded-xl font-bold cursor-pointer transition shadow-2xs">
+            <Printer size={13} /> Print
+          </button>
+        </div>
+      </header>
+
+      {/* ── PRINTABLE PROFESSIONAL PAYOUT / SALARY SLIP (Hidden on normal screen, shown during window.print()) ── */}
+      <div className="hidden print:block p-8 bg-white text-stone-900 font-sans text-sm space-y-6">
+        <div className="flex justify-between items-start border-b-2 border-emerald-600 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs">KD</div>
+              <h1 className="text-xl font-black text-stone-900 tracking-tight">KD Store Vendor & Shopkeeper Logistics</h1>
+            </div>
+            <p className="text-stone-500 text-xs mt-1">Official Merchant Payout & Revenue Statement</p>
+          </div>
+          <div className="text-right">
+            <p className="font-black text-stone-900">Statement Date: {new Date().toLocaleDateString('en-IN')}</p>
+            <p className="text-stone-500 text-xs capitalize">Filter: {datePreset} period</p>
+          </div>
+        </div>
+
+        {/* Shopkeeper Details */}
+        <div className="grid grid-cols-2 gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200">
+          <div>
+            <p className="text-[10px] font-black text-stone-400 uppercase">1. Store & Merchant Name</p>
+            <p className="font-black text-stone-900 text-base">{shopkeeperProfile?.store_name || 'Store Partner'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-stone-400 uppercase">2. Contact Account</p>
+            <p className="font-black text-stone-900 text-base">{session.user.email}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-stone-400 uppercase">3. Period / Date Range</p>
+            <p className="font-bold text-stone-800 capitalize">Preset: {datePreset} {startDate && endDate ? `(${startDate} to ${endDate})` : ''}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-stone-400 uppercase">Fulfilled Delivered Orders</p>
+            <p className="font-bold text-stone-800">{filteredDeliveredOrders.length} orders</p>
+          </div>
+        </div>
+
+        {/* 4. Order Line items, cart total and payout % */}
+        <div>
+          <h3 className="font-black text-stone-900 text-sm mb-2">4. Order Line Items & Net Payout Summary</h3>
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="bg-emerald-600 text-white text-left">
+                <th className="p-2 border border-emerald-700">Order ID</th>
+                <th className="p-2 border border-emerald-700">Customer Location</th>
+                <th className="p-2 border border-emerald-700 text-right">Store Gross</th>
+                <th className="p-2 border border-emerald-700 text-right">Admin Fee %</th>
+                <th className="p-2 border border-emerald-700 text-right">Net Payout Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredDeliveredOrders.map(order => {
+                const cartAmount = Number(order.total_amount || 0);
+                const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+
+                const storeGross = order.items
+                  ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
+                  .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
+
+                const adminCut = (storeGross * tierPct) / 100;
+                const netShare = storeGross - adminCut;
+
+                return (
+                  <tr key={order.id} className="border-b border-stone-200">
+                    <td className="p-2 border border-stone-200 font-mono font-bold">#{order.id.slice(0, 8)}</td>
+                    <td className="p-2 border border-stone-200 truncate max-w-[220px]">{order.delivery_address || order.address}</td>
+                    <td className="p-2 border border-stone-200 text-right">₹{storeGross.toFixed(2)}</td>
+                    <td className="p-2 border border-stone-200 text-right">{tierPct}%</td>
+                    <td className="p-2 border border-stone-200 text-right font-black text-emerald-700">₹{netShare.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 5. Grand Total */}
+        <div className="flex justify-end pt-2">
+          <div className="w-72 bg-emerald-50 border-2 border-emerald-600 p-4 rounded-2xl flex justify-between items-center">
+            <span className="font-black text-stone-900 text-sm">5. Grand Total Net Payout:</span>
+            <span className="font-black text-emerald-700 text-lg">₹{totalFilteredNetRevenue.toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* 6. KD Store Sign */}
+        <div className="pt-12 flex justify-between items-end border-t border-stone-200">
+          <div>
+            <p className="text-xs text-stone-500 font-medium">This is a computer-generated merchant statement and requires no physical signature.</p>
+            <p className="text-xs font-bold text-stone-800 mt-1">KD Store Merchant Settlement Department</p>
+          </div>
+          <div className="text-center space-y-2">
+            <div className="h-12 border-b border-dashed border-stone-400 w-48 mx-auto flex items-center justify-center">
+              <span className="font-serif italic font-bold text-emerald-800 text-sm">KD Store Auth. Sign</span>
+            </div>
+            <p className="font-black text-stone-800 text-xs">6. Authorized Signatory</p>
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 print:hidden">
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'dashboard' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
-            <BarChart3 size={17} /> Dashboard & Stats
-          </button>
-          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'products' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
-            <Package size={17} /> My Products ({products.length})
-          </button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'orders' ? 'bg-emerald-50 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
-            <ShoppingCart size={17} /> My Store Orders ({orders.length})
-          </button>
-          <button onClick={() => setActiveTab('location')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black transition cursor-pointer ${activeTab === 'location' ? 'bg-emerald-50 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-emerald-100 hover:bg-emerald-900/60'}`}>
-            <MapPin size={17} /> Store Location
-          </button>
-        </nav>
-
-        <div className="p-4 border-t border-emerald-800/50 space-y-2 bg-black/20 backdrop-blur-md">
-          <button onClick={() => navigate('/')} className="w-full flex items-center gap-3 px-4 py-3 text-emerald-200 hover:bg-emerald-900/40 rounded-2xl font-black transition cursor-pointer">
-            <Store size={16} /> View Storefront
-          </button>
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-4 py-3 text-rose-300 hover:bg-rose-950/50 rounded-2xl font-black transition cursor-pointer">
-            <LogOut size={16} /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 max-w-7xl mx-auto space-y-6">
-        
-        {/* Global Filter & Statement Toolbar */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm mb-6 flex-wrap gap-4 print:hidden">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-emerald-700" />
-            <span className="font-black text-stone-700 uppercase text-[10px] tracking-wider">Filter Range:</span>
-            <div className="flex gap-1 flex-wrap">
-              {['today', 'week', 'month', 'custom', 'all'].map(d => (
-                <button 
-                  key={d} 
-                  onClick={() => setDatePreset(d)} 
-                  className={`px-3 py-1.5 rounded-xl font-black text-xs transition capitalize cursor-pointer ${datePreset === d ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'}`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={() => window.print()} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition active:scale-95">
-            <Printer size={14} /> Print Statement PDF
-          </button>
+        {/* Navigation Tabs */}
+        <div className="bg-white rounded-2xl border border-emerald-100 p-1.5 flex gap-1 shadow-2xs overflow-x-auto scrollbar-none">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 min-w-[70px] flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition cursor-pointer ${
+                  isActive ? 'bg-emerald-700 text-white shadow-xs' : 'text-stone-600 hover:bg-emerald-50'
+                }`}
+              >
+                <Icon size={14} />
+                <span className="truncate">{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${isActive ? 'bg-white text-emerald-900' : 'bg-emerald-100 text-emerald-900'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {datePreset === 'custom' && (
-          <div className="bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm mb-6 flex gap-4 items-center print:hidden">
-            <div className="flex-1">
-              <label className="block font-black text-[10px] text-stone-400 uppercase mb-1">From Date</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none text-stone-800" />
-            </div>
-            <div className="flex-1">
-              <label className="block font-black text-[10px] text-stone-400 uppercase mb-1">To Date</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-emerald-50/50 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none text-stone-800" />
-            </div>
-          </div>
-        )}
-
+        {/* ── TAB 0: DASHBOARD ── */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-8 text-white shadow-xl space-y-3 border border-emerald-700/50 relative overflow-hidden">
@@ -644,12 +773,12 @@ export default function ShopkeeperPortal() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-3 relative overflow-hidden group hover:border-emerald-300 transition">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Filtered Net Payout</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Total Lifetime Payout</span>
                   <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center font-bold border border-emerald-200">
                     <DollarSign size={20} />
                   </div>
                 </div>
-                <h3 className="text-3xl font-black text-slate-900">₹{totalNetRevenue.toFixed(2)}</h3>
+                <h3 className="text-3xl font-black text-slate-900">₹{totalLifetimeRevenue.toFixed(2)}</h3>
                 <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
                   <TrendingUp size={13} /> From delivered store items
                 </p>
@@ -670,22 +799,23 @@ export default function ShopkeeperPortal() {
 
               <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-3 relative overflow-hidden group hover:border-emerald-300 transition">
                 <div className="flex justify-between items-center text-stone-400">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Filtered Orders</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Total Store Orders</span>
                   <div className="w-10 h-10 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center font-bold border border-teal-200">
                     <ShoppingCart size={20} />
                   </div>
                 </div>
                 <h3 className="text-3xl font-black text-slate-900">{orders.length}</h3>
                 <p className="text-[11px] text-teal-700 font-bold flex items-center gap-1">
-                  <Clock size={13} /> Customer orders matching filter
+                  <Clock size={13} /> Customer orders received
                 </p>
               </div>
             </div>
           </div>
         )}
 
+        {/* ── TAB 1: PRODUCTS ── */}
         {activeTab === 'products' && (
-          <div className="space-y-6 print:hidden">
+          <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Manage My Products</h2>
@@ -827,7 +957,7 @@ export default function ShopkeeperPortal() {
                 <p className="text-xs text-stone-400 italic text-center py-8">You haven't added any products yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {products.map(prod => (
+                  {paginatedProducts.map(prod => (
                     <div key={prod.id} className="flex items-center justify-between p-4 bg-emerald-50/20 rounded-2xl border border-emerald-100 text-xs hover:border-emerald-300 transition">
                       <div className="flex items-center gap-3.5">
                         <img src={prod.image_url || '/placeholder.png'} alt="" className="w-12 h-12 object-cover rounded-xl bg-white border border-emerald-200 shrink-0" />
@@ -858,13 +988,24 @@ export default function ShopkeeperPortal() {
                   ))}
                 </div>
               )}
+
+              {totalProductPages > 1 && (
+                <div className="flex justify-center items-center gap-1.5 pt-4 border-t border-emerald-100">
+                  <button disabled={productPage === 1} onClick={() => setProductPage(p => Math.max(1, p - 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronLeft size={14} /></button>
+                  {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(num => (
+                    <button key={num} onClick={() => setProductPage(num)} className={`w-8 h-8 rounded-xl font-black text-xs cursor-pointer shadow-2xs ${productPage === num ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 border border-emerald-200'}`}>{num}</button>
+                  ))}
+                  <button disabled={productPage === totalProductPages} onClick={() => setProductPage(p => Math.min(totalProductPages, p + 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronRight size={14} /></button>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* ── TAB 2: ORDERS ── */}
         {activeTab === 'orders' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center flex-wrap gap-4 print:hidden">
+            <div className="flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Store Orders & Fulfillment</h2>
                 <p className="text-xs text-stone-500 mt-0.5">Comprehensive view of customer orders containing items from your catalog.</p>
@@ -880,7 +1021,7 @@ export default function ShopkeeperPortal() {
               </div>
             ) : (
               <div className="space-y-4">
-                {orders.map(order => {
+                {paginatedOrders.map(order => {
                   const cartAmount = Number(order.total_amount || 0);
                   const storeItems = order.items?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id)) || [];
                   const storeOrderGross = storeItems.reduce((acc, item) => acc + (Number(item.price || 0) * item.quantity), 0);
@@ -982,11 +1123,129 @@ export default function ShopkeeperPortal() {
                     </div>
                   );
                 })}
+
+                {totalOrderPages > 1 && (
+                  <div className="flex justify-center items-center gap-1.5 pt-4">
+                    <button disabled={orderPage === 1} onClick={() => setOrderPage(p => Math.max(1, p - 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronLeft size={14} /></button>
+                    {Array.from({ length: totalOrderPages }, (_, i) => i + 1).map(num => (
+                      <button key={num} onClick={() => setOrderPage(num)} className={`w-8 h-8 rounded-xl font-black text-xs cursor-pointer shadow-2xs ${orderPage === num ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 border border-emerald-200'}`}>{num}</button>
+                    ))}
+                    <button disabled={orderPage === totalOrderPages} onClick={() => setOrderPage(p => Math.min(totalOrderPages, p + 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronRight size={14} /></button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
+        {/* ── TAB 3: PAYOUTS & STATEMENT SLIP ── */}
+        {activeTab === 'payouts' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-3xl p-6 text-white shadow-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-full">KD Store Merchant Payout Portal</span>
+                <span className="font-mono text-xs opacity-90">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
+              </div>
+              <div>
+                <p className="text-2xl font-black mt-1">₹{totalFilteredNetRevenue.toFixed(2)}</p>
+                <p className="text-[11px] opacity-90">Calculated net store payout for selected filter range</p>
+              </div>
+            </div>
+
+            {/* Working Filter Controls */}
+            <div className="bg-white rounded-2xl border border-emerald-100 p-4 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-1.5 text-stone-700 font-bold">
+                  <Filter size={14} className="text-emerald-700" />
+                  <span>Filter Payout Statement</span>
+                </div>
+                <button
+                  onClick={() => window.print()}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-700/20"
+                >
+                  <FileText size={14} /> Download PDF Salary / Payout Slip
+                </button>
+              </div>
+
+              <div className="flex gap-1.5 flex-wrap pt-1">
+                {['today', 'week', 'month', 'custom', 'all'].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDatePreset(d)}
+                    className={`px-3.5 py-2 rounded-xl font-black text-[10px] uppercase transition cursor-pointer ${
+                      datePreset === d ? 'bg-stone-900 text-white shadow-xs' : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+
+              {datePreset === 'custom' && (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-emerald-100">
+                  <div>
+                    <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">From Date</label>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                      className="w-full bg-emerald-50/30 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-600" />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">To Date</label>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                      className="w-full bg-emerald-50/30 border border-emerald-200 p-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-600" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payout breakdown statement */}
+            <div className="bg-white rounded-3xl border border-emerald-100 p-5 space-y-3 shadow-2xs">
+              <h3 className="font-black text-slate-900 text-sm">Statement Breakdown ({filteredDeliveredOrders.length} Delivered Orders)</h3>
+
+              {filteredDeliveredOrders.length === 0 ? (
+                <div className="p-12 text-center text-stone-400 font-medium">No delivered store orders found for this period.</div>
+              ) : (
+                <div className="space-y-2.5">
+                  {paginatedPayouts.map(order => {
+                    const cartAmount = Number(order.total_amount || 0);
+                    const tierPct = getApplicableCommissionPct(shopkeeperProfile, commissionRules, 'shopkeeper', cartAmount);
+
+                    const storeGross = order.items
+                      ?.filter(item => item.products?.shopkeeper_id === (shopkeeperProfile?.id || session?.user?.id))
+                      .reduce((acc, item) => acc + (item.price * item.quantity), 0) || 0;
+
+                    const adminCut = (storeGross * tierPct) / 100;
+                    const netShare = storeGross - adminCut;
+
+                    return (
+                      <div key={order.id} className="flex items-center justify-between p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100">
+                        <div>
+                          <p className="font-mono font-black text-slate-900">#{order.id.slice(0, 8)}</p>
+                          <p className="text-[10px] text-stone-400">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-emerald-700 text-sm">+₹{netShare.toFixed(2)}</p>
+                          <p className="text-[9px] text-stone-400 font-bold">Gross: ₹{storeGross.toFixed(0)} (Fee: {tierPct}%)</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {totalPayoutPages > 1 && (
+                <div className="flex justify-center items-center gap-1.5 pt-4 border-t border-emerald-100">
+                  <button disabled={payoutPage === 1} onClick={() => setPayoutPage(p => Math.max(1, p - 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronLeft size={14} /></button>
+                  {Array.from({ length: totalPayoutPages }, (_, i) => i + 1).map(num => (
+                    <button key={num} onClick={() => setPayoutPage(num)} className={`w-8 h-8 rounded-xl font-black text-xs cursor-pointer shadow-2xs ${payoutPage === num ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 border border-emerald-200'}`}>{num}</button>
+                  ))}
+                  <button disabled={payoutPage === totalPayoutPages} onClick={() => setPayoutPage(p => Math.min(totalPayoutPages, p + 1))} className="p-2 bg-white rounded-xl border border-emerald-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronRight size={14} /></button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 4: LOCATION ── */}
         {activeTab === 'location' && (
           <div className="space-y-6">
             <div>
@@ -996,7 +1255,6 @@ export default function ShopkeeperPortal() {
 
             <div className="bg-white p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-5 max-w-3xl">
               
-              {/* Pincode Search Bar */}
               <form onSubmit={handleSearchPincode} className="flex gap-2">
                 <div className="relative flex-1">
                   <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -1017,7 +1275,6 @@ export default function ShopkeeperPortal() {
                 </button>
               </form>
 
-              {/* Interactive Map Container */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center text-[10px] text-stone-500 font-black uppercase tracking-wider">
                   <span>Interactive Map (Drag pin or click to relocate)</span>

@@ -87,7 +87,7 @@ export default function HomeSelector() {
           <ShoppingBasket size={22} className="text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-black text-stone-900 tracking-tight leading-none">Harraiya Super Market</h1>
+          <h1 className="text-xl font-black text-stone-900 tracking-tight leading-none">10000+ Products</h1>
           <p className="text-[11px] text-brand-600 font-bold mt-0.5 flex items-center gap-1">
             <Sparkles size={10} /> Quick Commerce Platform
           </p>

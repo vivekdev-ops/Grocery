@@ -228,20 +228,20 @@ export default function ProductGrid({
   return (
     <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-20 md:pb-12 text-slate-900 overflow-visible">
       
-      {/* ── TOP CATEGORIES STRIP (EXPLORE BY CATEGORY) ── -->[cite: 1] */}
+      {/* ── TOP CATEGORIES STRIP (EXPLORE BY CATEGORY - FULL CIRCLE IMAGES) ── */}
       {!isAnyCategorySelected && (
         <div className="space-y-2 mb-4">
           <div className="flex items-center justify-between px-1">
             <h3 className="font-black text-sm sm:text-lg text-stone-900 tracking-tight">Explore Categories</h3>
           </div>
-          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-3 overflow-x-auto pb-1 scrollbar-none">
             <motion.button
               whileHover={{ y: -2 }}
               onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
-                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
+              className={`flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
+                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-stone-200 bg-white hover:border-emerald-400'}`}
             >
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center mb-1 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-1 shrink-0 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
                 <Sparkles size={18} />
               </div>
               <span className={`text-[10px] font-black truncate w-full ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
@@ -255,11 +255,11 @@ export default function ProductGrid({
                   whileHover={{ y: -2 }}
                   key={cat.id}
                   onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`flex flex-col items-center p-2 rounded-xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
-                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-emerald-100 bg-white/90 hover:border-emerald-400'}`}
+                  className={`flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 sm:w-auto transition-all
+                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md' : 'border-stone-200 bg-white hover:border-emerald-400'}`}
                 >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-stone-100 overflow-hidden mb-1 border border-emerald-100">
-                    <img src={img} alt={cat.name} className="w-full h-full object-cover" />
+                  <div className="w-12 h-12 rounded-full bg-stone-100 overflow-hidden mb-1 border border-stone-200 shrink-0">
+                    <img src={img} alt={cat.name} className="w-full h-full object-cover rounded-full" />
                   </div>
                   <span className={`text-[10px] font-black truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
                 </motion.button>
@@ -288,8 +288,11 @@ export default function ProductGrid({
                   className="w-full h-auto max-h-[500px] object-contain filter brightness-105 contrast-110 mx-auto" 
                 />
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-7 bg-white/10 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/20 shadow-2xl">
-                  
+                  <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-md">
+                    ⚡ 10 Mins Delivery
+                  </span>
                   <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight leading-tight filter blur-[0.4px] drop-shadow-sm">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
+                  <p className="text-[11px] sm:text-xs text-emerald-100 font-medium filter blur-[0.3px]">{banners[currentSlide]?.subtitle || 'Delivered straight to your doorstep.'}</p>
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -325,7 +328,7 @@ export default function ProductGrid({
             </div>
           )}
 
-          {/* DESKTOP 15% VERTICAL SUB-SIDEBAR */}
+          {/* DESKTOP 15% VERTICAL SUB-SIDEBAR (FULL CIRCLE IMAGES) */}
           {!query && currentSubcategories.length > 0 && (
             <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-stone-200/90 p-1.5 space-y-1 shadow-2xs sticky top-16">
               <button
@@ -336,7 +339,7 @@ export default function ProductGrid({
                     : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
                 }`}
               >
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1 shadow-2xs">
+                <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1 shadow-2xs shrink-0">
                   <Sparkles size={16} />
                 </div>
                 <span className="text-[10px] leading-tight truncate w-full">All Items</span>
@@ -356,8 +359,8 @@ export default function ProductGrid({
                           : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
                       }`}
                     >
-                      <div className="w-11 h-11 rounded-xl bg-stone-100 overflow-hidden mb-1 border border-stone-200/80 flex items-center justify-center shadow-2xs">
-                        {sub.image_url ? <img src={subImg} alt="" className="w-full h-full object-cover" /> : <Package size={16} className="text-stone-400" />}
+                      <div className="w-11 h-11 rounded-full bg-stone-100 overflow-hidden mb-1 border border-stone-200/80 flex items-center justify-center shadow-2xs shrink-0">
+                        {sub.image_url ? <img src={subImg} alt="" className="w-full h-full object-cover rounded-full" /> : <Package size={16} className="text-stone-400" />}
                       </div>
                       <span className="text-[10px] leading-tight truncate w-full">{sub.name}</span>
                     </button>
@@ -398,7 +401,11 @@ export default function ProductGrid({
             <div className="bg-white px-4 py-3 rounded-2xl border border-stone-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
               <div>
                 <h2 className="font-black text-stone-900 text-sm sm:text-base tracking-tight">
-                  {query ? `Search: "${searchQuery}"` : (activeSubcategoryObj?.name || activeCategoryObj?.name)}
+                  {query 
+                    ? `Search: "${searchQuery}"` 
+                    : activeSubcategoryId !== 'All' && activeSubcategoryObj 
+                      ? activeSubcategoryObj.name 
+                      : activeCategoryObj?.name || 'All Products'}
                 </h2>
                 <p className="text-[10px] text-stone-400 font-medium">Delivering to: Bhikaji Cama Place, New Delhi</p>
               </div>
@@ -517,7 +524,7 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH PRODUCTS UNDERNEATH EACH SECTION */
+        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH PRODUCTS UNDERNEATH EACH SECTION (FULL CIRCLE IMAGES) */
         <div className="space-y-6">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
@@ -538,7 +545,7 @@ export default function ProductGrid({
                   </button>
                 </div>
 
-                {/* Subcategories Scroll Strip */}
+                {/* Subcategories Scroll Strip (Full Circle Images) */}
                 <div className="flex overflow-x-auto pb-1 gap-3 scrollbar-none snap-x">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
@@ -549,9 +556,9 @@ export default function ProductGrid({
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
                         className="flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-20 snap-start"
                       >
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-1 flex items-center justify-center">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-1 flex items-center justify-center">
                           {sub.image_url ? (
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-contain" />
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
                           ) : (
                             <Package size={20} className="text-emerald-600" />
                           )}
