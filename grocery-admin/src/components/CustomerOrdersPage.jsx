@@ -2439,7 +2439,7 @@ const CustomerOrdersPage = () => {
                     <MapPin className="w-4 h-4 text-emerald-600" /> Delivery Address
                   </h4>
                   <p className="text-stone-700 font-medium leading-relaxed text-xs">
-                    {selectedOrder?.address || selectedOrder?.delivery_address || selectedOrder?.shipping_address || 'Address info unavailable'}
+                    {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || 'Address info unavailable'}
                   </p>
                 </div>
 
