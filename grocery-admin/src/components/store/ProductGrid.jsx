@@ -65,7 +65,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
       onClick={() => onSelectProduct(product)}
-      className="bg-white/95 backdrop-blur-md rounded-[2rem] border border-emerald-100/80 shadow-xs hover:shadow-xl hover:border-emerald-300 transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full"
+      className="bg-white rounded-[2rem] shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full"
     >
       <button
         onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
@@ -85,7 +85,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
       )}
 
       {/* Crystal Clear HD Product Image Container */}
-      <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-stone-50 via-emerald-50/5 to-teal-50/20 overflow-hidden flex items-center justify-center p-3">
+      <div className="relative w-full aspect-[4/3] bg-stone-50 overflow-hidden flex items-center justify-center p-3">
         <img 
           src={displayImage} 
           alt={product.name} 
@@ -96,7 +96,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
           className="w-full h-full object-contain filter contrast-105 group-hover:scale-110 transition-transform duration-500 ease-out" 
         />
 
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-lg text-[8px] font-black text-slate-800 shadow-2xs border border-emerald-100/60">
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-lg text-[8px] font-black text-slate-800 shadow-2xs">
           <Clock size={9} className="text-emerald-600 animate-pulse" />
           <span>10 mins</span>
         </div>
@@ -111,7 +111,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
       <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
         <div className="space-y-1">
           {avgRating && avgRating !== 'No ratings' && Number(avgRating) > 0 && (
-            <div className="flex items-center gap-1 text-[8px] font-black text-amber-800 bg-amber-50/80 px-2 py-0.5 rounded-md w-max border border-amber-200">
+            <div className="flex items-center gap-1 text-[8px] font-black text-amber-800 bg-amber-50/80 px-2 py-0.5 rounded-md w-max">
               <Star size={9} className="fill-amber-500 text-amber-500" />
               <span>{avgRating}</span>
             </div>
@@ -124,7 +124,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
               <select
                 value={currentVariantKey || ''}
                 onChange={handleVariantChange}
-                className="w-full bg-emerald-50/60 hover:bg-emerald-100/60 border border-emerald-200 text-emerald-950 text-[10px] font-extrabold rounded-xl px-2 py-1 outline-none transition cursor-pointer shadow-2xs"
+                className="w-full bg-stone-50 hover:bg-stone-100 text-slate-900 text-[10px] font-extrabold rounded-xl px-2 py-1 outline-none transition cursor-pointer"
               >
                 {variants.map((v, idx) => {
                   const vKey = v.id || v.label || v.unit_label || idx;
@@ -140,7 +140,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-emerald-50 mt-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between pt-2 border-t border-stone-100 mt-auto" onClick={e => e.stopPropagation()}>
           <div>
             <div className="flex items-baseline gap-1">
               <span className="font-black text-xs text-slate-900 leading-tight">₹{price.toFixed(0)}</span>
@@ -173,7 +173,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
                 animate={addedFlash ? { scale: [1, 0.9, 1.08, 1] } : {}}
                 transition={{ duration: 0.2 }}
                 className={`h-7 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-2xs btn-press
-                  ${addedFlash ? 'bg-emerald-600 text-white shadow-emerald-600/30' : 'bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-transparent'}`}
+                  ${addedFlash ? 'bg-emerald-600 text-white shadow-emerald-600/30' : 'bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white'}`}
               >
                 {addedFlash ? '✓ Added' : '+ Add'}
               </motion.button>
@@ -241,7 +241,7 @@ export default function ProductGrid({
       
       {/* ── STYLISH HERO BANNERS CAROUSEL ── */}
       {!isAnyCategorySelected && banners?.length > 0 && (
-        <div className="relative rounded-[2.5rem] overflow-hidden shadow-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 mb-10 min-h-[200px] sm:min-h-[260px] border border-emerald-500/20">
+        <div className="relative rounded-[2.5rem] overflow-hidden shadow-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 mb-10 min-h-[200px] sm:min-h-[260px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentSlide}
@@ -269,15 +269,15 @@ export default function ProductGrid({
         <div className="space-y-4 mb-10">
           <div className="flex items-center justify-between">
             <h3 className="font-black text-lg sm:text-xl text-stone-900 tracking-tight">Explore Categories</h3>
-            <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-3.5 py-1 rounded-full border border-emerald-200/80 shadow-2xs">All Hubs Active</span>
+            <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-3.5 py-1 rounded-full shadow-2xs">All Hubs Active</span>
           </div>
           
           <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-3.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
             <motion.button
               whileHover={{ y: -3 }}
               onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`flex flex-col items-center p-3.5 rounded-3xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
-                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white ring-4 ring-emerald-600/20 shadow-lg scale-105' : 'border-emerald-100 bg-white/85 backdrop-blur-md hover:border-emerald-400 hover:bg-emerald-50/50 shadow-2xs'}`}
+              className={`flex flex-col items-center p-3.5 rounded-3xl cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
+                ${activeCategory === 'All' ? 'bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-lg scale-105' : 'bg-white hover:bg-stone-50 shadow-2xs'}`}
             >
               <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center overflow-hidden mb-2.5 shadow-sm ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'}`}>
                 <Sparkles size={22} />
@@ -293,10 +293,10 @@ export default function ProductGrid({
                   whileHover={{ y: -3 }}
                   key={cat.id}
                   onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`flex flex-col items-center p-3.5 rounded-3xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
-                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white ring-4 ring-emerald-600/20 shadow-lg scale-105' : 'border-emerald-100 bg-white/85 backdrop-blur-md hover:border-emerald-400 hover:bg-emerald-50/50 shadow-2xs'}`}
+                  className={`flex flex-col items-center p-3.5 rounded-3xl cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
+                    ${isSelected ? 'bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-lg scale-105' : 'bg-white hover:bg-stone-50 shadow-2xs'}`}
                 >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-stone-100 overflow-hidden mb-2.5 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-stone-100 overflow-hidden mb-2.5 shadow-2xs group-hover:scale-105 transition-transform">
                     <img src={img} alt={cat.name} className="w-full h-full object-cover filter contrast-105" />
                   </div>
                   <span className={`text-[11px] font-black leading-tight text-center truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
@@ -313,20 +313,20 @@ export default function ProductGrid({
           
           {/* Sidebar for Subcategories if any exist */}
           {!query && currentSubcategories.length > 0 && (
-            <div className="w-full md:w-64 shrink-0 bg-white/90 backdrop-blur-xl rounded-3xl border border-emerald-100 p-3.5 space-y-2 shadow-lg shadow-stone-200/40">
+            <div className="w-full md:w-64 shrink-0 bg-white rounded-3xl p-3.5 space-y-2 shadow-lg shadow-stone-200/30">
               <div className="px-3 pt-1 pb-0.5">
                 <p className="text-[9px] font-black uppercase tracking-widest text-stone-400">Subcategories</p>
               </div>
 
               <button
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
+                className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer ${
                   activeSubcategoryId === 'All' 
-                    ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
-                    : 'bg-stone-50/80 border-stone-100 text-stone-700 hover:bg-emerald-50/60 font-bold'
+                    ? 'bg-emerald-600 text-white font-black shadow-md' 
+                    : 'bg-stone-50 text-stone-700 hover:bg-stone-100 font-bold'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border ${activeSubcategoryId === 'All' ? 'bg-emerald-700 border-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+                <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${activeSubcategoryId === 'All' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
                   {activeCategoryObj?.image_url ? <img src={activeCategoryObj.image_url} alt="" className="w-full h-full object-cover" /> : <Sparkles size={16} />}
                 </div>
                 <span className="text-xs font-black leading-tight truncate">All {activeCategoryObj?.name}</span>
@@ -339,13 +339,13 @@ export default function ProductGrid({
                   <button
                     key={sub.id}
                     onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer ${
                       isSubSelected 
-                        ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
-                        : 'bg-stone-50/80 border-stone-100 text-stone-700 hover:bg-emerald-50/60 font-bold'
+                        ? 'bg-emerald-600 text-white font-black shadow-md' 
+                        : 'bg-stone-50 text-stone-700 hover:bg-stone-100 font-bold'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200 flex items-center justify-center shadow-2xs">
+                    <div className="w-8 h-8 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
                       {sub.image_url ? <img src={subImg} alt="" className="w-full h-full object-cover filter contrast-105" /> : <Package size={16} className="text-stone-400" />}
                     </div>
                     <span className="text-xs font-black leading-tight truncate">{sub.name}</span>
@@ -357,15 +357,15 @@ export default function ProductGrid({
 
           {/* Main Products Area */}
           <div className="flex-1 w-full space-y-5">
-            <div className="flex items-center justify-between bg-white/90 backdrop-blur-xl px-6 py-4 rounded-3xl border border-emerald-100 shadow-lg shadow-stone-200/30">
+            <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl shadow-lg shadow-stone-200/25">
               <h3 className="font-black text-stone-900 text-base sm:text-lg tracking-tight">
                 {query ? `Search Results for "${searchQuery}"` : (activeSubcategoryObj?.name || activeCategoryObj?.name || 'Products')}
               </h3>
-              <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-2xs">{sourceProducts.length} items found</span>
+              <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full shadow-2xs">{sourceProducts.length} items found</span>
             </div>
 
             {sourceProducts.length === 0 ? (
-              <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-16 border border-emerald-100 text-center shadow-lg">
+              <div className="bg-white rounded-3xl p-16 text-center shadow-lg">
                 <Package size={44} className="text-emerald-300 mx-auto mb-3 animate-bounce" />
                 <p className="text-sm font-black text-stone-800">No active products found in this selection.</p>
                 <p className="text-xs text-stone-400 mt-1 font-medium">Try exploring another category or search query.</p>
@@ -395,7 +395,7 @@ export default function ProductGrid({
                     <button
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className="p-3 bg-white/90 backdrop-blur-md rounded-2xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                      className="p-3 bg-white rounded-2xl disabled:opacity-40 hover:bg-stone-50 transition cursor-pointer shadow-2xs"
                     >
                       <ChevronLeft size={16} />
                     </button>
@@ -408,7 +408,7 @@ export default function ProductGrid({
                           className={`w-10 h-10 rounded-2xl font-black text-xs transition cursor-pointer shadow-2xs ${
                             currentPage === num 
                               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 scale-105' 
-                              : 'bg-white/90 backdrop-blur-md text-stone-600 hover:bg-emerald-50 border border-emerald-100'
+                              : 'bg-white text-stone-600 hover:bg-stone-50'
                           }`}
                         >
                           {num}
@@ -419,7 +419,7 @@ export default function ProductGrid({
                     <button
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className="p-3 bg-white/90 backdrop-blur-md rounded-2xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-2xs"
+                      className="p-3 bg-white rounded-2xl disabled:opacity-40 hover:bg-stone-50 transition cursor-pointer shadow-2xs"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -431,32 +431,27 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: CATEGORY WITH COMPACT SUBCATEGORY ICONS */
+        /* HOMEPAGE POPULATION: CLEAN BLINKIT-STYLE CARDS WITH HD IMAGES & NO BORDERS */
         <div className="space-y-6">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
             if (subcats.length === 0) return null;
 
             return (
-              <div key={parent.id} className="bg-white/90 backdrop-blur-xl rounded-3xl border border-emerald-100/90 shadow-md p-4 sm:p-5 space-y-3.5">
-                {/* Compact Parent Category Header */}
-                <div className="flex items-center justify-between border-b border-emerald-100/60 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black shadow-2xs">
-                      <Sparkles size={14} />
-                    </div>
-                    <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">{parent.name}</h3>
-                  </div>
+              <div key={parent.id} className="bg-white rounded-3xl shadow-md p-4 sm:p-5 space-y-4">
+                {/* Parent Category Header matching Blinkit style */}
+                <div className="flex items-center justify-between pb-1">
+                  <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">{parent.name}</h3>
                   <button
-                    onClick={() => { setActiveCategory(parent.id); setCurrentPage(1); }}
-                    className="text-[11px] font-black text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase tracking-wider flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-1.5 rounded-xl transition shadow-2xs"
+                    onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('Atta, Dal & Oil'); setCurrentPage(1); }}
+                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 cursor-pointer uppercase tracking-wider flex items-center gap-0.5"
                   >
-                    <span>View All</span> <ChevronRight size={13} />
+                    <span>see all</span> <ChevronRight size={13} />
                   </button>
                 </div>
 
-                {/* Compact Subcategories Grid with HD Icons / Images */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {/* Subcategories Grid mirroring reference image layout */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
@@ -464,16 +459,16 @@ export default function ProductGrid({
                         whileHover={{ y: -2 }}
                         key={sub.id}
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className="bg-stone-50/70 hover:bg-emerald-50/50 backdrop-blur-md p-3 rounded-2xl border border-stone-200/70 hover:border-emerald-300 transition-all duration-300 flex flex-col items-center text-center cursor-pointer group shadow-2xs"
+                        className="bg-emerald-50/30 hover:bg-emerald-50/70 p-3 rounded-2xl transition-all duration-300 flex flex-col items-center text-center cursor-pointer group shadow-2xs"
                       >
-                        <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-white overflow-hidden mb-2 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform flex items-center justify-center p-1">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white overflow-hidden mb-2 shadow-xs group-hover:scale-105 transition-transform flex items-center justify-center p-1.5">
                           {sub.image_url ? (
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover filter contrast-105" />
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-contain filter contrast-105" />
                           ) : (
-                            <Package size={18} className="text-emerald-600" />
+                            <Package size={24} className="text-emerald-600" />
                           )}
                         </div>
-                        <span className="font-black text-[10px] sm:text-[11px] text-stone-900 line-clamp-1 group-hover:text-emerald-700 transition-colors leading-tight">
+                        <span className="font-extrabold text-[11px] sm:text-xs text-stone-800 line-clamp-2 group-hover:text-emerald-700 transition-colors leading-tight">
                           {sub.name}
                         </span>
                       </motion.button>
