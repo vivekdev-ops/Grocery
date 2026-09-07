@@ -1,6 +1,6 @@
 // src/components/store/ProductGrid.jsx
 import { useState } from 'react';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap } from 'lucide-react';
+import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct }) {
@@ -62,30 +62,22 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 
   return (
     <motion.div
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
       onClick={() => onSelectProduct(product)}
-      className="bg-white rounded-3xl border border-stone-200/80 shadow-xs hover:shadow-xl hover:border-emerald-300 transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full"
+      className="bg-white rounded-3xl border border-stone-200/80 shadow-2xs hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full p-4 justify-between"
     >
       <button
         onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
-        className={`absolute top-3 right-3 z-25 p-2 rounded-xl transition-all duration-200 shadow-sm backdrop-blur-md
-          ${isWishlisted ? 'bg-rose-50 text-rose-500 scale-110 shadow-rose-100' : 'bg-white/80 text-stone-400 hover:text-rose-500 hover:bg-rose-50'}`}
+        className={`absolute top-3 right-3 z-25 p-2 rounded-2xl transition-all duration-200 shadow-2xs backdrop-blur-md
+          ${isWishlisted ? 'bg-rose-50 text-rose-500 scale-110 shadow-rose-100' : 'bg-white/90 text-stone-400 hover:text-rose-500 hover:bg-rose-50'}`}
         title="Wishlist"
       >
         <Heart size={14} className={isWishlisted ? 'fill-rose-500' : ''} />
       </button>
 
-      {discountPct > 0 && (
-        <div className="absolute top-0 left-0 z-25">
-          <span className="bg-[#2563EB] text-white font-black text-[10px] px-2.5 py-2 rounded-br-2xl shadow-md uppercase tracking-wider flex flex-col items-center leading-tight">
-            <span>{discountPct}%</span>
-            <span>OFF</span>
-          </span>
-        </div>
-      )}
-
-      <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-stone-50 via-amber-50/20 to-stone-100 overflow-hidden flex items-center justify-center p-4">
+      {/* Top Image Container */}
+      <div className="relative w-full aspect-[4/3] bg-stone-50/80 rounded-2xl overflow-hidden flex items-center justify-center p-3 mb-3 border border-stone-100">
         <img 
           src={displayImage} 
           alt={product.name} 
@@ -93,69 +85,81 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
             e.target.onerror = null;
             e.target.src = fallbackDummyImages[0];
           }}
-          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 ease-out drop-shadow-sm" 
+          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" 
         />
 
-        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 bg-stone-100/90 backdrop-blur-md px-2.5 py-1 rounded-xl text-[10px] font-black text-slate-800 shadow-2xs">
-          <Clock size={11} className="text-stone-600" />
-          <span>15 MINS</span>
+        {/* Time Delivery Badge */}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded-lg text-[9px] font-black text-stone-700 shadow-2xs border border-stone-100">
+          <Clock size={10} className="text-emerald-600" />
+          <span>9 mins</span>
         </div>
 
         {isOutOfStock && (
-          <div className="absolute inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-20">
-            <span className="bg-white text-stone-950 text-[10px] font-black px-4 py-1.5 rounded-xl uppercase tracking-widest shadow-2xl">Sold Out</span>
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center z-20">
+            <span className="bg-stone-900 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-md">Sold Out</span>
           </div>
         )}
       </div>
 
-      <div className="p-4 flex flex-col flex-1 justify-between gap-3 bg-white">
+      {/* Product Details Section */}
+      <div className="space-y-2 flex-1 flex flex-col justify-between">
         <div className="space-y-1.5">
-          <p className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-2 leading-snug group-hover:text-emerald-700 transition-colors">{product.name}</p>
-
           {hasVariants ? (
-            <div onClick={e => e.stopPropagation()} className="pt-0.5">
+            <div onClick={e => e.stopPropagation()}>
               <select
                 value={currentVariantKey || ''}
                 onChange={handleVariantChange}
-                className="w-full bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 text-[11px] font-bold rounded-xl px-2.5 py-1.5 outline-none transition cursor-pointer shadow-2xs"
+                className="w-full bg-emerald-50/60 hover:bg-emerald-100/60 border border-emerald-200 text-emerald-950 text-[10px] font-black rounded-xl px-2.5 py-1.5 outline-none transition cursor-pointer shadow-2xs"
               >
                 {variants.map((v, idx) => {
                   const vKey = v.id || v.label || v.unit_label || idx;
                   const vLabel = v.unit_label || v.label || `Option ${idx + 1}`;
                   return (
-                    <option key={vKey} value={vKey}>{vLabel} • ₹{v.price}</option>
+                    <option key={vKey} value={vKey}>{vLabel}</option>
                   );
                 })}
               </select>
             </div>
           ) : (
-            <p className="text-[11px] text-stone-500 font-bold">{product.unit || '1 unit'}</p>
+            <span className="text-[10px] font-black text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md inline-block">
+              {product.unit || '1 unit'}
+            </span>
           )}
+
+          <p className="font-bold text-xs text-stone-900 line-clamp-2 leading-snug group-hover:text-emerald-700 transition-colors">
+            {product.name}
+          </p>
         </div>
 
+        {/* Price & Add Button Bar */}
         <div className="flex items-center justify-between pt-2.5 border-t border-stone-100 mt-auto" onClick={e => e.stopPropagation()}>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="font-black text-base sm:text-lg text-slate-900 leading-tight">₹{price.toFixed(0)}</span>
+              <span className="font-black text-sm text-stone-900">₹{price.toFixed(0)}</span>
               {hasMrp && (
-                <span className="text-[11px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>
+                <span className="text-[10px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>
               )}
             </div>
+            {hasMrp && discountPct > 0 && (
+              <span className="text-[9px] font-black text-emerald-700 block leading-none mt-0.5">
+                {discountPct}% OFF
+              </span>
+            )}
           </div>
 
           {!isOutOfStock && (
             qtyInCart > 0 ? (
-              <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden shadow-md shadow-emerald-600/25 h-9">
+              <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden shadow-sm h-8">
                 <button
                   onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }}
-                  className="px-3 h-full hover:bg-emerald-700 font-black text-xs flex items-center justify-center cursor-pointer transition"
+                  className="px-2.5 h-full hover:bg-emerald-700 font-black text-xs flex items-center justify-center cursor-pointer transition"
                 >
                   -
                 </button>
-                <span className="px-2.5 font-black text-xs">{qtyInCart}</span>
+                <span className="px-2 font-black text-xs">{qtyInCart}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }}
-                  className="px-3 h-full hover:bg-emerald-700 font-black text-xs flex items-center justify-center cursor-pointer transition"
+                  className="px-2.5 h-full hover:bg-emerald-700 font-black text-xs flex items-center justify-center cursor-pointer transition"
                 >
                   +
                 </button>
@@ -163,12 +167,12 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
             ) : (
               <motion.button
                 onClick={handleAdd}
-                animate={addedFlash ? { scale: [1, 0.9, 1.1, 1] } : {}}
+                animate={addedFlash ? { scale: [1, 0.9, 1.08, 1] } : {}}
                 transition={{ duration: 0.25 }}
-                className={`h-9 px-5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm border btn-press
-                  ${addedFlash ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-600/30' : 'bg-emerald-50/80 hover:bg-emerald-600 text-emerald-700 hover:text-white border-emerald-200/80 hover:border-transparent'}`}
+                className={`h-8 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-2xs btn-press border
+                  ${addedFlash ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-600'}`}
               >
-                {addedFlash ? '✓ ADD' : 'ADD'}
+                {addedFlash ? '✓ Added' : 'ADD'}
               </motion.button>
             )
           )}
@@ -230,99 +234,27 @@ export default function ProductGrid({
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 font-sans pb-16 text-slate-900">
+    <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-4 font-sans pb-32 md:pb-16 text-slate-900">
       
-      {/* ── STYLISH HERO BANNERS CAROUSEL ── */}
-      {!isAnyCategorySelected && banners?.length > 0 && (
-        <div className="relative rounded-[2.5rem] overflow-hidden shadow-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 mb-6 min-h-[180px] sm:min-h-[240px] border border-emerald-500/20">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentSlide}
-              initial={{ opacity: 0, scale: 1.02 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="absolute inset-0"
-            >
-              <img src={banners[currentSlide]?.image_url} alt="Banner" className="w-full h-full object-cover opacity-50 filter saturate-125" />
-              <div className="absolute inset-0 bg-gradient-to-r from-stone-950/95 via-stone-950/50 to-transparent flex flex-col justify-center p-6 sm:p-10 text-white space-y-2">
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-black text-[10px] px-3.5 py-1 rounded-full uppercase tracking-widest w-max shadow-md">
-                  ⚡ 10 Minutes Lightning Delivery
-                </span>
-                <h2 className="text-xl sm:text-3xl font-black max-w-lg tracking-tight leading-tight">{banners[currentSlide]?.title || 'Fresh groceries at your doorstep'}</h2>
-                <p className="text-xs sm:text-sm text-emerald-100/90 font-medium max-w-md">{banners[currentSlide]?.subtitle || 'Farm-fresh vegetables, dairy, and daily essentials delivered instantly.'}</p>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* ── STYLISH HOMEPAGE CATEGORY CARDS ── */}
-      {!isAnyCategorySelected && (
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-black text-lg sm:text-xl text-stone-900 tracking-tight">Explore Categories</h3>
-            <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/80 shadow-2xs">All Hubs Active</span>
-          </div>
-          
-          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-3 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-            <motion.button
-              whileHover={{ y: -4 }}
-              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
-                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white ring-4 ring-emerald-600/20 shadow-lg scale-105' : 'border-emerald-100 bg-white/85 backdrop-blur-md hover:border-emerald-400 hover:bg-emerald-50/50 shadow-2xs'}`}
-            >
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center overflow-hidden mb-2 shadow-xs ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'}`}>
-                <Sparkles size={22} />
-              </div>
-              <span className={`text-[11px] font-black leading-tight text-center truncate w-full ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All Items</span>
-            </motion.button>
-
-            {parentCategories.map((cat, index) => {
-              const isSelected = activeCategory === cat.id;
-              const img = cat.image_url || fallbackImages[index % fallbackImages.length];
-              return (
-                <motion.button
-                  whileHover={{ y: -4 }}
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shrink-0 w-24 sm:w-auto group btn-press
-                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white ring-4 ring-emerald-600/20 shadow-lg scale-105' : 'border-emerald-100 bg-white/85 backdrop-blur-md hover:border-emerald-400 hover:bg-emerald-50/50 shadow-2xs'}`}
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-stone-100 overflow-hidden mb-2 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
-                    <img src={img} alt={cat.name} className="w-full h-full object-cover" />
-                  </div>
-                  <span className={`text-[11px] font-black leading-tight text-center truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── STOREFRONT LAYOUT ── */}
+      {/* ── STOREFRONT LAYOUT WHEN CATEGORY SELECTED (BLINKIT STYLE TWO-COLUMN SUB-SIDEBAR) ── */}
       {isAnyCategorySelected ? (
-        <div className="flex flex-col md:flex-row gap-6 items-start">
+        <div className="flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
           
-          {/* Sidebar for Subcategories if any exist */}
+          {/* Left Vertical Subcategory Pill Bar (Blinkit Style) */}
           {!query && currentSubcategories.length > 0 && (
-            <div className="w-full md:w-72 shrink-0 bg-white/90 backdrop-blur-xl rounded-[2rem] border border-emerald-100 p-3.5 space-y-2 shadow-lg shadow-stone-200/50">
-              <div className="px-2 pt-1 pb-0.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-stone-400">Subcategories</p>
-              </div>
-
+            <div className="w-full md:w-48 shrink-0 flex md:flex-col gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0 scrollbar-none sticky top-20 z-10 bg-transparent">
               <button
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
+                className={`flex flex-col items-center p-3 rounded-2xl text-center transition cursor-pointer border shrink-0 w-24 md:w-full ${
                   activeSubcategoryId === 'All' 
-                    ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
-                    : 'bg-stone-50/80 border-stone-100 text-stone-700 hover:bg-emerald-50/60 font-bold'
+                    ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-black shadow-2xs ring-2 ring-emerald-500/20' 
+                    : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 font-bold'
                 }`}
               >
-                <div className={`w-9 h-9 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border ${activeSubcategoryId === 'All' ? 'bg-emerald-700 border-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
-                  {activeCategoryObj?.image_url ? <img src={activeCategoryObj.image_url} alt="" className="w-full h-full object-cover" /> : <Sparkles size={16} />}
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1.5 mx-auto">
+                  <Sparkles size={18} />
                 </div>
-                <span className="text-xs font-black leading-tight truncate">All {activeCategoryObj?.name}</span>
+                <span className="text-[11px] leading-tight truncate w-full">All Items</span>
               </button>
 
               {currentSubcategories.map((sub, index) => {
@@ -332,40 +264,51 @@ export default function ProductGrid({
                   <button
                     key={sub.id}
                     onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left transition cursor-pointer border ${
+                    className={`flex flex-col items-center p-3 rounded-2xl text-center transition cursor-pointer border shrink-0 w-24 md:w-full ${
                       isSubSelected 
-                        ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-md' 
-                        : 'bg-stone-50/80 border-stone-100 text-stone-700 hover:bg-emerald-50/60 font-bold'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-black shadow-2xs ring-2 ring-emerald-500/20' 
+                        : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50 font-bold'
                     }`}
                   >
-                    <div className="w-9 h-9 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200 flex items-center justify-center shadow-2xs">
+                    <div className="w-10 h-10 rounded-xl bg-stone-100 overflow-hidden mb-1.5 border border-stone-200 flex items-center justify-center mx-auto shadow-2xs">
                       {sub.image_url ? <img src={subImg} alt="" className="w-full h-full object-cover" /> : <Package size={16} className="text-stone-400" />}
                     </div>
-                    <span className="text-xs font-black leading-tight truncate">{sub.name}</span>
+                    <span className="text-[11px] leading-tight truncate w-full">{sub.name}</span>
                   </button>
                 );
               })}
             </div>
           )}
 
-          {/* Main Products Area */}
+          {/* Main Products Area with Blinkit Filter Toolbar */}
           <div className="flex-1 w-full space-y-4">
-            <div className="flex items-center justify-between bg-white/90 backdrop-blur-xl px-6 py-4 rounded-[2rem] border border-emerald-100 shadow-lg shadow-stone-200/40">
-              <h3 className="font-black text-stone-900 text-base sm:text-lg tracking-tight">
+            
+            {/* Category Title & Blinkit Sort/Filter Bar */}
+            <div className="bg-white px-5 py-3.5 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <h2 className="font-black text-stone-900 text-base sm:text-lg tracking-tight">
                 {query ? `Search Results for "${searchQuery}"` : (activeSubcategoryObj?.name || activeCategoryObj?.name || 'Products')}
-              </h3>
-              <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3.5 py-1 rounded-full border border-emerald-200 shadow-2xs">{sourceProducts.length} items found</span>
+              </h2>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer">
+                  <SlidersHorizontal size={13} /> Filters
+                </button>
+                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 shrink-0 cursor-pointer">
+                  <ArrowUpDown size={13} /> Sort By
+                </button>
+                <span className="text-[11px] font-bold text-stone-400 pl-1 shrink-0">{sourceProducts.length} items</span>
+              </div>
             </div>
 
             {sourceProducts.length === 0 ? (
-              <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] p-16 border border-emerald-100 text-center shadow-lg">
-                <Package size={44} className="text-emerald-300 mx-auto mb-3 animate-bounce" />
-                <p className="text-sm font-black text-stone-800">No active products found in this selection.</p>
-                <p className="text-xs text-stone-400 mt-0.5 font-medium">Try exploring another category or search query.</p>
+              <div className="bg-white rounded-3xl p-16 border border-stone-200 text-center shadow-2xs">
+                <Package size={44} className="text-stone-300 mx-auto mb-3" />
+                <p className="text-sm font-black text-stone-700">No active products found in this selection.</p>
+                <p className="text-xs text-stone-400 mt-1 font-medium">Try exploring another category or search query.</p>
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {currentProducts.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -388,7 +331,7 @@ export default function ProductGrid({
                     <button
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className="p-3 bg-white/90 backdrop-blur-md rounded-xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-xs"
+                      className="p-2.5 bg-white rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50 transition cursor-pointer shadow-2xs"
                     >
                       <ChevronLeft size={16} />
                     </button>
@@ -398,10 +341,10 @@ export default function ProductGrid({
                         <button
                           key={num}
                           onClick={() => setCurrentPage(num)}
-                          className={`w-10 h-10 rounded-xl font-black text-xs transition cursor-pointer shadow-xs ${
+                          className={`w-9 h-9 rounded-xl font-black text-xs transition cursor-pointer shadow-2xs ${
                             currentPage === num 
-                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105' 
-                              : 'bg-white/90 backdrop-blur-md text-stone-600 hover:bg-emerald-50 border border-emerald-100'
+                              ? 'bg-emerald-600 text-white' 
+                              : 'bg-white text-stone-600 hover:bg-stone-50 border border-stone-200'
                           }`}
                         >
                           {num}
@@ -412,7 +355,7 @@ export default function ProductGrid({
                     <button
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className="p-3 bg-white/90 backdrop-blur-md rounded-xl border border-emerald-100 disabled:opacity-40 hover:bg-emerald-50 transition cursor-pointer shadow-xs"
+                      className="p-2.5 bg-white rounded-xl border border-stone-200 disabled:opacity-40 hover:bg-stone-50 transition cursor-pointer shadow-2xs"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -424,27 +367,21 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: TIGHTLY BOUND CARDS WITH ZERO DEAD SPACE */
-        <div className="space-y-3">
+        /* HOMEPAGE POPULATION: EXACT BLINKIT STYLE GRID CATEGORY SECTIONS WITH LIGHT TEAL BACKGROUND TILES */
+        <div className="space-y-8">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
             if (subcats.length === 0) return null;
 
             return (
-              <div key={parent.id} className="bg-white rounded-2xl border border-stone-200/80 shadow-2xs px-4 pt-3 pb-3 space-y-2">
-                {/* Parent Category Header */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-stone-900 tracking-tight">{parent.name}</h3>
-                  <button
-                    onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase tracking-wider flex items-center gap-0.5 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-xl transition shadow-2xs"
-                  >
-                    <span>see all</span> <ChevronRight size={12} />
-                  </button>
-                </div>
+              <div key={parent.id} className="space-y-3">
+                {/* Section Title */}
+                <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight px-1">
+                  {parent.name}
+                </h3>
 
-                {/* Subcategories: Clean horizontal row with tight padding, removing any empty grid rows below */}
-                <div className="flex overflow-x-auto gap-3 scrollbar-none snap-x pt-0.5 pb-1">
+                {/* Blinkit Style 4x2 Grid of Subcategories with Soft Light Teal/Cyan Tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
@@ -452,23 +389,21 @@ export default function ProductGrid({
                         whileHover={{ y: -2 }}
                         key={sub.id}
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className="flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-16 snap-start"
+                        className="bg-[#F0F8F6] hover:bg-[#E2F4EE] p-3.5 rounded-2xl border border-emerald-100/50 transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-2xs min-h-[110px]"
                       >
-                        {/* Circle Fully Filled with Image */}
-                        <div className="w-14 h-14 rounded-full bg-[#EAF2F8] border border-[#D5E5F2] overflow-hidden shadow-2xs group-hover:scale-105 group-hover:border-blue-300 transition-all shrink-0">
-                          {sub.image_url ? (
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600">
-                              <Package size={18} />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Text Below */}
-                        <span className="font-extrabold text-[10px] text-stone-800 group-hover:text-blue-900 transition-colors leading-tight line-clamp-2 w-full px-0.5">
+                        <span className="font-bold text-xs text-stone-900 group-hover:text-emerald-900 transition-colors leading-tight">
                           {sub.name}
                         </span>
+
+                        <div className="flex justify-end items-end mt-2">
+                          <div className="w-12 h-12 rounded-xl bg-white overflow-hidden border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform flex items-center justify-center p-1">
+                            {sub.image_url ? (
+                              <img src={subImg} alt={sub.name} className="w-full h-full object-contain" />
+                            ) : (
+                              <Package size={20} className="text-emerald-600" />
+                            )}
+                          </div>
+                        </div>
                       </motion.div>
                     );
                   })}
