@@ -424,11 +424,14 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: TIGHTLY PACKED 8-COLUMN GRID ELIMINATING GAPS */
+        /* HOMEPAGE POPULATION: SHOWING ONLY 4 SUBCATEGORIES ON MOBILE UNLESS VIEW ALL IS CLICKED */
         <div className="space-y-4">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
             if (subcats.length === 0) return null;
+
+            // Show only first 4 items on mobile by default
+            const displaySubcats = subcats.slice(0, 4);
 
             return (
               <div key={parent.id} className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-4 sm:p-5 space-y-3">
@@ -436,16 +439,16 @@ export default function ProductGrid({
                 <div className="flex items-center justify-between pb-1">
                   <h3 className="text-sm sm:text-base font-black text-stone-900 tracking-tight">{parent.name}</h3>
                   <button
-                    onClick={() => { setActiveCategory(parent.id); setCurrentPage(1); }}
+                    onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
                     className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase tracking-wider flex items-center gap-0.5 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition shadow-2xs"
                   >
                     <span>see all</span> <ChevronRight size={12} />
                   </button>
                 </div>
 
-                {/* Subcategories Grid with minimal gaps (grid-cols-4 on mobile, grid-cols-8 on desktop) */}
+                {/* Subcategories Grid: exactly 4 columns on mobile (showing 4 items max), 8 on desktop */}
                 <div className="grid grid-cols-4 sm:grid-cols-8 gap-x-2 gap-y-2.5">
-                  {subcats.map((sub, index) => {
+                  {displaySubcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
                       <motion.div
