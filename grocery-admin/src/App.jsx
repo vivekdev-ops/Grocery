@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useState, useEffect, useRef } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck,
@@ -84,7 +84,97 @@ function LoadingScreen() {
 }
 
 /* ─────────────────────────────────────────────
-   ADMIN LAYOUT
+   SHOPKEEPER ROUTE GUARD
+───────────────────────────────────────────── */
+function ShopkeeperRouteGuard() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-stone-50 text-xs">
+        <p className="font-bold text-stone-500">Verifying Shopkeeper Session...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <ShopkeeperPortal />;
+}
+
+/* ─────────────────────────────────────────────
+   ADMIN ROUTE GUARD (Blocks Customers & Unauthorized Roles)
+───────────────────────────────────────────── */
+function AdminRouteGuard() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setLoading(false);
+        return;
+      }
+
+      setSession(session);
+      const userId = session.user.id;
+
+      // Check if user has an admin or manager role in staff_profiles
+      const { data: staff } = await supabase
+        .from('staff_profiles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const role = (staff?.role || '').toLowerCase();
+      
+      // Allow only admin, manager, or staff roles
+      if (role === 'admin' || role === 'manager' || role === 'staff') {
+        setIsAuthorized(true);
+      } else {
+        // Block customers, delivery partners, and shopkeepers
+        alert("Access Denied: Customers and unauthorized roles cannot access the Admin panel.");
+        await supabase.auth.signOut({ scope: 'local' });
+        setIsAuthorized(false);
+      }
+      
+      setLoading(false);
+    };
+
+    checkAdminAuth();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-stone-50 text-xs">
+        <p className="font-bold text-stone-500">Verifying Admin Access...</p>
+      </div>
+    );
+  }
+
+  if (!session || !isAuthorized) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <AdminLayout />;
+}
+
+/* ─────────────────────────────────────────────
+   ADMIN LAYOUT (With Role-Based Guard)
 ───────────────────────────────────────────── */
 function AdminLayout() {
   const [session, setSession] = useState(null);
@@ -104,24 +194,68 @@ function AdminLayout() {
   const prevView = useRef(activeView);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    const verifyAdminAccess = async (currentSession) => {
+      if (!currentSession) {
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
+      const userId = currentSession.user.id;
+
+      // 1. Check if user is a Shopkeeper (Block access)
+      const { data: shopkeeperCheck } = await supabase
+        .from('shopkeeper_profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (shopkeeperCheck) {
+        alert("Access Denied: Shopkeepers cannot access the Admin panel.");
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setLoading(false);
+        navigate('/login');
+        return;
+      }
+
+      // 2. Check Staff Role (Block delivery partners, allow admin/manager)
+      const { data: staffCheck } = await supabase
+        .from('staff_profiles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const role = (staffCheck?.role || '').toLowerCase();
+      const isDelivery = role.includes('delivery') || role.includes('rider') || role.includes('boy');
+
+      if (isDelivery) {
+        alert("Access Denied: Delivery Partners cannot access the Admin panel.");
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setLoading(false);
+        navigate('/login');
+        return;
+      }
+
+      // Valid Admin/Manager access
+      setSession(currentSession);
       setLoading(false);
-      if (session) {
-        registerPushToken(session.user.id, 'admin');
-        registerAdminUser(session.user.id); // registers this user as an admin recipient
-      }
+      registerPushToken(currentSession.user.id, 'admin');
+      registerAdminUser(currentSession.user.id);
+      fetchBadgeCounts();
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      verifyAdminAccess(session);
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
-      if (s) {
-        registerPushToken(s.user.id, 'admin');
-        registerAdminUser(s.user.id);
-      }
+      verifyAdminAccess(s);
     });
-    fetchBadgeCounts();
+
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const fetchBadgeCounts = async () => {
     const { data: fbData } = await supabase
@@ -197,7 +331,6 @@ function AdminLayout() {
 
   const toggleGroup = (title) => setCollapsedGroups(p => ({ ...p, [title]: !p[title] }));
 
-  // Find active item label for topbar
   const allItems = menuGroups.flatMap(g => g.items);
   const activeLabel = allItems.find(i => i.id === activeView)?.label ?? 'Dashboard';
 
@@ -211,7 +344,6 @@ function AdminLayout() {
         transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
         className="bg-white border-r border-stone-100 flex flex-col shadow-[2px_0_16px_-4px_rgba(0,0,0,0.06)] relative z-20 overflow-hidden shrink-0"
       >
-        {/* Logo strip */}
         <div className="h-14 flex items-center px-3 border-b border-stone-100 shrink-0">
           <AnimatePresence mode="wait">
             {!isCollapsed && (
@@ -242,7 +374,6 @@ function AdminLayout() {
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 py-3 overflow-y-auto scrollbar-none space-y-4 px-2">
           {menuGroups.map((group) => {
             const isGroupCollapsed = collapsedGroups[group.title] ?? false;
@@ -250,7 +381,6 @@ function AdminLayout() {
 
             return (
               <div key={group.title}>
-                {/* Group header */}
                 {!isCollapsed && (
                   <button
                     onClick={() => toggleGroup(group.title)}
@@ -299,7 +429,6 @@ function AdminLayout() {
                               ${isCollapsed ? 'justify-center' : 'justify-between'}
                             `}
                           >
-                            {/* Active left indicator */}
                             {isActive && (
                               <motion.div
                                 layoutId="active-pill"
@@ -318,7 +447,6 @@ function AdminLayout() {
                               )}
                             </div>
 
-                            {/* Badge */}
                             {item.badge > 0 && !isCollapsed && (
                               <motion.span
                                 initial={{ scale: 0 }}
@@ -342,7 +470,6 @@ function AdminLayout() {
           })}
         </nav>
 
-        {/* Bottom actions */}
         <div className="p-2 border-t border-stone-100 space-y-0.5 shrink-0">
           <button
             onClick={() => navigate('/select')}
@@ -363,26 +490,20 @@ function AdminLayout() {
         </div>
       </motion.aside>
 
-      {/* ── MAIN ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Top bar */}
         <header className="h-14 bg-white/80 backdrop-blur-md border-b border-stone-100 flex items-center justify-between px-5 shrink-0 z-10">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
             <h2 className="text-sm font-black text-stone-800">{activeLabel}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Real-time notification bell */}
             <NotificationBell session={session} size={16} />
-            {/* Avatar */}
             <div className="w-7 h-7 bg-gradient-to-br from-brand-400 to-brand-600 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-sm">
               {session.user.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
           </div>
         </header>
 
-        {/* Content area with page transition */}
         <main className="flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div
@@ -412,10 +533,10 @@ function AnimatedRoutes() {
       <Routes location={location} key={location.pathname}>
         <Route path="/"                element={<PageWrap><CustomerStorefront /></PageWrap>} />
         <Route path="/track"           element={<PageWrap><OrderTracker /></PageWrap>} />
-        <Route path="/login"           element={<PageWrap><CustomerAuth /></PageWrap>} />
+        <Route path="/login"           element={<PageWrap><Login /></PageWrap>} />
         <Route path="/select"          element={<PageWrap><HomeSelector /></PageWrap>} />
-        <Route path="/admin"           element={<AdminLayout />} />
-        <Route path="/shopkeeper"      element={<ShopkeeperPortal />} />
+        <Route path="/admin"           element={<AdminRouteGuard />} />
+        <Route path="/shopkeeper"      element={<ShopkeeperRouteGuard />} />
         <Route path="/delivery"        element={<DeliveryPortal />} />
         <Route path="/privacy-policy"  element={<PageWrap><PrivacyPolicy /></PageWrap>} />
         <Route path="/terms"           element={<PageWrap><TermsOfService /></PageWrap>} />

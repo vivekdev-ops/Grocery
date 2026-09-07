@@ -227,9 +227,26 @@ export default function ShopkeeperPortal() {
     if (rulesData.data) setCommissionRules(rulesData.data);
   };
 
+  // Inside src/components/ShopkeeperPortal.jsx (within fetchOrCreateShopkeeperProfile or useEffect)
   const fetchOrCreateShopkeeperProfile = async (user) => {
     setLoading(true);
     try {
+      // First check if this user is a delivery staff member
+      const { data: staffCheck } = await supabase
+        .from('staff_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const staffRole = (staffCheck?.role || '').toLowerCase();
+      if (staffRole.includes('delivery') || staffRole.includes('rider') || staffRole.includes('boy')) {
+        alert("Access Denied: Delivery Partners cannot access the Shopkeeper portal.");
+        await supabase.auth.signOut({ scope: 'local' });
+        navigate('/login');
+        setLoading(false);
+        return;
+      }
+
       let { data: profileData, error: profileErr } = await supabase
         .from('shopkeeper_profiles')
         .select('id, user_id, store_name, phone, address, latitude, longitude, custom_commission_pct')
@@ -237,26 +254,18 @@ export default function ShopkeeperPortal() {
         .maybeSingle();
 
       if (!profileData || profileErr) {
-        const newProfile = {
-          id: user.id,
-          user_id: user.id,
-          store_name: user.email.split('@')[0] + "'s Store"
-        };
-        const { data: insertedProfile } = await supabase
-          .from('shopkeeper_profiles')
-          .upsert([newProfile], { onConflict: 'user_id' })
-          .select()
-          .single();
-        
-        profileData = insertedProfile || newProfile;
+        alert("Access Denied: No merchant/shopkeeper profile found for this account.");
+        await supabase.auth.signOut({ scope: 'local' });
+        navigate('/login');
+        setLoading(false);
+        return;
       }
 
       setShopkeeperProfile(profileData);
       await fetchStoreData(profileData.id);
     } catch (err) {
       console.error('Error handling profile:', err);
-      setShopkeeperProfile({ id: user.id, store_name: 'My Store' });
-      await fetchStoreData(user.id);
+      navigate('/login');
     } finally {
       setLoading(false);
     }

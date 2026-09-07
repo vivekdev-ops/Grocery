@@ -4,7 +4,9 @@ import { supabase } from '../supabaseClient';
 import {
   Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut,
   ShieldCheck, Mail, Lock, Eye, X, Navigation, ExternalLink, Calendar,
-  Printer, Filter, TrendingUp, Zap, ChevronRight, AlertCircle, Star, UserCircle, Bike, Loader2, Upload, Receipt, ArrowUpRight, BarChart3, LayoutDashboard, FileText
+  Printer, Filter, TrendingUp, Zap, ChevronRight, ChevronLeft, AlertCircle,
+  Star, UserCircle, Bike, Loader2, Upload, Receipt, ArrowUpRight, BarChart3,
+  LayoutDashboard, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,7 +49,6 @@ const statusStyles = {
 /* ─────────────────────────────────────────────
    SUB-COMPONENTS
 ───────────────────────────────────────────── */
-
 function StatCard({ icon: Icon, value, label, color = 'emerald', sub }) {
   const colors = {
     emerald: { bg: 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white', icon: 'bg-white/20 text-white', val: 'text-white' },
@@ -93,7 +94,9 @@ function OrderCard({ order, staffProfile, commissionRules, children }) {
           </div>
           <div>
             <p className="font-mono font-black text-stone-900 text-xs">#{order.id.slice(0, 8)}</p>
-            <p className="text-[10px] text-stone-400 font-medium">{new Date(order.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</p>
+            <p className="text-[10px] text-stone-400 font-medium">
+              {new Date(order.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2.5">
@@ -145,11 +148,15 @@ export default function DeliveryPortal() {
   const [commissionRules, setCommissionRules] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [datePreset, setDatePreset] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const [payoutPage, setPayoutPage] = useState(1);
+  const payoutsPerPage = 6;
 
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [verifyingOrder, setVerifyingOrder] = useState(null);
@@ -167,93 +174,92 @@ export default function DeliveryPortal() {
 
   const navigate = useNavigate();
 
+  const handleSecureSignOut = async () => {
+    try {
+      // Use 'local' scope to clear the token client-side safely without a 403 server rejection
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (err) {
+      console.warn('Sign out warning:', err?.message);
+    } finally {
+      setSession(null);
+      setStaffProfile(null);
+      setOrders([]);
+      setAuthError('');
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
         fetchStaffProfileAndDependencies(session.user);
-        registerPushToken(session.user.id, 'delivery');
-      } else setLoading(false);
+      } else {
+        setLoading(false);
+      }
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setSession(session);
       if (session) {
         fetchStaffProfileAndDependencies(session.user);
-        registerPushToken(session.user.id, 'delivery');
-      } else setLoading(false);
+      } else {
+        setStaffProfile(null);
+        setLoading(false);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchStaffProfileAndDependencies = async (user) => {
-  setLoading(true);
-  try {
-    // 1. Block if user has a shopkeeper profile
-    const { data: shopkeeperCheck } = await supabase
-      .from('shopkeeper_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (shopkeeperCheck) {
-      alert("Access Denied: Shopkeepers cannot access the Delivery Partner portal.");
-      await supabase.auth.signOut({ scope: 'local' });
-      setSession(null);
-      setStaffProfile(null);
-      setLoading(false);
-      navigate('/login');
-      return;
-    }
-
-    // 2. Fetch staff profile data
-    let staffRes = await supabase
-      .from('staff_profiles')
-      .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!staffRes.data && user.email) {
-      staffRes = await supabase
+    setLoading(true);
+    setAuthError('');
+    try {
+      let staffRes = await supabase
         .from('staff_profiles')
         .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
-        .eq('email', user.email)
+        .eq('user_id', user.id)
         .maybeSingle();
-    }
 
-    // 3. Strict Role Verification: Ensure role is delivery-related
-    const userRole = (staffRes.data?.role || '').toLowerCase();
-    const allowedRoles = ['delivery', 'delivery_partner', 'rider', 'delivery boy'];
-    
-    if (staffRes.data && userRole && !allowedRoles.some(r => userRole.includes(r))) {
-      alert("Access Denied: This portal is strictly restricted to Delivery Partners.");
-      await supabase.auth.signOut({ scope: 'local' });
-      setSession(null);
-      setStaffProfile(null);
+      if (!staffRes.data && user.email) {
+        staffRes = await supabase
+          .from('staff_profiles')
+          .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
+          .eq('email', user.email)
+          .maybeSingle();
+      }
+
+      // Check database role to verify user is a delivery partner
+      const userRole = (staffRes.data?.role || '').toLowerCase();
+      const allowedRoles = ['delivery', 'delivery_partner', 'rider', 'delivery boy'];
+
+      if (staffRes.data && userRole && !allowedRoles.some(r => userRole.includes(r))) {
+        setAuthError('Access Denied: This portal is strictly for registered Delivery Partners.');
+        await handleSecureSignOut();
+        setLoading(false);
+        return;
+      }
+
+      const rulesRes = await supabase.from('cart_commission_rules').select('*').eq('is_active', true);
+
+      if (staffRes.data) {
+        setStaffProfile(staffRes.data);
+        setProfileForm({
+          full_name: staffRes.data.full_name || staffRes.data.name || '',
+          phone: staffRes.data.phone || '',
+          avatar_url: staffRes.data.avatar_url || ''
+        });
+      }
+      if (rulesRes.data) setCommissionRules(rulesRes.data);
+
+      registerPushToken(user.id, 'delivery');
+      await fetchDeliveryOrders(session || { user }, staffRes.data);
+    } catch (err) {
+      console.error('Error loading staff profile & rules:', err);
+    } finally {
       setLoading(false);
-      navigate('/login');
-      return;
     }
-
-    const rulesRes = await supabase.from('cart_commission_rules').select('*').eq('is_active', true);
-
-    if (staffRes.data) {
-      setStaffProfile(staffRes.data);
-      setProfileForm({
-        full_name: staffRes.data.full_name || staffRes.data.name || '',
-        phone: staffRes.data.phone || '',
-        avatar_url: staffRes.data.avatar_url || ''
-      });
-    }
-    if (rulesRes.data) setCommissionRules(rulesRes.data);
-    
-    registerPushToken(user.id, 'delivery');
-    await fetchDeliveryOrders(session || { user }, staffRes.data);
-  } catch (err) {
-    console.error('Error loading staff profile & rules:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const fetchDeliveryOrders = async (currentSession, currentStaff) => {
     const activeSession = currentSession || session;
@@ -285,10 +291,16 @@ export default function DeliveryPortal() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoggingIn(true);
+    setAuthError('');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { alert('Login failed: ' + error.message); }
-    else if (data.session) { setSession(data.session); await fetchStaffProfileAndDependencies(data.session.user); }
-    setLoggingIn(false);
+    if (error) {
+      setAuthError(error.message);
+      setLoggingIn(false);
+    } else if (data.session) {
+      setSession(data.session);
+      await fetchStaffProfileAndDependencies(data.session.user);
+      setLoggingIn(false);
+    }
   };
 
   const handleUpdateStatus = async (orderId, newStatus) => {
@@ -415,6 +427,13 @@ export default function DeliveryPortal() {
     return sum + (amt * getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', amt)) / 100;
   }, 0);
 
+  const paginatedPayouts = useMemo(() => {
+    const start = (payoutPage - 1) * payoutsPerPage;
+    return filteredCompletedOrders.slice(start, start + payoutsPerPage);
+  }, [filteredCompletedOrders, payoutPage]);
+  const totalPayoutPages = Math.ceil(filteredCompletedOrders.length / payoutsPerPage);
+
+  /* ── LOADING ── */
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-stone-50 text-xs">
@@ -422,12 +441,13 @@ export default function DeliveryPortal() {
           <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg">
             <Truck size={22} className="animate-bounce" />
           </div>
-          <p className="font-bold text-stone-500">Loading KD Store Portal...</p>
+          <p className="font-bold text-stone-500">Connecting to KD Store Logistics...</p>
         </motion.div>
       </div>
     );
   }
 
+  /* ── LOGIN VIEW ── */
   if (!session) {
     return (
       <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4 font-sans text-xs">
@@ -437,8 +457,15 @@ export default function DeliveryPortal() {
               KD
             </div>
             <h1 className="font-black text-stone-900 text-base">KD Store Delivery Partner</h1>
-            <p className="text-stone-400 text-[11px]">Sign in with your agent credentials</p>
+            <p className="text-stone-400 text-[11px]">Sign in with your delivery agent credentials</p>
           </div>
+
+          {authError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-2xl text-[11px] font-bold flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
@@ -509,7 +536,7 @@ export default function DeliveryPortal() {
         </div>
       </header>
 
-      {/* ── PRINTABLE PROFESSIONAL SALARY SLIP (Hidden on normal screen, shown during window.print()) ── */}
+      {/* ── PRINTABLE SALARY SLIP (Appears only during window.print()) ── */}
       <div className="hidden print:block p-8 bg-white text-stone-900 font-sans text-sm space-y-6">
         <div className="flex justify-between items-start border-b-2 border-emerald-600 pb-4">
           <div>
@@ -525,7 +552,6 @@ export default function DeliveryPortal() {
           </div>
         </div>
 
-        {/* Delivery Partner Details */}
         <div className="grid grid-cols-2 gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200">
           <div>
             <p className="text-[10px] font-black text-stone-400 uppercase">1. Delivery Partner Name</p>
@@ -545,7 +571,6 @@ export default function DeliveryPortal() {
           </div>
         </div>
 
-        {/* 4. Order Line items, cart total and payout % */}
         <div>
           <h3 className="font-black text-stone-900 text-sm mb-2">4. Order Line Items & Payout Summary</h3>
           <table className="w-full border-collapse text-xs">
@@ -577,7 +602,6 @@ export default function DeliveryPortal() {
           </table>
         </div>
 
-        {/* 5. Grand Total */}
         <div className="flex justify-end pt-2">
           <div className="w-72 bg-emerald-50 border-2 border-emerald-600 p-4 rounded-2xl flex justify-between items-center">
             <span className="font-black text-stone-900 text-sm">5. Grand Total Payout:</span>
@@ -585,7 +609,6 @@ export default function DeliveryPortal() {
           </div>
         </div>
 
-        {/* 6. KD Store Sign */}
         <div className="pt-12 flex justify-between items-end border-t border-stone-200">
           <div>
             <p className="text-xs text-stone-500 font-medium">This is a computer-generated salary slip and requires no physical signature.</p>
@@ -652,14 +675,12 @@ export default function DeliveryPortal() {
               </div>
             </div>
 
-            {/* Quick Stat Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <StatCard icon={Package} value={availableOrders.length} label="Available Pickups" color="emerald" sub="Ready to accept" />
               <StatCard icon={Clock} value={myActiveOrders.length} label="In Progress" color="blue" sub="Assigned to you" />
               <StatCard icon={CheckCircle} value={myCompletedOrders.length} label="Delivered" color="purple" sub="Successfully completed" />
             </div>
 
-            {/* Recent Active Orders Quick View */}
             <div className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-stone-100 pb-3">
                 <h3 className="font-black text-stone-900 text-sm">Active Queue Quick Preview</h3>
@@ -774,9 +795,8 @@ export default function DeliveryPortal() {
               </div>
             </div>
 
-            {/* Working Filter Controls */}
             <div className="bg-white rounded-2xl border border-stone-200 p-3.5 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-1.5 text-stone-700 font-bold">
                   <Filter size={14} className="text-emerald-600" />
                   <span>Filter Payout Statement</span>
@@ -793,7 +813,7 @@ export default function DeliveryPortal() {
                 {['today', 'week', 'month', 'custom', 'all'].map(d => (
                   <button
                     key={d}
-                    onClick={() => setDatePreset(d)}
+                    onClick={() => { setDatePreset(d); setPayoutPage(1); }}
                     className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase transition cursor-pointer ${
                       datePreset === d ? 'bg-stone-900 text-white shadow-xs' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                     }`}
@@ -807,27 +827,26 @@ export default function DeliveryPortal() {
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
                   <div>
                     <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">From Date</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                    <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPayoutPage(1); }}
                       className="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">To Date</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                    <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPayoutPage(1); }}
                       className="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Payout breakdown table */}
             <div className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-2xs space-y-3">
               <h3 className="font-black text-stone-900 text-sm">Statement Breakdown ({filteredCompletedOrders.length} Deliveries)</h3>
 
               {filteredCompletedOrders.length === 0 ? (
                 <div className="p-8 text-center text-stone-400 font-medium">No completed deliveries found for this period.</div>
               ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto scrollbar-none pr-1">
-                  {filteredCompletedOrders.map(order => {
+                <div className="space-y-2">
+                  {paginatedPayouts.map(order => {
                     const cartAmount = Number(order.total_amount || 0);
                     const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
                     const earnedFee = (cartAmount * tierPct) / 100;
@@ -844,6 +863,16 @@ export default function DeliveryPortal() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {totalPayoutPages > 1 && (
+                <div className="flex justify-center items-center gap-1.5 pt-3 border-t border-stone-100">
+                  <button disabled={payoutPage === 1} onClick={() => setPayoutPage(p => Math.max(1, p - 1))} className="p-2 bg-white rounded-xl border border-stone-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronLeft size={14} /></button>
+                  {Array.from({ length: totalPayoutPages }, (_, i) => i + 1).map(num => (
+                    <button key={num} onClick={() => setPayoutPage(num)} className={`w-8 h-8 rounded-xl font-black text-xs cursor-pointer shadow-2xs ${payoutPage === num ? 'bg-emerald-600 text-white' : 'bg-white text-stone-600 border border-stone-200'}`}>{num}</button>
+                  ))}
+                  <button disabled={payoutPage === totalPayoutPages} onClick={() => setPayoutPage(p => Math.min(totalPayoutPages, p + 1))} className="p-2 bg-white rounded-xl border border-stone-200 disabled:opacity-40 text-xs shadow-2xs cursor-pointer"><ChevronRight size={14} /></button>
                 </div>
               )}
             </div>
@@ -919,7 +948,7 @@ export default function DeliveryPortal() {
                   <p className="font-bold text-stone-800">{staffProfile?.phone || 'Not provided'}</p>
                 </div>
 
-                <button onClick={() => supabase.auth.signOut()} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3 rounded-2xl cursor-pointer transition">
+                <button onClick={handleSecureSignOut} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3 rounded-2xl cursor-pointer transition">
                   Sign Out
                 </button>
               </div>
@@ -1012,7 +1041,6 @@ export default function DeliveryPortal() {
                 </div>
               </div>
 
-              {/* Financial Breakdown */}
               <div className="bg-stone-50 p-3.5 rounded-2xl space-y-1.5 border border-stone-100">
                 <div className="flex justify-between text-stone-600">
                   <span>Delivery Fee</span>

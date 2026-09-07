@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
+import { Lock, Mail, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     setErrorMsg('');
 
-    // 1. Authenticate with Supabase Auth (Email & Password)
+    // 1. Authenticate with Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -42,7 +42,7 @@ export default function Login() {
       return;
     }
 
-    // 3. Check if user is Staff (Delivery Partner, Manager, or Admin)
+    // 3. Check Staff Profiles for Role Validation (Admin, Manager, Delivery, etc.)
     const { data: staff } = await supabase
       .from('staff_profiles')
       .select('*')
@@ -50,10 +50,12 @@ export default function Login() {
       .single();
 
     if (staff) {
-      if (staff.role === 'delivery' || staff.role === 'delivery_man') {
+      const role = (staff.role || '').toLowerCase();
+      
+      if (role === 'delivery' || role === 'delivery_partner' || role === 'rider' || role === 'delivery boy') {
         navigate('/delivery');
-      } else if (staff.role === 'manager') {
-        navigate('/manager');
+      } else if (role === 'admin' || role === 'manager' || role === 'staff') {
+        navigate('/admin');
       } else {
         navigate('/admin');
       }
@@ -65,30 +67,34 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 border border-gray-100">
+    <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4 font-sans text-xs">
+      <div className="bg-white rounded-3xl shadow-xl max-w-sm w-full p-8 border border-stone-200/80 space-y-5">
         
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in with your email and password</p>
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20 font-black text-lg">
+            KD
+          </div>
+          <h1 className="font-black text-stone-900 text-base">KD Store Sign In</h1>
+          <p className="text-stone-400 text-[11px]">Sign in to access your account or portal</p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-xl font-medium">
-            {errorMsg}
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-2xl text-[11px] font-bold flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-3.5">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Email Address</label>
+            <label className="block font-bold text-stone-600 mb-1">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" size={14} />
               <input 
                 type="email" 
                 required 
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-green-600 outline-none transition"
+                className="w-full bg-stone-50 border border-stone-200 pl-10 pr-3 py-2.5 rounded-xl font-bold outline-none focus:border-emerald-500"
                 value={email} 
                 onChange={e => setEmail(e.target.value)} 
               />
@@ -96,14 +102,14 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Password</label>
+            <label className="block font-bold text-stone-600 mb-1">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" size={14} />
               <input 
                 type="password" 
                 required 
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-green-600 outline-none transition"
+                className="w-full bg-stone-50 border border-stone-200 pl-10 pr-3 py-2.5 rounded-xl font-bold outline-none focus:border-emerald-500"
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
               />
@@ -113,24 +119,23 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-[#0c831f] hover:bg-[#0b6f1a] text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 mt-2 cursor-pointer"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow-md shadow-emerald-600/20 cursor-pointer transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign In'} <ArrowRight size={16} />
+            {loading ? 'Signing in...' : 'Sign In'} <ArrowRight size={14} />
           </button>
 
-          {/* Forgot Password Button matching the Login style */}
           <Link 
             to="/forgot-password" 
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-sm cursor-pointer block text-center"
+            className="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs cursor-pointer block text-center"
           >
-            <KeyRound size={16} className="text-gray-600" />
+            <KeyRound size={14} className="text-stone-500" />
             Forgot Password?
           </Link>
         </form>
 
-        <div className="mt-6 text-center border-t pt-4">
-          <Link to="/" className="text-xs font-bold text-gray-600 hover:text-green-700 transition">
-            ← Back to Customer Storefront
+        <div className="text-center pt-2 border-t border-stone-100">
+          <Link to="/" className="text-emerald-600 font-bold hover:underline cursor-pointer">
+            ← Return to Customer Storefront
           </Link>
         </div>
 
