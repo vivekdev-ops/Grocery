@@ -74,7 +74,7 @@ const formatDateTime = (value) => {
 };
 
 const formatStatus = (status) => {
-  if (!status) return 'Order Placed';
+  if (!status) return 'Placed';
 
   return String(status)
     .replace(/_/g, ' ')
@@ -133,7 +133,7 @@ const getTrackingSteps = (orderOrStatus) => {
   const steps = [
     { 
       key: 'PLACED', 
-      label: 'Order Placed', 
+      label: 'Placed', 
       icon: ShoppingBag, 
       time: createdAt ? formatDateTime(createdAt) : null 
     },
@@ -145,13 +145,13 @@ const getTrackingSteps = (orderOrStatus) => {
     },
     { 
       key: 'PREPARING', 
-      label: 'Preparing', 
+      label: 'Prep', 
       icon: Package, 
       time: order?.preparing_at ? formatDateTime(order.preparing_at) : null
     },
     { 
       key: 'OUT_FOR_DELIVERY', 
-      label: 'Out for Delivery', 
+      label: 'Dispatched', 
       icon: Truck, 
       time: order?.shipped_at ? formatDateTime(order.shipped_at) : null
     },
@@ -165,7 +165,7 @@ const getTrackingSteps = (orderOrStatus) => {
 
   if (currentStatus === 'CANCELLED') {
     return [
-      { key: 'PLACED', label: 'Order Placed', icon: ShoppingBag, time: createdAt ? formatDateTime(createdAt) : null },
+      { key: 'PLACED', label: 'Placed', icon: ShoppingBag, time: createdAt ? formatDateTime(createdAt) : null },
       { key: 'CANCELLED', label: 'Cancelled', icon: X, time: order?.updated_at ? formatDateTime(order.updated_at) : null },
     ];
   }
@@ -195,9 +195,9 @@ const calculateDeliveryDuration = (createdAt, deliveredAt) => {
     const minutes = diffMins % 60;
 
     if (hours === 0) {
-      return `${minutes} mins`;
+      return `${minutes}m`;
     }
-    return `${hours} hr ${minutes} mins`;
+    return `${hours}h ${minutes}m`;
   } catch {
     return null;
   }
@@ -442,7 +442,6 @@ const CustomerOrdersPage = () => {
   const [ratingOrder, setRatingOrder] =
     useState(null);
 
-  // Per-product rating state map: { [productId]: { rating: number, comment: string } }
   const [productRatingsMap, setProductRatingsMap] = useState({});
 
   const [savingRating, setSavingRating] =
@@ -688,11 +687,11 @@ const CustomerOrdersPage = () => {
     const status = String(getOrderStatus(order)).toLowerCase().trim();
 
     if (status !== 'pending' && status !== 'placed') {
-      alert('Orders can only be cancelled while their status is Pending.');
+      alert('Orders can only be cancelled while pending.');
       return;
     }
 
-    const confirmed = window.confirm('Are you sure you want to cancel this order?');
+    const confirmed = window.confirm('Cancel order?');
     if (!confirmed) return;
 
     try {
@@ -711,12 +710,12 @@ const CustomerOrdersPage = () => {
 
       if (error) throw error;
 
-      alert('Order cancelled successfully.');
+      alert('Cancelled.');
       setSelectedOrder(null);
       await loadOrders();
     } catch (error) {
       console.error('Cancel order error:', error);
-      alert(`Unable to cancel order: ${error?.message || 'Something went wrong.'}`);
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setCancellingOrderId(null);
     }
@@ -759,25 +758,20 @@ const CustomerOrdersPage = () => {
         : [];
 
       if (!orderItems.length) {
-        alert('No items found in this order.');
+        alert('No items found.');
         return;
       }
 
       const cart = [...existingCart];
 
       let addedCount = 0;
-      let skippedCount = 0;
 
       for (const orderItem of orderItems) {
         const product = orderItem?.products;
 
         if (!product?.id) {
-          skippedCount += 1;
           continue;
         }
-
-        const variants =
-          getProductVariants(product);
 
         let matchedVariant =
           findOrderItemVariant(
@@ -786,7 +780,6 @@ const CustomerOrdersPage = () => {
           );
 
         if (!matchedVariant) {
-          skippedCount += 1;
           continue;
         }
 
@@ -800,7 +793,6 @@ const CustomerOrdersPage = () => {
           getVariantMRP(matchedVariant);
 
         if (currentStock <= 0) {
-          skippedCount += 1;
           continue;
         }
 
@@ -918,20 +910,11 @@ const CustomerOrdersPage = () => {
       setSelectedOrder(null);
 
       if (addedCount === 0) {
-        alert(
-          'None of the items from this order are currently available.'
-        );
+        alert('Items unavailable.');
         return;
       }
 
-      let message =
-        `${addedCount} item${addedCount !== 1 ? 's' : ''} added to your cart.`;
-
-      if (skippedCount > 0) {
-        message += ` ${skippedCount} unavailable item${skippedCount !== 1 ? 's were' : ' was'} skipped.`;
-      }
-
-      alert(message);
+      alert(`${addedCount} items added to cart.`);
 
       navigate('/');
     } catch (error) {
@@ -940,12 +923,7 @@ const CustomerOrdersPage = () => {
         error
       );
 
-      alert(
-        `Unable to reorder: ${
-          error?.message ||
-          'Something went wrong.'
-        }`
-      );
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setReorderingOrderId(null);
     }
@@ -1019,9 +997,7 @@ const CustomerOrdersPage = () => {
     const ownerUserId = authUser?.id || user?.id;
 
     if (!ownerUserId) {
-      alert(
-        'Please login again to manage your address.'
-      );
+      alert('Login required.');
       return;
     }
 
@@ -1031,9 +1007,7 @@ const CustomerOrdersPage = () => {
       !addressForm.state?.trim() ||
       !addressForm.pincode?.trim()
     ) {
-      alert(
-        'Please fill House / Flat No., City, State and Pincode.'
-      );
+      alert('Fill required fields.');
       return;
     }
 
@@ -1042,9 +1016,7 @@ const CustomerOrdersPage = () => {
         String(addressForm.pincode).trim()
       )
     ) {
-      alert(
-        'Please enter a valid 6-digit pincode.'
-      );
+      alert('Invalid pincode.');
       return;
     }
 
@@ -1121,9 +1093,7 @@ const CustomerOrdersPage = () => {
           })
         );
 
-        alert(
-          'Address updated successfully.'
-        );
+        alert('Updated.');
       } else {
         const shouldBeDefault =
           payload.is_default ||
@@ -1160,9 +1130,7 @@ const CustomerOrdersPage = () => {
           return [...updatedList, data];
         });
 
-        alert(
-          'Address added successfully.'
-        );
+        alert('Saved.');
       }
 
       setShowAddressForm(false);
@@ -1178,12 +1146,7 @@ const CustomerOrdersPage = () => {
         error
       );
 
-      alert(
-        `Unable to save address: ${
-          error?.message ||
-          'Unknown error'
-        }`
-      );
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setSavingAddress(false);
     }
@@ -1198,9 +1161,7 @@ const CustomerOrdersPage = () => {
     if (!address?.id) return;
 
     const confirmed =
-      window.confirm(
-        'Are you sure you want to delete this address?'
-      );
+      window.confirm('Delete address?');
 
     if (!confirmed) return;
 
@@ -1270,21 +1231,14 @@ const CustomerOrdersPage = () => {
 
       setAddresses(remaining);
 
-      alert(
-        'Address deleted successfully.'
-      );
+      alert('Deleted.');
     } catch (error) {
       console.error(
         'Delete address error:',
         error
       );
 
-      alert(
-        `Unable to delete address: ${
-          error?.message ||
-          'Something went wrong.'
-        }`
-      );
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setDeletingAddressId(null);
     }
@@ -1358,12 +1312,7 @@ const CustomerOrdersPage = () => {
         error
       );
 
-      alert(
-        `Unable to set default address: ${
-          error?.message ||
-          'Something went wrong.'
-        }`
-      );
+      alert(`Error: ${error?.message || 'Failed'}`);
     }
   };
 
@@ -1400,10 +1349,10 @@ const CustomerOrdersPage = () => {
 
       setEditingProfile(false);
 
-      alert('Profile updated successfully.');
+      alert('Updated.');
     } catch (error) {
       console.error('Profile update error:', error);
-      alert(`Unable to update profile: ${error?.message || 'Something went wrong.'}`);
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setSavingProfile(false);
     }
@@ -1444,7 +1393,7 @@ const CustomerOrdersPage = () => {
     const userEmail = authUser?.email || user?.email || 'customer@hub.com';
 
     if (!userId) {
-      alert('Please log in to submit product reviews.');
+      alert('Login required.');
       return;
     }
 
@@ -1469,7 +1418,7 @@ const CustomerOrdersPage = () => {
       });
 
       if (insertPayloads.length === 0) {
-        alert('No ratings provided.');
+        alert('No ratings.');
         return;
       }
 
@@ -1479,12 +1428,12 @@ const CustomerOrdersPage = () => {
 
       if (error) throw error;
 
-      alert('Thank you! Product reviews submitted successfully.');
+      alert('Submitted.');
       setRatingOrder(null);
       setProductRatingsMap({});
     } catch (error) {
-      console.error('Product review submission error:', error);
-      alert(`Unable to submit reviews: ${error?.message || 'Something went wrong.'}`);
+      console.error('Review error:', error);
+      alert(`Error: ${error?.message || 'Failed'}`);
     } finally {
       setSavingRating(false);
     }
@@ -1497,15 +1446,13 @@ const CustomerOrdersPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-50 font-sans">
+      <div className="min-h-screen bg-stone-50 font-sans text-xs">
         <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
 
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center">
-            <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mx-auto mb-3" />
-            <p className="text-stone-600 font-bold text-sm">
-              Loading your account dashboard...
-            </p>
+            <Loader2 className="w-6 h-6 animate-spin text-emerald-600 mx-auto mb-2" />
+            <p className="text-stone-500 font-bold">Loading...</p>
           </div>
         </div>
 
@@ -1520,60 +1467,54 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/30 via-[#F8FAFC] to-emerald-50/20 pb-32 md:pb-16 font-sans text-slate-900 selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-stone-50 pb-28 md:pb-12 font-sans text-stone-900 selection:bg-emerald-500 selection:text-white text-xs">
       <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         {/* =================================================
-            VIBRANT INTERACTIVE TAB NAVIGATION BUTTONS (Icons on Mobile, Full text on Web)
+            TAB NAVIGATION BUTTONS
         ================================================= */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-stone-200/80 p-2 mb-8 shadow-xl shadow-stone-200/50 flex flex-row gap-2">
+        <div className="bg-white rounded-2xl border border-stone-200 p-1.5 mb-4 shadow-xs flex flex-row gap-1.5">
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
               activeTab === 'orders'
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 scale-[1.01]'
-                : 'text-stone-600 hover:bg-stone-100/80'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
             }`}
             title="Orders"
           >
-            <div className={`p-1.5 rounded-xl ${activeTab === 'orders' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-600'}`}>
-              <Package className="w-4 h-4 shrink-0" />
-            </div>
-            <span className="hidden sm:inline truncate">Orders ({orders.length})</span>
-            <span className="sm:hidden text-xs">({orders.length})</span>
+            <Package className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Orders</span>
+            <span className="opacity-80">({orders.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('addresses')}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
               activeTab === 'addresses'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 scale-[1.01]'
-                : 'text-stone-600 hover:bg-stone-100/80'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
             }`}
-            title="Save Address"
+            title="Addresses"
           >
-            <div className={`p-1.5 rounded-xl ${activeTab === 'addresses' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
-              <MapPin className="w-4 h-4 shrink-0" />
-            </div>
-            <span className="hidden sm:inline truncate">Save Address ({addresses.length})</span>
-            <span className="sm:hidden text-xs">({addresses.length})</span>
+            <MapPin className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Addresses</span>
+            <span className="opacity-80">({addresses.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-3.5 px-2 sm:px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
               activeTab === 'profile'
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-600/30 scale-[1.01]'
-                : 'text-stone-600 hover:bg-stone-100/80'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
             }`}
-            title="Profile Setting"
+            title="Profile"
           >
-            <div className={`p-1.5 rounded-xl ${activeTab === 'profile' ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-600'}`}>
-              <UserCircle className="w-4 h-4 shrink-0" />
-            </div>
-            <span className="hidden sm:inline truncate">Profile Setting</span>
+            <UserCircle className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Profile</span>
           </button>
         </div>
 
@@ -1585,97 +1526,94 @@ const CustomerOrdersPage = () => {
           {activeTab === 'profile' && (
             <motion.section
               key="profile"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
-              className="bg-white rounded-[2.5rem] border border-stone-200/95 shadow-xl mb-8 overflow-hidden"
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className="bg-white rounded-2xl border border-stone-200 shadow-xs mb-4 overflow-hidden"
             >
-              <div className="p-8 sm:p-10 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-50/40 via-white to-transparent">
-                <div className="flex items-center gap-5">
-                  <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-purple-600/30">
-                    <UserCircle className="w-8 h-8" />
+              <div className="p-4 sm:p-5 border-b border-stone-100 flex items-center justify-between gap-2 bg-stone-50/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                    <UserCircle className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h2 className="font-black text-stone-900 text-xl tracking-tight">Profile Setting & Security Credentials</h2>
-                    <p className="text-xs text-stone-500 font-medium mt-1">Manage your personal contact information and account settings</p>
-                  </div>
+                  <h2 className="font-black text-stone-900">Profile Settings</h2>
                 </div>
 
                 {!editingProfile && (
                   <button
                     onClick={() => setEditingProfile(true)}
-                    className="inline-flex items-center gap-2 text-xs font-black text-purple-700 bg-purple-100/80 hover:bg-purple-200 px-5 py-3 rounded-2xl transition cursor-pointer shadow-xs self-start sm:self-auto"
+                    className="inline-flex items-center gap-1 text-[11px] font-black text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
                   >
-                    <Edit className="w-4 h-4" /> Edit Profile Details
+                    <Edit className="w-3 h-3" /> Edit
                   </button>
                 )}
               </div>
 
-              <div className="p-8 sm:p-10">
+              <div className="p-4 sm:p-5">
                 {editingProfile ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+                  <div className="space-y-3 max-w-md">
                     <div>
-                      <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">Full Name</label>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Name</label>
                       <input
                         type="text"
                         value={profileForm.full_name}
                         onChange={(e) => setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))}
-                        className="w-full border border-stone-200 bg-stone-50/50 rounded-2xl px-4.5 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition"
+                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">Mobile Number</label>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Phone</label>
                       <input
                         type="tel"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
                         maxLength={10}
-                        className="w-full border border-stone-200 bg-stone-50/50 rounded-2xl px-4.5 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition"
+                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
                       />
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">Account Email (Permanent)</label>
+                    <div>
+                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Email</label>
                       <input
                         type="email"
                         value={authUser?.email || user?.email || ''}
                         disabled
-                        className="w-full border border-stone-200 bg-stone-100 rounded-2xl px-4.5 py-3.5 text-sm text-stone-500 cursor-not-allowed font-medium"
+                        className="w-full border border-stone-200 bg-stone-100 rounded-xl px-3 py-2 text-xs text-stone-500 cursor-not-allowed font-medium"
                       />
                     </div>
 
-                    <div className="sm:col-span-2 flex justify-end gap-3 pt-6 border-t border-stone-100">
+                    <div className="flex justify-end gap-2 pt-2">
                       <button
                         onClick={() => setEditingProfile(false)}
-                        className="px-6 py-3.5 rounded-2xl border border-stone-200 hover:bg-stone-100 text-xs font-black transition cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 font-bold cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleProfileSave}
                         disabled={savingProfile}
-                        className="px-7 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 inline-flex items-center gap-2 text-xs font-black transition cursor-pointer shadow-lg shadow-purple-600/30"
+                        className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 inline-flex items-center gap-1 font-bold cursor-pointer"
                       >
-                        {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Save Changes
+                        {savingProfile && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Save
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="bg-stone-50/80 p-6 rounded-3xl border border-stone-200/70 shadow-2xs">
-                      <p className="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1.5">Full Name</p>
-                      <p className="font-black text-stone-900 text-base">{user?.full_name || 'Not provided'}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Name</p>
+                      <p className="font-bold text-stone-900">{user?.full_name || '-'}</p>
                     </div>
-                    <div className="bg-stone-50/80 p-6 rounded-3xl border border-stone-200/70 shadow-2xs">
-                      <p className="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1.5">Email Address</p>
-                      <p className="font-black text-stone-900 text-sm break-all">{authUser?.email || user?.email || '-'}</p>
+                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Email</p>
+                      <p className="font-bold text-stone-900 truncate">{authUser?.email || user?.email || '-'}</p>
                     </div>
-                    <div className="bg-stone-50/80 p-6 rounded-3xl border border-stone-200/70 shadow-2xs">
-                      <p className="text-stone-400 text-[10px] font-black uppercase tracking-widest mb-1.5">Phone Number</p>
-                      <p className="font-black text-stone-900 text-base">{user?.phone || 'Not provided'}</p>
+                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                      <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Phone</p>
+                      <p className="font-bold text-stone-900">{user?.phone || '-'}</p>
                     </div>
                   </div>
                 )}
@@ -1690,113 +1628,102 @@ const CustomerOrdersPage = () => {
           {activeTab === 'addresses' && (
             <motion.section
               key="addresses"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
-              className="bg-white rounded-[2.5rem] border border-stone-200/95 shadow-xl mb-8 overflow-hidden"
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className="bg-white rounded-2xl border border-stone-200 shadow-xs mb-4 overflow-hidden"
             >
-              <div className="p-8 sm:p-10 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-blue-50/40 via-white to-transparent">
-                <div className="flex items-center gap-5">
-                  <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/30">
-                    <MapPin className="w-8 h-8" />
+              <div className="p-4 sm:p-5 border-b border-stone-100 flex items-center justify-between gap-2 bg-stone-50/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h2 className="font-black text-stone-900 text-xl tracking-tight">Save Address & Delivery Locations</h2>
-                    <p className="text-xs text-stone-500 font-medium mt-1">Manage drop-off locations for rapid express order dispatch</p>
-                  </div>
+                  <h2 className="font-black text-stone-900">Saved Addresses</h2>
                 </div>
 
                 <button
                   onClick={handleAddAddress}
-                  className="inline-flex items-center gap-2 px-5.5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition cursor-pointer shadow-lg shadow-blue-600/30 self-start sm:self-auto"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black transition cursor-pointer shadow-xs"
                 >
-                  <Plus className="w-4 h-4" /> Add New Address
+                  <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
 
-              <div className="p-8 sm:p-10">
+              <div className="p-4 sm:p-5">
                 {addresses.length === 0 ? (
-                  <div className="text-center py-20 bg-blue-50/30 rounded-3xl border border-dashed border-blue-200">
-                    <MapPin className="w-14 h-14 text-blue-400 mx-auto mb-3 animate-bounce" />
-                    <p className="text-stone-800 font-black text-base">No saved delivery addresses</p>
-                    <p className="text-xs text-stone-400 mt-1 font-medium">Add a location to enable instant 10-minute grocery delivery.</p>
+                  <div className="text-center py-10 bg-stone-50 rounded-xl border border-dashed border-stone-200">
+                    <MapPin className="w-8 h-8 text-stone-300 mx-auto mb-1.5" />
+                    <p className="text-stone-600 font-bold">No saved addresses</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {addresses.map((address) => (
                       <div
                         key={address.id}
-                        className={`border rounded-3xl p-6 transition-all relative overflow-hidden shadow-xs ${
+                        className={`border rounded-xl p-3.5 transition-all relative ${
                           address.is_default
-                            ? 'border-blue-500 bg-blue-50/20 ring-4 ring-blue-500/10'
-                            : 'border-stone-200 hover:border-stone-300 bg-white'
+                            ? 'border-blue-500 bg-blue-50/20'
+                            : 'border-stone-200 bg-white'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-4 min-w-0">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 shadow-2xs">
-                              <Home className="w-6 h-6" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2.5 flex-wrap">
-                                <span className="font-black text-stone-900 text-base">
-                                  {address.title || 'Address'}
-                                </span>
-                                {address.is_default && (
-                                  <span className="text-[10px] px-3 py-1 rounded-full bg-blue-600 text-white font-black uppercase tracking-wider shadow-2xs">
-                                    Default Zone
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Home className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span className="font-black text-stone-900">
+                              {address.title || 'Address'}
+                            </span>
+                            {address.is_default && (
+                              <span className="text-[9px] px-2 py-0.5 rounded-md bg-blue-600 text-white font-black">
+                                Default
+                              </span>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => handleEditAddress(address)}
-                              className="p-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 hover:text-blue-600 cursor-pointer transition"
-                              title="Edit Address"
+                              className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
+                              title="Edit"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteAddress(address)}
                               disabled={deletingAddressId === address.id}
-                              className="p-2.5 rounded-2xl bg-stone-100 hover:bg-rose-100 text-stone-700 hover:text-rose-600 disabled:opacity-50 cursor-pointer transition"
-                              title="Delete Address"
+                              className="p-1.5 rounded-lg bg-stone-100 hover:bg-rose-100 text-stone-600 hover:text-rose-600 disabled:opacity-50 cursor-pointer"
+                              title="Delete"
                             >
                               {deletingAddressId === address.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               )}
                             </button>
                           </div>
                         </div>
 
-                        <div className="mt-4 space-y-1.5 text-xs sm:text-sm pl-16">
-                          <p className="text-stone-800 font-extrabold leading-relaxed">
+                        <div className="mt-2 space-y-1 text-stone-600">
+                          <p className="font-medium">
                             {[address.house_no, address.ward_no_name, address.address].filter(Boolean).join(', ')}
                           </p>
-                          <p className="text-stone-500 font-medium">
-                            {[address.city, address.district, address.state].filter(Boolean).join(', ')}
-                            {address.pincode ? ` — ${address.pincode}` : ''}
+                          <p className="text-stone-400">
+                            {[address.city, address.state, address.pincode].filter(Boolean).join(', ')}
                           </p>
                           {address.phone && (
-                            <p className="text-stone-700 flex items-center gap-2 pt-1 font-bold text-xs">
-                              <Phone className="w-3.5 h-3.5 text-blue-600" /> {address.phone}
+                            <p className="text-stone-700 flex items-center gap-1 pt-0.5 font-bold">
+                              <Phone className="w-3 h-3 text-blue-600" /> {address.phone}
                             </p>
                           )}
                         </div>
 
                         {!address.is_default && (
-                          <div className="mt-5 pt-4 border-t border-stone-100 flex justify-end">
+                          <div className="mt-3 pt-2 border-t border-stone-100 flex justify-end">
                             <button
                               onClick={() => handleSetDefaultAddress(address)}
-                              className="text-xs text-blue-600 hover:text-blue-700 font-black tracking-wide cursor-pointer inline-flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition"
+                              className="text-[11px] text-blue-600 hover:text-blue-700 font-black cursor-pointer inline-flex items-center gap-1"
                             >
-                              Set as Default <ArrowRight size={13} />
+                              Set Default <ArrowRight size={11} />
                             </button>
                           </div>
                         )}
@@ -1815,56 +1742,49 @@ const CustomerOrdersPage = () => {
           {activeTab === 'orders' && (
             <motion.section
               key="orders"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                 <div>
-                  <h2 className="text-2xl font-black text-stone-900 tracking-tight">Orders Activity History</h2>
-                  <p className="text-xs sm:text-sm text-stone-500 font-medium mt-1">Track real-time shipment steps and past grocery transactions</p>
+                  <h2 className="font-black text-stone-900 text-sm">My Orders</h2>
                 </div>
 
-                <div className="relative w-full sm:w-80">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search orders by ID, status, items..."
-                    className="w-full bg-white border border-stone-200/90 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold text-stone-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                    placeholder="Search orders..."
+                    className="w-full bg-white border border-stone-200 rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
 
               {loadingOrders ? (
-                <div className="bg-white rounded-3xl border border-stone-200 p-20 text-center shadow-sm">
-                  <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mx-auto mb-3" />
-                  <p className="text-stone-600 font-bold text-sm">Fetching active orders...</p>
+                <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-emerald-600 mx-auto mb-2" />
+                  <p className="text-stone-500 font-bold">Loading orders...</p>
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="bg-white rounded-[2.5rem] border border-stone-200 p-16 text-center shadow-sm">
-                  <Package className="w-16 h-16 text-stone-300 mx-auto mb-3" />
-                  <h3 className="font-black text-stone-900 text-lg">
-                    {searchTerm ? 'No matching orders found' : 'No past orders yet'}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-stone-500 mt-1 font-medium">
-                    {searchTerm ? 'Try searching with a different keyword.' : 'Your placed grocery orders will show up here.'}
-                  </p>
-
+                <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
+                  <Package className="w-10 h-10 text-stone-300 mx-auto mb-2" />
+                  <p className="font-black text-stone-900">No orders found</p>
                   {!searchTerm && (
                     <button
                       onClick={() => navigate('/')}
-                      className="mt-6 px-7 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition cursor-pointer shadow-lg shadow-emerald-600/30"
+                      className="mt-3 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
                     >
-                      Start Shopping Now
+                      Shop Now
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {filteredOrders.map((order) => {
                     const orderId = getOrderId(order);
                     const status = getOrderStatus(order);
@@ -1879,157 +1799,137 @@ const CustomerOrdersPage = () => {
                     return (
                       <div
                         key={orderId}
-                        className="bg-white rounded-[2.5rem] border border-stone-200/90 shadow-lg shadow-stone-200/40 overflow-hidden transition hover:shadow-xl"
+                        className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden"
                       >
-                        <div className="p-6 sm:p-8">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <div className="flex items-start gap-4.5 min-w-0">
-                              <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-600/25">
-                                <Package className="w-7 h-7" />
+                        <div className="p-3.5 sm:p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <Package className="w-5 h-5" />
                               </div>
 
                               <div className="min-w-0">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <h3 className="font-black text-stone-900 text-base sm:text-lg">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-stone-900">
                                     {getDisplayOrderId(order)}
-                                  </h3>
-                                  <span className={`text-[10px] px-3.5 py-1.5 rounded-full font-black uppercase tracking-wider shadow-2xs ${
-                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800 animate-pulse'
+                                  </span>
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase tracking-wider ${
+                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                                   }`}>
                                     {formatStatus(status)}
                                   </span>
                                 </div>
-                                <p className="text-xs text-stone-400 mt-1 font-medium flex items-center gap-1.5">
-                                  <Clock size={13} className="text-stone-400" /> {formatDateTime(order?.created_at)}
+                                <p className="text-[10px] text-stone-400 mt-0.5 flex items-center gap-1 font-medium">
+                                  <Clock size={11} /> {formatDateTime(order?.created_at)}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2.5 self-end sm:self-auto w-full sm:w-auto justify-end pt-4 sm:pt-0 border-t sm:border-t-0 border-stone-100 flex-wrap">
+                            <div className="text-right shrink-0">
+                              <span className="font-black text-emerald-700 text-sm">{formatCurrency(total)}</span>
+                              <span className="text-[10px] text-stone-400 block font-medium">{items.length} items</span>
+                            </div>
+                          </div>
+
+                          {/* ── OTP BANNER ── */}
+                          {!isDelivered && !isCancelled && (
+                            <div className="mt-3 bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                                <ShieldCheck size={12} /> OTP:
+                              </span>
+                              <span className="font-mono font-black text-sm text-emerald-700 tracking-wider">
+                                {order?.otp || '----'}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100 gap-2 flex-wrap">
+                            <button
+                              onClick={() => toggleOrder(orderId)}
+                              className="text-[11px] text-stone-600 hover:text-emerald-700 inline-flex items-center gap-1 font-bold cursor-pointer"
+                            >
+                              <span>{expanded ? 'Hide Items' : 'View Items'}</span>
+                              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {isPending && (
                                 <button
                                   onClick={() => handleCancelOrder(order)}
                                   disabled={cancellingOrderId === orderId}
-                                  className="px-4.5 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-xs font-black text-rose-700 disabled:opacity-50 cursor-pointer transition shadow-2xs inline-flex items-center gap-1.5"
+                                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-[11px] font-black text-rose-700 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1"
                                 >
-                                  {cancellingOrderId === orderId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                                  <span>Cancel Order</span>
+                                  {cancellingOrderId === orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                                  <span>Cancel</span>
                                 </button>
                               )}
 
                               <button
                                 onClick={() => setSelectedOrder(order)}
-                                className="px-5 py-3 rounded-2xl border border-stone-200 hover:bg-stone-50 text-xs font-black text-stone-800 cursor-pointer transition shadow-2xs"
+                                className="px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-[11px] font-black text-stone-800 cursor-pointer"
                               >
-                                View Details & Track
+                                Track / Details
                               </button>
 
                               {isDelivered && (
                                 <button
                                   onClick={() => handleReorder(order)}
                                   disabled={reorderingOrderId === orderId}
-                                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 cursor-pointer shadow-lg shadow-emerald-600/25 transition"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black disabled:opacity-50 cursor-pointer"
                                 >
                                   {reorderingOrderId === orderId ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <Loader2 className="w-3 h-3 animate-spin" />
                                   ) : (
-                                    <RefreshCw className="w-4 h-4" />
+                                    <RefreshCw className="w-3 h-3" />
                                   )}
                                   <span>Reorder</span>
                                 </button>
                               )}
                             </div>
                           </div>
-
-                          {/* ── DELIVERY VERIFICATION OTP BANNER ON CARD ── */}
-                          {!isDelivered && !isCancelled && (
-                            <div className="mt-5 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200/80 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
-                              <div className="space-y-0.5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-800 block">
-                                  Delivery Verification OTP
-                                </span>
-                                <p className="text-xs text-stone-600 font-medium">Show this code to the delivery partner upon arrival</p>
-                              </div>
-                              <div className="bg-white px-5 py-2 rounded-2xl border border-emerald-300 font-mono font-black text-lg text-emerald-700 tracking-[0.2em] shadow-xs">
-                                {order?.otp || '----'}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-stone-100 text-xs bg-stone-50/70 p-5 rounded-3xl border border-stone-100">
-                            <div>
-                              <p className="text-stone-400 font-black uppercase tracking-wider text-[10px]">Total Items</p>
-                              <p className="font-black text-stone-900 mt-0.5 text-sm sm:text-base">{items.length} items</p>
-                            </div>
-                            <div>
-                              <p className="text-stone-400 font-black uppercase tracking-wider text-[10px]">Items Subtotal</p>
-                              <p className="font-black text-stone-900 mt-0.5 text-sm sm:text-base">{formatCurrency(subtotal)}</p>
-                            </div>
-                            <div>
-                              <p className="text-stone-400 font-black uppercase tracking-wider text-[10px]">Delivery Fee</p>
-                              <p className="font-black text-stone-900 mt-0.5 text-sm sm:text-base">
-                                {getDeliveryCharge(order) > 0 ? formatCurrency(getDeliveryCharge(order)) : <span className="text-emerald-600 font-black">FREE</span>}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-stone-400 font-black uppercase tracking-wider text-[10px]">Grand Total</p>
-                              <p className="font-black text-emerald-700 mt-0.5 text-base sm:text-lg">{formatCurrency(total)}</p>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => toggleOrder(orderId)}
-                            className="mt-5 text-xs text-stone-600 hover:text-emerald-700 inline-flex items-center gap-1.5 font-bold cursor-pointer transition"
-                          >
-                            <span>{expanded ? 'Hide ordered items list' : 'View ordered items list'}</span>
-                            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </button>
                         </div>
 
                         {expanded && (
-                          <div className="border-t border-stone-100 bg-stone-50/90 p-6 sm:p-8">
-                            <div className="space-y-3.5">
-                              {items.map((item, index) => {
-                                const product = item?.products;
-                                const variant = findOrderItemVariant(item, product);
-                                const image =
-                                  product?.image_url ||
-                                  product?.image ||
-                                  product?.images?.[0] ||
-                                  product?.gallery?.[0] ||
-                                  '';
+                          <div className="border-t border-stone-100 bg-stone-50/70 p-3 space-y-2">
+                            {items.map((item, index) => {
+                              const product = item?.products;
+                              const variant = findOrderItemVariant(item, product);
+                              const image =
+                                product?.image_url ||
+                                product?.image ||
+                                product?.images?.[0] ||
+                                product?.gallery?.[0] ||
+                                '';
 
-                                return (
-                                  <div
-                                    key={item?.id || index}
-                                    className="bg-white rounded-2xl border border-stone-200/90 p-4 flex items-center gap-4 shadow-2xs"
-                                  >
-                                    <div className="w-16 h-16 rounded-2xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
-                                      {image ? (
-                                        <img src={image} alt={product?.name || 'Product'} className="w-full h-full object-contain" />
-                                      ) : (
-                                        <Package className="w-6 h-6 text-stone-300" />
-                                      )}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-extrabold text-stone-900 text-sm truncate">
-                                        {product?.name || 'Product'}
-                                      </p>
-                                      {variant && (
-                                        <p className="text-xs text-stone-500 font-bold mt-0.5">{getVariantLabel(variant)}</p>
-                                      )}
-                                      <p className="text-xs text-stone-400 font-black mt-1">Qty: {Number(item?.quantity) || 1}</p>
-                                    </div>
-
-                                    <div className="text-right shrink-0">
-                                      <p className="font-black text-stone-900 text-sm sm:text-base">{formatCurrency(item?.price)}</p>
-                                      <p className="text-xs text-stone-400 font-bold mt-0.5">{formatCurrency(getItemSubtotal(item))}</p>
-                                    </div>
+                              return (
+                                <div
+                                  key={item?.id || index}
+                                  className="bg-white rounded-xl border border-stone-200/80 p-2.5 flex items-center gap-3"
+                                >
+                                  <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
+                                    {image ? (
+                                      <img src={image} alt="" className="w-full h-full object-contain" />
+                                    ) : (
+                                      <Package className="w-4 h-4 text-stone-300" />
+                                    )}
                                   </div>
-                                );
-                              })}
-                            </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-stone-900 truncate">
+                                      {product?.name || 'Product'}
+                                    </p>
+                                    {variant && (
+                                      <p className="text-[10px] text-stone-500 font-medium">{getVariantLabel(variant)}</p>
+                                    )}
+                                    <p className="text-[10px] text-stone-400 font-bold">Qty: {Number(item?.quantity) || 1}</p>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <p className="font-black text-stone-900">{formatCurrency(item?.price)}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -2045,47 +1945,47 @@ const CustomerOrdersPage = () => {
 
 
       {/* =========================================================
-          VIBRANT MOBILE BOTTOM NAVIGATION BAR (Icons Only on Mobile)
+          MOBILE BOTTOM NAVIGATION BAR
       ========================================================= */}
       <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
-        <div className="flex items-center justify-around px-2 py-3">
+        <div className="flex items-center justify-around px-2 py-2">
           <button
             onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-2 cursor-pointer group"
+            className="flex flex-col items-center p-1.5 cursor-pointer group"
             title="Home"
           >
-            <div className="w-12 h-12 bg-stone-100 group-active:bg-stone-200 rounded-2xl flex items-center justify-center transition-colors">
-              <Home size={22} className="text-stone-700" />
+            <div className="w-10 h-10 bg-stone-100 group-active:bg-stone-200 rounded-xl flex items-center justify-center">
+              <Home size={18} className="text-stone-700" />
             </div>
           </button>
 
           <button
             onClick={() => { setActiveTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-2 cursor-pointer group"
+            className="flex flex-col items-center p-1.5 cursor-pointer group"
             title="Orders"
           >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'orders' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <Package size={22} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'orders' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
+              <Package size={18} />
             </div>
           </button>
 
           <button
             onClick={() => { setActiveTab('addresses'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Save Address"
+            className="flex flex-col items-center p-1.5 cursor-pointer group"
+            title="Addresses"
           >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'addresses' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <MapPin size={22} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'addresses' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
+              <MapPin size={18} />
             </div>
           </button>
 
           <button
             onClick={() => { setActiveTab('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Profile Setting"
+            className="flex flex-col items-center p-1.5 cursor-pointer group"
+            title="Profile"
           >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-2xs ${activeTab === 'profile' ? 'bg-purple-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <UserCircle size={22} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'profile' ? 'bg-purple-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
+              <UserCircle size={18} />
             </div>
           </button>
         </div>
@@ -2100,34 +2000,30 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {showAddressForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-stone-100">
-            <div className="sticky top-0 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-lg font-black text-stone-900">
-                  {editingAddress ? 'Edit Delivery Address' : 'Add New Address'}
-                </h2>
-                <p className="text-xs text-stone-500 font-medium">Specify details for express drop-off.</p>
-              </div>
-
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100">
+            <div className="sticky top-0 bg-white border-b border-stone-100 px-4 py-3 flex items-center justify-between z-10">
+              <h2 className="font-black text-stone-900">
+                {editingAddress ? 'Edit Address' : 'Add Address'}
+              </h2>
               <button
                 onClick={() => {
                   setShowAddressForm(false);
                   setEditingAddress(null);
                 }}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddressSubmit} className="p-6 space-y-4 text-xs sm:text-sm">
+            <form onSubmit={handleAddressSubmit} className="p-4 space-y-3">
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Address Label</label>
+                <label className="block font-bold text-stone-600 mb-1">Label</label>
                 <select
                   value={addressForm.title}
                   onChange={(e) => setAddressForm((prev) => ({ ...prev, title: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                 >
                   <option value="Home">Home</option>
                   <option value="Work">Work</option>
@@ -2135,79 +2031,64 @@ const CustomerOrdersPage = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">House / Flat / Shop No. *</label>
+                  <label className="block font-bold text-stone-600 mb-1">House / Flat *</label>
                   <input
                     type="text"
                     value={addressForm.house_no}
                     onChange={(e) => setAddressForm((prev) => ({ ...prev, house_no: e.target.value }))}
-                    placeholder="e.g. Flat No. 402"
                     required
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Ward / Area / Locality</label>
+                  <label className="block font-bold text-stone-600 mb-1">Area / Locality</label>
                   <input
                     type="text"
                     value={addressForm.ward_no_name}
                     onChange={(e) => setAddressForm((prev) => ({ ...prev, ward_no_name: e.target.value }))}
-                    placeholder="e.g. Sector 18"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Complete Landmark & Street Address</label>
+                <label className="block font-bold text-stone-600 mb-1">Landmark / Street</label>
                 <textarea
                   value={addressForm.address}
                   onChange={(e) => setAddressForm((prev) => ({ ...prev, address: e.target.value }))}
-                  placeholder="Nearby landmark, building name..."
                   rows={2}
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 resize-none font-medium"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">City *</label>
+                  <label className="block font-bold text-stone-600 mb-1">City *</label>
                   <input
                     type="text"
                     value={addressForm.city}
                     onChange={(e) => setAddressForm((prev) => ({ ...prev, city: e.target.value }))}
                     required
-                    placeholder="City"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">District</label>
-                  <input
-                    type="text"
-                    value={addressForm.district}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))}
-                    placeholder="District"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">State *</label>
+                  <label className="block font-bold text-stone-600 mb-1">State *</label>
                   <input
                     type="text"
                     value={addressForm.state}
                     onChange={(e) => setAddressForm((prev) => ({ ...prev, state: e.target.value }))}
                     required
-                    placeholder="State"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Pincode *</label>
+                  <label className="block font-bold text-stone-600 mb-1">Pincode *</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -2215,53 +2096,50 @@ const CustomerOrdersPage = () => {
                     value={addressForm.pincode}
                     onChange={(e) => setAddressForm((prev) => ({ ...prev, pincode: e.target.value.replace(/\D/g, '') }))}
                     required
-                    placeholder="6-digit pincode"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-stone-600 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={addressForm.phone}
+                    onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-stone-700 mb-1">Receiver Phone Number</label>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={addressForm.phone}
-                  onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
-                  placeholder="10-digit mobile number"
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-                />
-              </div>
-
-              <label className="flex items-center gap-3 cursor-pointer pt-2">
+              <label className="flex items-center gap-2 cursor-pointer pt-1">
                 <input
                   type="checkbox"
                   checked={Boolean(addressForm.is_default)}
                   onChange={(e) => setAddressForm((prev) => ({ ...prev, is_default: e.target.checked }))}
-                  className="h-4 w-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                  className="h-3.5 w-3.5 rounded border-stone-300 text-blue-600"
                 />
-                <span className="text-stone-700 font-bold text-xs">Make this my default checkout address</span>
+                <span className="text-stone-700 font-bold">Default Address</span>
               </label>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-stone-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddressForm(false);
                     setEditingAddress(null);
                   }}
-                  className="px-5 py-2.5 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-100 font-bold cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl border border-stone-200 text-stone-700 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingAddress}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 inline-flex items-center gap-2 font-bold cursor-pointer shadow-md shadow-emerald-600/20"
+                  className="px-4.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 font-bold cursor-pointer inline-flex items-center gap-1"
                 >
-                  {savingAddress && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {editingAddress ? 'Update Address' : 'Save Address'}
+                  {savingAddress && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Save
                 </button>
               </div>
             </form>
@@ -2275,36 +2153,36 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-stone-100"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100"
           >
-            <div className="sticky top-0 z-10 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white border-b border-stone-100 px-4 py-3 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-stone-900">
-                  Order Details {getDisplayOrderId(selectedOrder)}
+                <h2 className="font-black text-stone-900">
+                  Order {getDisplayOrderId(selectedOrder)}
                 </h2>
-                <p className="text-xs text-stone-400 font-medium">
-                  Placed on {formatDateTime(selectedOrder?.created_at)}
+                <p className="text-[10px] text-stone-400">
+                  {formatDateTime(selectedOrder?.created_at)}
                 </p>
               </div>
 
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 text-xs sm:text-sm">
+            <div className="p-4 space-y-4">
               {/* TRACKING PROGRESS */}
-              <div className="bg-stone-50/70 p-5 rounded-2xl border border-stone-100">
-                <h3 className="font-black text-stone-900 mb-4 text-xs uppercase tracking-wider">Live Order Tracking</h3>
-                <div className="overflow-x-auto pb-2">
-                  <div className="flex min-w-[550px]">
+              <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                <h3 className="font-black text-stone-900 mb-3 text-[10px] uppercase">Tracking</h3>
+                <div className="overflow-x-auto pb-1">
+                  <div className="flex min-w-[400px]">
                     {getTrackingSteps(selectedOrder).map((step, index, allSteps) => {
                       const Icon = step.icon;
 
@@ -2312,18 +2190,18 @@ const CustomerOrdersPage = () => {
                         <div key={step.key} className="flex-1 relative">
                           <div className="flex items-center">
                             <div
-                              className={`w-9 h-9 rounded-full flex items-center justify-center border-2 shrink-0 shadow-2xs ${
+                              className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 ${
                                 step.completed || step.active
                                   ? 'bg-emerald-600 border-emerald-600 text-white'
                                   : 'bg-white border-stone-300 text-stone-400'
                               }`}
                             >
-                              <Icon className="w-4 h-4" />
+                              <Icon className="w-3 h-3" />
                             </div>
 
                             {index < allSteps.length - 1 && (
                               <div
-                                className={`h-1 flex-1 mx-2 rounded-full ${
+                                className={`h-0.5 flex-1 mx-1 rounded-full ${
                                   step.completed ? 'bg-emerald-600' : 'bg-stone-200'
                                 }`}
                               />
@@ -2331,18 +2209,12 @@ const CustomerOrdersPage = () => {
                           </div>
 
                           <p
-                            className={`text-xs mt-2.5 font-bold ${
+                            className={`text-[10px] mt-1.5 font-bold truncate ${
                               step.active ? 'text-emerald-700' : 'text-stone-500'
                             }`}
                           >
                             {step.label}
                           </p>
-
-                          {step.time && (
-                            <p className="text-[10px] text-stone-400 mt-0.5 font-mono font-bold">
-                              {step.time}
-                            </p>
-                          )}
                         </div>
                       );
                     })}
@@ -2350,45 +2222,31 @@ const CustomerOrdersPage = () => {
                 </div>
               </div>
 
-              {/* ── DELIVERY VERIFICATION OTP BANNER IN MODAL ── */}
+              {/* ── OTP BANNER IN MODAL ── */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
-                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-3xl p-4 flex items-center justify-between shadow-2xs">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-800 block">
-                      Delivery Verification OTP
-                    </span>
-                    <p className="text-[11px] text-stone-600 font-medium">
-                      Share this code with the delivery partner upon arrival
-                    </p>
-                  </div>
-                  <div className="bg-white px-4 py-2 rounded-2xl border border-emerald-300 font-mono font-black text-xl text-emerald-700 tracking-[0.2em] shadow-sm">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                    <ShieldCheck size={13} /> Delivery OTP:
+                  </span>
+                  <span className="font-mono font-black text-base text-emerald-700 tracking-wider">
                     {selectedOrder?.otp || '----'}
-                  </div>
+                  </span>
                 </div>
               )}
 
-              {/* FULFILLMENT DURATION BANNER (When Delivered) */}
+              {/* FULFILLMENT DURATION */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black">
-                      ✓
-                    </div>
-                    <div>
-                      <p className="font-black text-sm">Lightning Fast Delivery Completed</p>
-                      <p className="text-emerald-100 text-[11px]">Total turnaround time from placement to doorstep</p>
-                    </div>
-                  </div>
-                  <div className="font-black text-emerald-900 bg-amber-300 px-3.5 py-1.5 rounded-xl shadow-2xs text-xs">
-                    {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
-                  </div>
+                <div className="bg-emerald-600 text-white rounded-xl p-3 flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1">
+                    <Check size={14} /> Delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
+                  </span>
                 </div>
               )}
 
               {/* ITEMS IN MODAL */}
               <div>
-                <h3 className="font-black text-stone-900 mb-3 text-xs uppercase tracking-wider">Ordered Products</h3>
-                <div className="space-y-3">
+                <h3 className="font-black text-stone-900 mb-2 text-[10px] uppercase">Items</h3>
+                <div className="space-y-2">
                   {(Array.isArray(selectedOrder?.order_items) ? selectedOrder.order_items : []).map((item, index) => {
                     const product = item?.products;
                     const variant = findOrderItemVariant(item, product);
@@ -2402,29 +2260,28 @@ const CustomerOrdersPage = () => {
                     return (
                       <div
                         key={item?.id || index}
-                        className="flex items-center gap-4 border border-stone-200/80 rounded-2xl p-3.5 bg-white shadow-2xs"
+                        className="flex items-center gap-3 border border-stone-200/80 rounded-xl p-2.5 bg-white"
                       >
-                        <div className="w-14 h-14 rounded-xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
+                        <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
                           {image ? (
-                            <img src={image} alt={product?.name || 'Product'} className="w-full h-full object-contain" />
+                            <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
-                            <Package className="w-6 h-6 text-stone-300" />
+                            <Package className="w-4 h-4 text-stone-300" />
                           )}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p className="font-extrabold text-stone-900 text-sm truncate">
+                          <p className="font-bold text-stone-900 truncate">
                             {product?.name || 'Product'}
                           </p>
                           {variant && (
-                            <p className="text-xs text-stone-500 font-medium">{getVariantLabel(variant)}</p>
+                            <p className="text-[10px] text-stone-500 font-medium">{getVariantLabel(variant)}</p>
                           )}
-                          <p className="text-xs text-stone-500 font-black mt-0.5">Qty: {Number(item?.quantity) || 1}</p>
+                          <p className="text-[10px] text-stone-400 font-bold">Qty: {Number(item?.quantity) || 1}</p>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <p className="font-black text-stone-900 text-sm">{formatCurrency(item?.price)}</p>
-                          <p className="text-xs text-stone-400 font-bold">{formatCurrency(getItemSubtotal(item))}</p>
+                          <p className="font-black text-stone-900">{formatCurrency(item?.price)}</p>
                         </div>
                       </div>
                     );
@@ -2432,89 +2289,82 @@ const CustomerOrdersPage = () => {
                 </div>
               </div>
 
-              {/* ADDRESS & PAYMENT INFO (COD Only) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70">
-                  <h4 className="font-black text-stone-900 mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-stone-500">
-                    <MapPin className="w-4 h-4 text-emerald-600" /> Delivery Address
+              {/* ADDRESS & PAYMENT INFO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="bg-stone-50 rounded-xl p-3 border border-stone-200/70">
+                  <h4 className="font-black text-stone-600 mb-1 flex items-center gap-1 text-[10px] uppercase">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Address
                   </h4>
-                  <p className="text-stone-700 font-medium leading-relaxed text-xs">
-                    {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || 'Address info unavailable'}
+                  <p className="text-stone-700 font-medium leading-relaxed">
+                    {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
                   </p>
                 </div>
 
-                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70">
-                  <h4 className="font-black text-stone-900 mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-stone-500">
-                    <CreditCard className="w-4 h-4 text-emerald-600" /> Payment Summary
+                <div className="bg-stone-50 rounded-xl p-3 border border-stone-200/70">
+                  <h4 className="font-black text-stone-600 mb-1 flex items-center gap-1 text-[10px] uppercase">
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment
                   </h4>
-                  <p className="font-extrabold text-stone-900 text-sm">Cash on Delivery (COD)</p>
-                  <p className={`font-black text-xs mt-1 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid' : 'Pending Payment'}
+                  <p className="font-bold text-stone-900">COD</p>
+                  <p className={`font-black text-[10px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid' : 'Pending'}
                   </p>
                 </div>
               </div>
 
               {/* BILLING BREAKDOWN */}
-              <div className="border-t border-stone-200 pt-4 space-y-2.5 px-1">
+              <div className="border-t border-stone-200 pt-3 space-y-1.5 px-0.5">
                 <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Items Subtotal</span>
+                  <span>Subtotal</span>
                   <span>{formatCurrency(getOrderItemsSubtotal(selectedOrder))}</span>
                 </div>
 
                 {getDiscount(selectedOrder) > 0 && (
                   <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>Discount Applied</span>
+                    <span>Discount</span>
                     <span>-{formatCurrency(getDiscount(selectedOrder))}</span>
                   </div>
                 )}
 
                 <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Delivery Charge</span>
-                  <span>{getDeliveryCharge(selectedOrder) > 0 ? formatCurrency(getDeliveryCharge(selectedOrder)) : <strong className="text-emerald-600">FREE</strong>}</span>
+                  <span>Delivery</span>
+                  <span>{getDeliveryCharge(selectedOrder) > 0 ? formatCurrency(getDeliveryCharge(selectedOrder)) : 'FREE'}</span>
                 </div>
 
-                {getTax(selectedOrder) > 0 && (
-                  <div className="flex justify-between text-stone-600 font-medium">
-                    <span>Taxes (GST)</span>
-                    <span>{formatCurrency(getTax(selectedOrder))}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between pt-3 border-t-2 border-stone-900 text-base font-black">
-                  <span className="text-stone-900">Grand Total</span>
-                  <span className="text-emerald-700 text-lg">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                <div className="flex justify-between pt-2 border-t border-stone-200 font-black text-sm">
+                  <span>Total</span>
+                  <span className="text-emerald-700">{formatCurrency(getOrderTotal(selectedOrder))}</span>
                 </div>
               </div>
 
-              {/* MODAL ACTIONS (Restricted to Delivered Status) */}
-              <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-stone-100">
+              {/* MODAL ACTIONS */}
+              <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-stone-100">
                 {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && (
                   <>
                     <button
                       onClick={() => setInvoiceOrder(selectedOrder)}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 text-xs font-bold text-stone-800 cursor-pointer shadow-2xs"
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-stone-800 cursor-pointer"
                     >
-                      <FileText className="w-4 h-4 text-emerald-600" /> Tax Invoice
+                      <FileText className="w-3.5 h-3.5 text-emerald-600" /> Invoice
                     </button>
 
                     <button
                       onClick={() => openRatingModal(selectedOrder)}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100/60 text-xs font-bold cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 font-bold cursor-pointer"
                     >
-                      <Star className="w-4 h-4 fill-amber-400 text-amber-500" /> Rate Products
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" /> Rate
                     </button>
 
                     <button
                       onClick={() => handleReorder(selectedOrder)}
                       disabled={reorderingOrderId === getOrderId(selectedOrder)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-bold cursor-pointer shadow-md shadow-emerald-600/20"
+                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-bold cursor-pointer"
                     >
                       {reorderingOrderId === getOrderId(selectedOrder) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="w-3.5 h-3.5" />
                       )}
-                      <span>Reorder Items</span>
+                      <span>Reorder</span>
                     </button>
                   </>
                 )}
@@ -2530,28 +2380,24 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {ratingOrder && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100">
-            <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50/50 sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100">
+            <div className="p-4 border-b border-stone-100 flex items-center justify-between bg-stone-50 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="font-black text-stone-900 text-base">Rate Ordered Products</h2>
-                <p className="text-xs text-stone-500 font-medium">Order {getDisplayOrderId(ratingOrder)}</p>
+                <h2 className="font-black text-stone-900">Rate Products</h2>
+                <p className="text-[10px] text-stone-400">Order {getDisplayOrderId(ratingOrder)}</p>
               </div>
 
               <button
                 onClick={() => setRatingOrder(null)}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <p className="text-xs text-stone-500 font-medium">
-                Please provide a rating and review for each product included in this delivery.
-              </p>
-
-              <div className="space-y-5">
+            <div className="p-4 space-y-4">
+              <div className="space-y-3">
                 {(Array.isArray(ratingOrder?.order_items) ? ratingOrder.order_items : []).map((item, index) => {
                   const product = item?.products;
                   const prodId = product?.id;
@@ -2561,65 +2407,65 @@ const CustomerOrdersPage = () => {
                   const image = product?.image_url || product?.image || product?.images?.[0] || '';
 
                   return (
-                    <div key={prodId || index} className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-stone-200">
+                    <div key={prodId || index} className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center overflow-hidden shrink-0 border border-stone-200">
                           {image ? (
                             <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
-                            <Package className="w-5 h-5 text-stone-300" />
+                            <Package className="w-4 h-4 text-stone-300" />
                           )}
                         </div>
-                        <div>
-                          <p className="font-black text-stone-900 text-sm">{product?.name || 'Product'}</p>
-                          <p className="text-xs text-stone-400 font-bold">Qty: {item.quantity}</p>
+                        <div className="min-w-0">
+                          <p className="font-black text-stone-900 truncate">{product?.name || 'Product'}</p>
+                          <p className="text-[10px] text-stone-400">Qty: {item.quantity}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 pt-1">
+                      <div className="flex items-center gap-1 pt-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
                             type="button"
                             onClick={() => handleProductRatingChange(prodId, 'rating', star)}
-                            className="cursor-pointer transition transform hover:scale-110"
+                            className="cursor-pointer"
                           >
                             <Star
-                              className={`w-6 h-6 ${
+                              className={`w-5 h-5 ${
                                 star <= currentData.rating ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
                               }`}
                             />
                           </button>
                         ))}
-                        <span className="ml-2 text-xs font-black text-stone-700">{currentData.rating} / 5</span>
+                        <span className="ml-1 text-[11px] font-black text-stone-700">{currentData.rating}/5</span>
                       </div>
 
                       <input
                         type="text"
                         value={currentData.comment}
                         onChange={(e) => handleProductRatingChange(prodId, 'comment', e.target.value)}
-                        placeholder="Write a quick review for this item..."
-                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Write a review..."
+                        className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
                       />
                     </div>
                   );
                 })}
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-stone-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   onClick={() => setRatingOrder(null)}
-                  className="px-5 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl border border-stone-200 font-bold text-stone-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitAllProductRatings}
                   disabled={savingRating}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
+                  className="px-4.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-bold inline-flex items-center gap-1 cursor-pointer"
                 >
-                  {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Submit All Product Reviews
+                  {savingRating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Submit Reviews
                 </button>
               </div>
             </div>
