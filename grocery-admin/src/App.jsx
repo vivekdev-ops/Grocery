@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck,
   Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare,
   PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, TrendingUp,
-  Sparkles, Search, Moon, Sun
+  Sparkles, Search, Moon, Sun, Power
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -35,6 +35,7 @@ import ShopkeeperDetailsAdmin from './components/ShopkeeperDetailsAdmin';
 import CategoryManager from './components/CategoryManager';
 import FlashSaleManager from './components/FlashSaleManager';
 import StoreLocationManager from './components/StoreLocationManager';
+import StoreStatusManager from './components/StoreStatusManager';
 import AdminFeedbacks from './components/AdminFeedbacks';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
@@ -298,6 +299,7 @@ function AdminLayout() {
       items: [
         { id: 'deliveryFees',   label: 'Delivery Fees',   icon: Truck },
         { id: 'storeLocation',  label: 'Store Location',  icon: MapPin },
+        { id: 'storeStatus',    label: 'Portal Status & Maintenance', icon: Power },
       ],
     },
     {
@@ -318,6 +320,7 @@ function AdminLayout() {
       categories: <CategoryManager />, orders: <Orders />, staff: <Staff />,
       customers: <CustomerManagement />, shopkeeperDetails: <ShopkeeperDetailsAdmin />,
       deliveryFees: <DeliveryFeeManager />, storeLocation: <StoreLocationManager />,
+      storeStatus: <StoreStatusManager />,
       coupons: <CouponManager />, banners: <BannerManager />, flashSales: <FlashSaleManager />,
       testimonials: <TestimonialManager />, feedback: <AdminFeedbacks />,
     };

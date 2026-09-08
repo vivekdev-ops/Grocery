@@ -13,7 +13,6 @@ import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
-import { Geolocation } from '@capacitor/geolocation';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -21,6 +20,9 @@ import ProductGrid from './store/ProductGrid';
 import CartDrawer from './store/CartDrawer';
 
 export default function CustomerStorefront() {
+  const [storeStatus, setStoreStatus] = useState({ active: true, message: '', image: '' });
+  const [checkingStatus, setCheckingStatus] = useState(true);
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
@@ -52,7 +54,6 @@ export default function CustomerStorefront() {
   const [openSection, setOpenSection] = useState(null);
   const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
   const [orderTab, setOrderTab] = useState('active'); // 'active' | 'delivered' | 'cancelled'
-  const [deliveredProductIds, setDeliveredProductIds] = useState([]);
   const [userReviewsMap, setUserReviewsMap] = useState({});
 
   // Order Section Review Modal State
@@ -79,6 +80,20 @@ export default function CustomerStorefront() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+
+  // Check portal status immediately on component mount
+  useEffect(() => {
+    supabase.from('store_settings').select('*').limit(1).maybeSingle().then(({ data }) => {
+      if (data) {
+        setStoreStatus({
+          active: data.is_portal_active ?? true,
+          message: data.maintenance_message || '',
+          image: data.maintenance_image || ''
+        });
+      }
+      setCheckingStatus(false);
+    });
+  }, []);
 
   useEffect(() => {
     const handleCartUpdate = (e) => {
@@ -243,7 +258,6 @@ export default function CustomerStorefront() {
     { sender: 'ai', text: 'Hello! I am your KD Store AI Grocery Concierge. Tell me what you want to cook or what items you need, and I will instantly set up your cart!' }
   ]);
   const [aiInputText, setAiInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [predictedRefillItems, setPredictedRefillItems] = useState([]);
 
   const navigate = useNavigate();
@@ -684,174 +698,8 @@ export default function CustomerStorefront() {
 
     if (!error && data) {
       setMyOrders(data || []);
-
-      const deliveredIds = [];
-      data.forEach(order => {
-        if (order.status === 'delivered' && order.order_items) {
-          order.order_items.forEach(item => {
-            if (item.product_id) deliveredIds.push(item.product_id);
-          });
-        }
-      });
-      setDeliveredProductIds(deliveredIds);
     }
   };
-
- const handleReorder = (order) => {
-  if (!order?.order_items?.length) {
-    alert('No items found in this order.');
-    return;
-  }
-
-  let updatedCart = [...cart];
-  let addedCount = 0;
-  let skippedCount = 0;
-
-  order.order_items.forEach((item) => {
-    const prod = item?.products;
-
-    if (!prod) {
-      skippedCount++;
-      return;
-    }
-
-    const relationalVariants = Array.isArray(prod.product_variants)
-      ? prod.product_variants
-      : [];
-
-    const jsonVariants = Array.isArray(prod.variants)
-      ? prod.variants
-      : [];
-
-    const variants =
-      relationalVariants.length > 0
-        ? relationalVariants
-        : jsonVariants;
-
-    let matchedVariant = null;
-
-    if (item.variant_id) {
-      matchedVariant = variants.find(
-        (v) => String(v.id) === String(item.variant_id)
-      );
-    }
-
-    if (!matchedVariant && item.variant_label) {
-      const orderVariantLabel =
-        String(item.variant_label).trim().toLowerCase();
-
-      matchedVariant = variants.find((v) => {
-        const label = String(
-          v.unit_label ||
-          v.label ||
-          v.unit ||
-          ''
-        ).trim().toLowerCase();
-
-        return label === orderVariantLabel;
-      });
-    }
-
-    if (!matchedVariant && item.price != null) {
-      matchedVariant = variants.find(
-        (v) => Number(v.price) === Number(item.price)
-      );
-    }
-
-    if (variants.length > 0 && !matchedVariant) {
-      skippedCount++;
-      return;
-    }
-
-    const itemPrice = matchedVariant
-      ? Number(matchedVariant.price || 0)
-      : Number(item.price || 0);
-
-    const itemStock = matchedVariant
-      ? Number(matchedVariant.stock || 0)
-      : 0;
-
-    if (itemStock <= 0) {
-      skippedCount++;
-      return;
-    }
-
-    const variantLabel = matchedVariant
-      ? (
-          matchedVariant.unit_label ||
-          matchedVariant.label ||
-          matchedVariant.unit ||
-          ''
-        )
-      : '';
-
-    const variantIdentifier = matchedVariant ? (matchedVariant.id || matchedVariant.unit_label || matchedVariant.label || 'default') : 'default';
-    const cartItemId = `${prod.id}-${variantIdentifier}`;
-
-    const productImages =
-      Array.isArray(prod.images) && prod.images.length
-        ? prod.images
-        : Array.isArray(prod.gallery) && prod.gallery.length
-          ? prod.gallery
-          : [prod.image_url].filter(Boolean);
-
-    const requestedQuantity = Math.max(
-      1,
-      Number(item.quantity || 1)
-    );
-
-    const existingIndex = updatedCart.findIndex(
-      (cartItem) =>
-        cartItem.cartItemId === cartItemId
-    );
-
-    if (existingIndex >= 0) {
-      const existingItem = updatedCart[existingIndex];
-
-      updatedCart[existingIndex] = {
-        ...existingItem,
-        quantity: Math.min(
-          itemStock,
-          Number(existingItem.quantity || 0) +
-            requestedQuantity
-        ),
-        stock: itemStock,
-        price: itemPrice,
-        variant: matchedVariant
-      };
-    } else {
-      updatedCart.push({
-        cartItemId,
-        product: prod,
-        variant: matchedVariant,
-        id: prod.id,
-        product_id: prod.id,
-        title: variantLabel
-          ? `${prod.name} (${variantLabel})`
-          : prod.name,
-        price: itemPrice,
-        quantity: Math.min(
-          requestedQuantity,
-          itemStock
-        ),
-        stock: itemStock,
-        image: productImages[0] || ''
-      });
-    }
-
-    addedCount++;
-  });
-
-  if (addedCount === 0) {
-    alert('Sorry, none of the items from this order are currently available.');
-    return;
-  }
-
-  setCart(updatedCart);
-  localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-  window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-  setIsCartOpen(true);
-};
 
   const updateQuantity = (cartItemId, delta) => {
     setCart(prev => {
@@ -1125,7 +973,7 @@ export default function CustomerStorefront() {
     }
   }, [cartSubtotal]);
 
- const handleApplyCoupon = async () => {
+  const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
      
     try {
@@ -1214,14 +1062,6 @@ export default function CustomerStorefront() {
     setDiscountAmount(0);
   };
 
-  const shareOnWhatsApp = (product) => {
-    const productUrl = window.location.href;
-    const message = encodeURIComponent(
-      `Hey! Check out *${product.name}* on KD Store delivered in 10 minutes! 🛒✨\n\nView here: ${productUrl}`
-    );
-    window.open(`https://wa.me/?text=${message}`, '_blank');
-  };
-
   const cartTotal = Math.max(0, cartSubtotal - discountAmount) + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -1236,6 +1076,36 @@ export default function CustomerStorefront() {
   const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
+  // Prevent flash while status is checking, then block if portal is inactive
+  if (checkingStatus) {
+    return <div className="min-h-screen bg-stone-950 flex items-center justify-center text-white text-xs">Checking store availability...</div>;
+  }
+
+  if (!storeStatus.active) {
+    return (
+      <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center p-6 font-sans text-center">
+        <div className="max-w-md w-full space-y-4 bg-stone-900 border border-stone-800 p-8 rounded-3xl shadow-2xl">
+          {storeStatus.image ? (
+            <img 
+              src={storeStatus.image} 
+              alt="Store Maintenance" 
+              className="w-full h-48 object-cover rounded-2xl mb-4 border border-stone-800 shadow-md" 
+              onError={(e) => { e.target.style.display = 'none'; }} // Fallback if URL fails to load
+            />
+          ) : (
+            <div className="w-full h-32 bg-stone-800 rounded-2xl mb-4 flex items-center justify-center border border-stone-700 text-stone-500 text-[11px] font-bold">
+              Maintenance Mode
+            </div>
+          )}
+          <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/30 font-black text-lg">
+            KD
+          </div>
+          <h1 className="text-xl font-black tracking-tight text-white">We'll be back soon!</h1>
+          <p className="text-stone-400 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50/50 via-[#F0FDF4] to-teal-50/40 text-slate-900 pb-36 font-sans selection:bg-emerald-500 selection:text-white">
        
@@ -1498,7 +1368,6 @@ export default function CustomerStorefront() {
                   const cancelledOrders = myOrders.filter(o => o.status === 'cancelled');
 
                   const renderOrderCard = (order) => {
-                    const complaintTicket = myComplaintsMap[order.id];
                     const showOtp = order.status !== 'delivered' && order.status !== 'cancelled';
 
                     return (
@@ -1511,7 +1380,6 @@ export default function CustomerStorefront() {
                           }`}>{order.status}</span>
                         </div>
 
-                        {/* ── DIRECT OTP BANNER ON ORDER CARD ── */}
                         {showOtp && (
                           <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-2.5 flex items-center justify-between">
                             <div>
@@ -1555,30 +1423,24 @@ export default function CustomerStorefront() {
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'active' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
-                              title={`Active (${activeOrders.length})`}
                             >
-                              <span className="sm:hidden">Active</span>
-                              <span className="hidden sm:inline">Active ({activeOrders.length})</span>
+                              Active ({activeOrders.length})
                             </button>
                             <button
                               onClick={() => setOrderTab('delivered')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'delivered' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
-                              title={`Delivered (${deliveredOrders.length})`}
                             >
-                              <span className="sm:hidden">Deliv.</span>
-                              <span className="hidden sm:inline">Delivered ({deliveredOrders.length})</span>
+                              Delivered ({deliveredOrders.length})
                             </button>
                             <button
                               onClick={() => setOrderTab('cancelled')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
                                 orderTab === 'cancelled' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
-                              title={`Cancelled (${cancelledOrders.length})`}
                             >
-                              <span className="sm:hidden">Canc.</span>
-                              <span className="hidden sm:inline">Cancelled ({cancelledOrders.length})</span>
+                              Cancelled ({cancelledOrders.length})
                             </button>
                           </div>
 
@@ -1750,23 +1612,21 @@ export default function CustomerStorefront() {
                 }`}>{selectedProfileOrder.status}</span>
               </div>
 
-              {/* ── ORDER ACTIVITY HISTORY OTP BANNER ── */}
-{order.status !== 'delivered' && order.status !== 'cancelled' && (
-  <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
-    <div>
-      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
-        Delivery Verification OTP
-      </span>
-      <p className="text-[10px] text-stone-600 font-medium">
-        Share this code with the delivery partner
-      </p>
-    </div>
-    <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
-      {order.otp || '----'}
-    </div>
-  </div>
-)}
-              {/* ────────────────────────────────────── */}
+              {selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
+                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
+                      Delivery Verification OTP
+                    </span>
+                    <p className="text-[10px] text-stone-600 font-medium">
+                      Share this code with the delivery partner
+                    </p>
+                  </div>
+                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
+                    {selectedProfileOrder.otp || '----'}
+                  </div>
+                </div>
+              )}
 
               {myComplaintsMap[selectedProfileOrder.id] && (
                 <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
@@ -1785,17 +1645,6 @@ export default function CustomerStorefront() {
                   </p>
                 </div>
               )}
-
-              {selectedProfileOrder.status === 'cancelled' && (
-                <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1">
-                  <span className="text-rose-900 font-black uppercase text-[10px] tracking-wider block">Cancellation Reason</span>
-                  <p className="text-rose-700 font-medium leading-snug">
-                    {selectedProfileOrder.cancellation_remark || 'No specific remark provided.'}
-                  </p>
-                </div>
-              )}
-
-              {/* Rest of your modal items list, address grid, and total summary */}
 
               {selectedProfileOrder.status === 'cancelled' && (
                 <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1">
@@ -1928,7 +1777,7 @@ export default function CustomerStorefront() {
                   onClick={() => handleCancelOrder(selectedProfileOrder.id)}
                   className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  <Ban size5={15} /> Cancel Order
+                  <Ban size={15} /> Cancel Order
                 </button>
               )}
               <button 
@@ -2408,7 +2257,6 @@ export default function CustomerStorefront() {
                             </div>
                             <p className="font-bold text-[11px] text-stone-900 line-clamp-2 leading-snug">{p.name}</p>
 
-                            {/* Variant Dropdown on Card if multiple variants exist */}
                             {hasPVariants && (
                               <div onClick={e => e.stopPropagation()} className="mt-1.5">
                                 <select
@@ -2492,7 +2340,6 @@ export default function CustomerStorefront() {
                             </div>
                             <p className="font-bold text-[11px] text-stone-900 line-clamp-2 leading-snug">{p.name}</p>
 
-                            {/* Variant Dropdown on Card if multiple variants exist */}
                             {hasPVariants && (
                               <div onClick={e => e.stopPropagation()} className="mt-1.5">
                                 <select

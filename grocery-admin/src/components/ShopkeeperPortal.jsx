@@ -118,6 +118,13 @@ export default function ShopkeeperPortal() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setShopkeeperProfile(null);
+    navigate('/login', { replace: true });
+  };
+
   useEffect(() => {
     if (shopkeeperProfile?.id) {
       fetchStoreData(shopkeeperProfile.id);
@@ -227,7 +234,6 @@ export default function ShopkeeperPortal() {
     if (rulesData.data) setCommissionRules(rulesData.data);
   };
 
-  // Inside src/components/ShopkeeperPortal.jsx (within fetchOrCreateShopkeeperProfile or useEffect)
   const fetchOrCreateShopkeeperProfile = async (user) => {
     setLoading(true);
     try {
@@ -242,7 +248,7 @@ export default function ShopkeeperPortal() {
       if (staffRole.includes('delivery') || staffRole.includes('rider') || staffRole.includes('boy')) {
         alert("Access Denied: Delivery Partners cannot access the Shopkeeper portal.");
         await supabase.auth.signOut({ scope: 'local' });
-        navigate('/login');
+        navigate('/login', { replace: true });
         setLoading(false);
         return;
       }
@@ -256,7 +262,7 @@ export default function ShopkeeperPortal() {
       if (!profileData || profileErr) {
         alert("Access Denied: No merchant/shopkeeper profile found for this account.");
         await supabase.auth.signOut({ scope: 'local' });
-        navigate('/login');
+        navigate('/login', { replace: true });
         setLoading(false);
         return;
       }
@@ -265,7 +271,7 @@ export default function ShopkeeperPortal() {
       await fetchStoreData(profileData.id);
     } catch (err) {
       console.error('Error handling profile:', err);
-      navigate('/login');
+      navigate('/login', { replace: true });
     } finally {
       setLoading(false);
     }
@@ -638,6 +644,9 @@ export default function ShopkeeperPortal() {
           <NotificationBell session={session} size={18} />
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-2 rounded-xl font-bold cursor-pointer transition shadow-2xs">
             <Printer size={13} /> Print
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-xl font-bold cursor-pointer transition border border-rose-200 shadow-2xs" title="Sign Out">
+            <LogOut size={13} /> <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>

@@ -185,6 +185,13 @@ export default function DeliveryPortal() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setStaffProfile(null);
+    navigate('/login', { replace: true });
+  };
+
   const fetchStaffProfileAndDependencies = async (user) => {
   setLoading(true);
   try {
@@ -201,7 +208,7 @@ export default function DeliveryPortal() {
       setSession(null);
       setStaffProfile(null);
       setLoading(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
       return;
     }
 
@@ -230,7 +237,7 @@ export default function DeliveryPortal() {
       setSession(null);
       setStaffProfile(null);
       setLoading(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
       return;
     }
 
@@ -505,6 +512,9 @@ export default function DeliveryPortal() {
           <NotificationBell session={session} size={18} />
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-2 rounded-xl font-bold cursor-pointer transition shadow-2xs">
             <Printer size={13} /> Print
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-xl font-bold cursor-pointer transition border border-rose-200 shadow-2xs" title="Sign Out">
+            <LogOut size={13} /> <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
@@ -919,8 +929,8 @@ export default function DeliveryPortal() {
                   <p className="font-bold text-stone-800">{staffProfile?.phone || 'Not provided'}</p>
                 </div>
 
-                <button onClick={() => supabase.auth.signOut()} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3 rounded-2xl cursor-pointer transition">
-                  Sign Out
+                <button onClick={handleLogout} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3 rounded-2xl cursor-pointer transition flex items-center justify-center gap-2">
+                  <LogOut size={15} /> Sign Out
                 </button>
               </div>
             )}
