@@ -275,7 +275,7 @@ export default function CartDrawer({
                 )}
               </div>
 
-              {/* DISTANCE WARNING BANNER (IF APPLICABLE) */}
+              {/* DISTANCE testing WARNING BANNER (IF APPLICABLE) */}
               {selectedAddressDistance && selectedAddressDistance > 15 && (
                 <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center text-rose-700 font-bold text-[11px]">
                   You seem to be <span className="font-black">{selectedAddressDistance.toFixed(1)} km</span> away from this address
