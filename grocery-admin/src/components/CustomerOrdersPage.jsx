@@ -5,45 +5,37 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Edit,
   FileText,
   Home,
   Loader2,
-  MapPin,
   Package,
   Phone,
-  Plus,
   RefreshCw,
   Search,
   Star,
-  Trash2,
-  User,
   X,
   ShoppingBag,
   Truck,
   CreditCard,
-  UserCircle,
-  MapPinned,
-  ShoppingBag as BagIcon,
-  Sparkles,
   Clock,
   ArrowRight,
-  Flame,
-  LogOut,
-  KeyRound,
   Ban,
   ShieldCheck,
   ExternalLink,
-  Camera,
-  Upload
+  MapPin,
+  SlidersHorizontal,
+  Sparkles,
+  Calendar,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { supabase } from '../supabaseClient';
-import StoreHeader from '../components/store/StoreHeader';
-import Footer from '../components/Footer';
-import InvoiceModal from '../components/InvoiceModal';
+import StoreHeader from './store/StoreHeader';
+import Footer from './Footer';
+import InvoiceModal from './InvoiceModal';
 
 
 /* =========================================================
@@ -372,33 +364,11 @@ const getOrderTotal = (order) => {
 
 
 /* =========================================================
-   ADDRESS HELPERS
-========================================================= */
-
-const emptyAddressForm = {
-  title: 'Home',
-  house_no: '',
-  ward_no_name: '',
-  city: '',
-  district: '',
-  state: '',
-  pincode: '',
-  phone: '',
-  address: '',
-  latitude: null,
-  longitude: null,
-  is_default: false,
-};
-
-
-/* =========================================================
    COMPONENT
 ========================================================= */
 
 const CustomerOrdersPage = () => {
   const navigate = useNavigate();
-
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'addresses' | 'profile'
 
   const [authUser, setAuthUser] = useState(null);
   const [user, setUser] = useState(null);
@@ -412,38 +382,8 @@ const CustomerOrdersPage = () => {
   const [expandedOrders, setExpandedOrders] = useState({});
 
   const [searchTerm, setSearchTerm] = useState('');
-
-  const [addresses, setAddresses] = useState([]);
-
-  const [showAddressForm, setShowAddressForm] =
-    useState(false);
-
-  const [editingAddress, setEditingAddress] =
-    useState(null);
-
-  const [addressForm, setAddressForm] =
-    useState(emptyAddressForm);
-
-  const [savingAddress, setSavingAddress] =
-    useState(false);
-
-  const [deletingAddressId, setDeletingAddressId] =
-    useState(null);
-
-  const [editingProfile, setEditingProfile] =
-    useState(false);
-
-  const [profileForm, setProfileForm] = useState({
-    full_name: '',
-    phone: '',
-    interests: '',
-    avatar_url: '',
-  });
-
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-
-  const [savingProfile, setSavingProfile] =
-    useState(false);
+  const [statusFilter, setStatusFilter] = useState('all'); // all, active, delivered, cancelled
+  const [sortBy, setSortBy] = useState('newest'); // newest, oldest, highest
 
   const [ratingOrder, setRatingOrder] =
     useState(null);
@@ -512,29 +452,7 @@ const CustomerOrdersPage = () => {
 
         setUser(profile);
 
-        setProfileForm({
-          full_name:
-            profile.full_name ||
-            currentUser.user_metadata?.full_name ||
-            '',
-          phone:
-            profile.phone ||
-            currentUser.user_metadata?.phone ||
-            '',
-          interests:
-            profile.interests ||
-            currentUser.user_metadata?.interests ||
-            '',
-          avatar_url:
-            profile.avatar_url ||
-            currentUser.user_metadata?.avatar_url ||
-            '',
-        });
-
-        await Promise.all([
-          loadOrders(currentUser.email),
-          loadAddresses(currentUser.id),
-        ]);
+        await loadOrders(currentUser.email);
       } catch (error) {
         console.error(
           'Customer orders initialization error:',
@@ -610,120 +528,63 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     LOAD ADDRESSES
-  ======================================================= */
-
-  const loadAddresses = async (overrideUserId = null) => {
-    const ownerUserId = overrideUserId || authUser?.id || user?.user_id;
-
-    if (!ownerUserId) {
-      setAddresses([]);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('customer_addresses')
-        .select('*')
-        .eq('user_id', ownerUserId)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setAddresses(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Error loading addresses:', error);
-      setAddresses([]);
-    }
-  };
-
-
-  /* =======================================================
-     AVATAR UPLOAD
-  ======================================================= */
-
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !authUser?.id) return;
-
-    try {
-      setUploadingAvatar(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${authUser.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64String = reader.result;
-          setProfileForm((prev) => ({ ...prev, avatar_url: base64String }));
-          setUploadingAvatar(false);
-        };
-        reader.readAsDataURL(file);
-        return;
-      }
-
-      const { data: publicURLData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      const publicUrl = publicURLData?.publicUrl || '';
-      setProfileForm((prev) => ({ ...prev, avatar_url: publicUrl }));
-    } catch (error) {
-      console.error('Avatar upload error:', error);
-      alert('Upload failed.');
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-
-  /* =======================================================
-     SEARCHED ORDERS
+     FILTERED & SORTED ORDERS
   ======================================================= */
 
   const filteredOrders = useMemo(() => {
-    const term = String(searchTerm || '')
-      .trim()
-      .toLowerCase();
+    let result = [...orders];
 
-    if (!term) return orders;
+    // Status filter
+    if (statusFilter === 'active') {
+      result = result.filter((order) => {
+        const norm = normalizeOrderStatus(getOrderStatus(order));
+        return norm !== 'DELIVERED' && norm !== 'CANCELLED';
+      });
+    } else if (statusFilter === 'delivered') {
+      result = result.filter((order) => normalizeOrderStatus(getOrderStatus(order)) === 'DELIVERED');
+    } else if (statusFilter === 'cancelled') {
+      result = result.filter((order) => normalizeOrderStatus(getOrderStatus(order)) === 'CANCELLED');
+    }
 
-    return orders.filter((order) => {
-      const orderId =
-        getDisplayOrderId(order).toLowerCase();
+    // Search filter
+    const term = String(searchTerm || '').trim().toLowerCase();
+    if (term) {
+      result = result.filter((order) => {
+        const orderId = getDisplayOrderId(order).toLowerCase();
+        const status = formatStatus(getOrderStatus(order)).toLowerCase();
+        const items = Array.isArray(order?.order_items) ? order.order_items : [];
+        const productText = items
+          .map((item) => item?.products?.name || '')
+          .join(' ')
+          .toLowerCase();
 
-      const status =
-        formatStatus(
-          getOrderStatus(order)
-        ).toLowerCase();
+        return (
+          orderId.includes(term) ||
+          status.includes(term) ||
+          productText.includes(term)
+        );
+      });
+    }
 
-      const items = Array.isArray(
-        order?.order_items
-      )
-        ? order.order_items
-        : [];
+    // Sorting
+    result.sort((a, b) => {
+      const dateA = new Date(a?.created_at || 0);
+      const dateB = new Date(b?.created_at || 0);
+      const totalA = getOrderTotal(a);
+      const totalB = getOrderTotal(b);
 
-      const productText = items
-        .map(
-          (item) =>
-            item?.products?.name || ''
-        )
-        .join(' ')
-        .toLowerCase();
-
-      return (
-        orderId.includes(term) ||
-        status.includes(term) ||
-        productText.includes(term)
-      );
+      if (sortBy === 'oldest') {
+        return dateA - dateB;
+      } else if (sortBy === 'highest') {
+        return totalB - totalA;
+      } else {
+        // newest default
+        return dateB - dateA;
+      }
     });
-  }, [orders, searchTerm]);
+
+    return result;
+  }, [orders, searchTerm, statusFilter, sortBy]);
 
 
   /* =======================================================
@@ -992,436 +853,6 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     ADDRESS - ADD
-  ======================================================= */
-
-  const handleAddAddress = () => {
-    setEditingAddress(null);
-
-    setAddressForm({
-      ...emptyAddressForm,
-      is_default:
-        addresses.length === 0,
-    });
-
-    setShowAddressForm(true);
-  };
-
-
-  /* =======================================================
-     ADDRESS - EDIT
-  ======================================================= */
-
-  const handleEditAddress = (address) => {
-    if (!address) return;
-
-    setEditingAddress(address);
-
-    setAddressForm({
-      title:
-        address.title || 'Home',
-      house_no:
-        address.house_no || '',
-      ward_no_name:
-        address.ward_no_name || '',
-      city:
-        address.city || '',
-      district:
-        address.district || '',
-      state:
-        address.state || '',
-      pincode:
-        address.pincode || '',
-      phone:
-        address.phone || '',
-      address:
-        address.address || '',
-      latitude:
-        address.latitude ?? null,
-      longitude:
-        address.longitude ?? null,
-      is_default:
-        Boolean(address.is_default),
-    });
-
-    setShowAddressForm(true);
-  };
-
-
-  /* =======================================================
-     ADDRESS - SUBMIT
-  ======================================================= */
-
-  const handleAddressSubmit = async (e) => {
-    e.preventDefault();
-
-    const ownerUserId = authUser?.id || user?.user_id;
-
-    if (!ownerUserId) {
-      alert('Login required.');
-      return;
-    }
-
-    if (
-      !addressForm.house_no?.trim() ||
-      !addressForm.city?.trim() ||
-      !addressForm.state?.trim() ||
-      !addressForm.pincode?.trim()
-    ) {
-      alert('Fill required fields.');
-      return;
-    }
-
-    if (
-      !/^\d{6}$/.test(
-        String(addressForm.pincode).trim()
-      )
-    ) {
-      alert('Invalid pincode.');
-      return;
-    }
-
-    try {
-      setSavingAddress(true);
-
-      const payload = {
-        user_id: ownerUserId,
-        title: addressForm.title || 'Home',
-        house_no: addressForm.house_no?.trim() || null,
-        ward_no_name: addressForm.ward_no_name?.trim() || null,
-        city: addressForm.city?.trim() || null,
-        district: addressForm.district?.trim() || null,
-        state: addressForm.state?.trim() || null,
-        pincode: addressForm.pincode?.trim() || null,
-        phone: addressForm.phone?.trim() || null,
-        address: addressForm.address?.trim() || null,
-        latitude:
-          addressForm.latitude !== null &&
-          addressForm.latitude !== ''
-            ? Number(addressForm.latitude)
-            : null,
-        longitude:
-          addressForm.longitude !== null &&
-          addressForm.longitude !== ''
-            ? Number(addressForm.longitude)
-            : null,
-        is_default: Boolean(addressForm.is_default),
-      };
-
-      if (payload.is_default) {
-        const { error: resetError } =
-          await supabase
-            .from('customer_addresses')
-            .update({
-              is_default: false,
-            })
-            .eq(
-              'user_id',
-              ownerUserId
-            );
-
-        if (resetError) {
-          throw resetError;
-        }
-      }
-
-      if (editingAddress?.id) {
-        const {
-          data,
-          error,
-        } = await supabase
-          .from('customer_addresses')
-          .update(payload)
-          .eq(
-            'id',
-            editingAddress.id
-          )
-          .eq(
-            'user_id',
-            ownerUserId
-          )
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        setAddresses((prev) =>
-          prev.map((item) => {
-            if (item.id === editingAddress.id) {
-              return data;
-            }
-            return payload.is_default ? { ...item, is_default: false } : item;
-          })
-        );
-
-        alert('Updated.');
-      } else {
-        const shouldBeDefault =
-          payload.is_default ||
-          addresses.length === 0;
-
-        const finalPayload = {
-          ...payload,
-          is_default:
-            shouldBeDefault,
-        };
-
-        if (shouldBeDefault && addresses.length > 0) {
-          await supabase
-            .from('customer_addresses')
-            .update({ is_default: false })
-            .eq('user_id', ownerUserId);
-        }
-
-        const {
-          data,
-          error,
-        } = await supabase
-          .from('customer_addresses')
-          .insert(finalPayload)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        setAddresses((prev) => {
-          const updatedList = prev.map((item) =>
-            shouldBeDefault ? { ...item, is_default: false } : item
-          );
-          return [...updatedList, data];
-        });
-
-        alert('Saved.');
-      }
-
-      setShowAddressForm(false);
-      setEditingAddress(null);
-      setAddressForm({
-        ...emptyAddressForm,
-      });
-
-      await loadAddresses();
-    } catch (error) {
-      console.error(
-        'Address save error:',
-        error
-      );
-
-      alert(`Error: ${error?.message || 'Failed'}`);
-    } finally {
-      setSavingAddress(false);
-    }
-  };
-
-
-  /* =======================================================
-     ADDRESS - DELETE
-  ======================================================= */
-
-  const handleDeleteAddress = async (address) => {
-    if (!address?.id) return;
-
-    const confirmed =
-      window.confirm('Delete address?');
-
-    if (!confirmed) return;
-
-    const ownerUserId = authUser?.id || user?.user_id;
-
-    try {
-      setDeletingAddressId(
-        address.id
-      );
-
-      const wasDefault =
-        Boolean(address.is_default);
-
-      const { error } =
-        await supabase
-          .from('customer_addresses')
-          .delete()
-          .eq(
-            'id',
-            address.id
-          )
-          .eq(
-            'user_id',
-            ownerUserId
-          );
-
-      if (error) throw error;
-
-      let remaining =
-        addresses.filter(
-          (item) =>
-            item.id !== address.id
-        );
-
-      if (
-        wasDefault &&
-        remaining.length > 0
-      ) {
-        const nextDefaultId =
-          remaining[0].id;
-
-        const {
-          data,
-          error: defaultError,
-        } = await supabase
-          .from('customer_addresses')
-          .update({
-            is_default: true,
-          })
-          .eq(
-            'id',
-            nextDefaultId
-          )
-          .eq(
-            'user_id',
-            ownerUserId
-          )
-          .select()
-          .single();
-
-        if (!defaultError && data) {
-          remaining = remaining.map((item) =>
-            item.id === nextDefaultId ? data : { ...item, is_default: false }
-          );
-        }
-      }
-
-      setAddresses(remaining);
-
-      alert('Deleted.');
-    } catch (error) {
-      console.error(
-        'Delete address error:',
-        error
-      );
-
-      alert(`Error: ${error?.message || 'Failed'}`);
-    } finally {
-      setDeletingAddressId(null);
-    }
-  };
-
-
-  /* =======================================================
-     ADDRESS - SET DEFAULT
-  ======================================================= */
-
-  const handleSetDefaultAddress = async (
-    address
-  ) => {
-    if (
-      !address?.id ||
-      address.is_default
-    ) {
-      return;
-    }
-
-    const ownerUserId = authUser?.id || user?.user_id;
-
-    try {
-      const {
-        error: resetError,
-      } = await supabase
-        .from('customer_addresses')
-        .update({
-          is_default: false,
-        })
-        .eq(
-          'user_id',
-          ownerUserId
-        );
-
-      if (resetError) {
-        throw resetError;
-      }
-
-      const {
-        data,
-        error,
-      } = await supabase
-        .from('customer_addresses')
-        .update({
-          is_default: true,
-        })
-        .eq(
-          'id',
-          address.id
-        )
-        .eq(
-          'user_id',
-          ownerUserId
-        )
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setAddresses((prev) =>
-        prev.map((item) => ({
-          ...item,
-          is_default:
-            item.id === data.id,
-        }))
-      );
-    } catch (error) {
-      console.error(
-        'Set default address error:',
-        error
-      );
-
-      alert(`Error: ${error?.message || 'Failed'}`);
-    }
-  };
-
-
- /* =======================================================
-     PROFILE - SAVE
-  ======================================================= */
-
-  const handleProfileSave = async () => {
-    if (!authUser?.id) return;
-
-    try {
-      setSavingProfile(true);
-
-      const payload = {
-        user_id: authUser.id,
-        full_name: profileForm.full_name?.trim() || null,
-        phone: profileForm.phone?.trim() || null,
-        interests: profileForm.interests?.trim() || null,
-        avatar_url: profileForm.avatar_url?.trim() || null,
-      };
-
-      const { data, error } = await supabase
-        .from('customer_profiles')
-        .upsert(payload, { onConflict: 'user_id' })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setUser((prev) => ({
-        ...prev,
-        ...data,
-      }));
-
-      setEditingProfile(false);
-
-      alert('Updated.');
-    } catch (error) {
-      console.error('Profile update error:', error);
-      alert(`Error: ${error?.message || 'Failed'}`);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-
-  /* =======================================================
      RATING (PER PRODUCT)
   ======================================================= */
 
@@ -1529,521 +960,275 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-stone-50 pb-28 md:pb-12 font-sans text-stone-900 selection:bg-emerald-500 selection:text-white text-xs">
+    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-stone-50/50 to-white pb-28 md:pb-12 font-sans text-stone-900 selection:bg-emerald-500 selection:text-white text-xs">
       <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
 
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-6">
+
+       
 
         {/* =================================================
-            TAB NAVIGATION BUTTONS
+            FILTERS & SEARCH SECTION
         ================================================= */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-1.5 mb-4 shadow-xs flex flex-row gap-1.5">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
-              activeTab === 'orders'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            title="Orders"
-          >
-            <Package className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Orders</span>
-            <span className="opacity-80">({orders.length})</span>
-          </button>
+        <div className="bg-white rounded-2xl border border-stone-200/80 shadow-xs p-4 mb-6 space-y-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            
+            {/* Status Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              {[
+                { id: 'all', label: 'All Orders' },
+                { id: 'active', label: 'Active' },
+                { id: 'delivered', label: 'Delivered' },
+                { id: 'cancelled', label: 'Cancelled' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3.5 py-2 rounded-xl font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === tab.id
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-          <button
-            onClick={() => setActiveTab('addresses')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
-              activeTab === 'addresses'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            title="Addresses"
-          >
-            <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Addresses</span>
-            <span className="opacity-80">({addresses.length})</span>
-          </button>
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold text-stone-400 hidden sm:inline">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-stone-100 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest">Highest Amount</option>
+              </select>
+            </div>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition-all cursor-pointer ${
-              activeTab === 'profile'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            title="Profile"
-          >
-            <UserCircle className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Profile</span>
-          </button>
+          {/* Search Input Bar */}
+          <div className="relative w-full pt-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-[calc(50%-2px)] w-4 h-4 text-stone-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by order ID, status, or item name..."
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-[calc(50%-2px)] text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
 
         {/* =================================================
-            TAB CONTENT: PROFILE (WITH AVATAR & EXTRA SETTINGS)
+            ORDERS LIST SECTION
         ================================================= */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'profile' && (
-            <motion.section
-              key="profile"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.15 }}
-              className="bg-white rounded-2xl border border-stone-200 shadow-xs mb-4 overflow-hidden"
-            >
-              <div className="p-4 sm:p-5 border-b border-stone-100 flex items-center justify-between gap-2 bg-stone-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
-                    <UserCircle className="w-4 h-4" />
-                  </div>
-                  <h2 className="font-black text-stone-900">Profile Settings</h2>
-                </div>
-
-                {!editingProfile && (
-                  <button
-                    onClick={() => setEditingProfile(true)}
-                    className="inline-flex items-center gap-1 text-[11px] font-black text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl transition cursor-pointer"
-                  >
-                    <Edit className="w-3 h-3" /> Edit
-                  </button>
-                )}
+        <section>
+          {loadingOrders ? (
+            <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
+              <p className="text-stone-500 font-bold">Loading your orders...</p>
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs space-y-3">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100">
+                <Package className="w-8 h-8" />
               </div>
-
-              <div className="p-4 sm:p-5">
-                {editingProfile ? (
-                  <div className="space-y-4 max-w-md">
-                    {/* AVATAR UPLOAD SECTION */}
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
-                        {profileForm.avatar_url ? (
-                          <img src={profileForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <UserCircle className="w-8 h-8 text-stone-400" />
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="inline-flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition shadow-2xs">
-                          <Upload size={12} /> {uploadingAvatar ? 'Uploading...' : 'Upload Picture'}
-                          <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                        </label>
-                        <p className="text-[10px] text-stone-400 font-medium">PNG, JPG up to 5MB</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={profileForm.full_name}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))}
-                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={profileForm.phone}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
-                        maxLength={10}
-                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Interests</label>
-                      <input
-                        type="text"
-                        value={profileForm.interests}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, interests: e.target.value }))}
-                        placeholder="e.g. Groceries, Organic"
-                        className="w-full border border-stone-200 bg-stone-50 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black text-stone-500 uppercase mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={authUser?.email || ''}
-                        disabled
-                        className="w-full border border-stone-200 bg-stone-100 rounded-xl px-3 py-2 text-xs text-stone-500 cursor-not-allowed font-medium"
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        onClick={() => setEditingProfile(false)}
-                        className="px-3 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 font-bold cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleProfileSave}
-                        disabled={savingProfile}
-                        className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 inline-flex items-center gap-1 font-bold cursor-pointer"
-                      >
-                        {savingProfile && <Loader2 className="w-3 h-3 animate-spin" />}
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
-                        {user?.avatar_url ? (
-                          <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <UserCircle className="w-8 h-8 text-stone-400" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-black text-stone-900 text-sm">{user?.full_name || 'Customer'}</p>
-                        <p className="text-[11px] text-stone-400 font-medium">{authUser?.email || '-'}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-stone-100">
-                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Phone</p>
-                        <p className="font-bold text-stone-900">{user?.phone || 'Not provided'}</p>
-                      </div>
-                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <p className="text-stone-400 text-[10px] font-black uppercase mb-0.5">Interests</p>
-                        <p className="font-bold text-stone-900">{user?.interests || 'Not provided'}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div>
+                <h3 className="font-black text-stone-900 text-sm">No orders found</h3>
+                <p className="text-stone-400 text-xs mt-1">Try adjusting your filters or search terms.</p>
               </div>
-            </motion.section>
-          )}
-
-
-          {/* =================================================
-              TAB CONTENT: ADDRESSES
-          ================================================= */}
-          {activeTab === 'addresses' && (
-            <motion.section
-              key="addresses"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.15 }}
-              className="bg-white rounded-2xl border border-stone-200 shadow-xs mb-4 overflow-hidden"
-            >
-              <div className="p-4 sm:p-5 border-b border-stone-100 flex items-center justify-between gap-2 bg-stone-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <h2 className="font-black text-stone-900">Saved Addresses</h2>
-                </div>
-
+              {!searchTerm && statusFilter === 'all' && (
                 <button
-                  onClick={handleAddAddress}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black transition cursor-pointer shadow-xs"
+                  onClick={() => navigate('/')}
+                  className="mt-2 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 cursor-pointer transition active:scale-95"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add
+                  Start Shopping
                 </button>
-              </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredOrders.map((order) => {
+                const orderId = getOrderId(order);
+                const status = getOrderStatus(order);
+                const items = Array.isArray(order?.order_items) ? order.order_items : [];
+                const subtotal = getOrderItemsSubtotal(order);
+                const total = getOrderTotal(order);
+                const expanded = Boolean(expandedOrders[orderId]);
+                const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
+                const isCancelled = normalizeOrderStatus(status) === 'CANCELLED';
+                const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
 
-              <div className="p-4 sm:p-5">
-                {addresses.length === 0 ? (
-                  <div className="text-center py-10 bg-stone-50 rounded-xl border border-dashed border-stone-200">
-                    <MapPin className="w-8 h-8 text-stone-300 mx-auto mb-1.5" />
-                    <p className="text-stone-600 font-bold">No saved addresses</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {addresses.map((address) => (
-                      <div
-                        key={address.id}
-                        className={`border rounded-xl p-3.5 transition-all relative ${
-                          address.is_default
-                            ? 'border-blue-500 bg-blue-50/20'
-                            : 'border-stone-200 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Home className="w-4 h-4 text-blue-600 shrink-0" />
-                            <span className="font-black text-stone-900">
-                              {address.title || 'Address'}
-                            </span>
-                            {address.is_default && (
-                              <span className="text-[9px] px-2 py-0.5 rounded-md bg-blue-600 text-white font-black">
-                                Default
-                              </span>
-                            )}
+                return (
+                  <motion.div
+                    key={orderId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-3xl border border-stone-200/90 shadow-xs hover:shadow-md transition duration-300 overflow-hidden"
+                  >
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                            isDelivered ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                            isCancelled ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                            'bg-amber-50 text-amber-600 border border-amber-100'
+                          }`}>
+                            <Package className="w-6 h-6" />
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-black text-stone-900 text-sm">
+                                {getDisplayOrderId(order)}
+                              </span>
+                              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider ${
+                                isDelivered ? 'bg-emerald-100 text-emerald-800' : 
+                                isCancelled ? 'bg-rose-100 text-rose-800' : 
+                                'bg-amber-100 text-amber-800 animate-pulse'
+                              }`}>
+                                {formatStatus(status)}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-stone-400 mt-1 flex items-center gap-1 font-medium">
+                              <Clock size={12} /> {formatDateTime(order?.created_at)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="font-black text-emerald-700 text-base">{formatCurrency(total)}</span>
+                          <span className="text-[11px] text-stone-400 block font-bold">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+
+                      {/* ── OTP BANNER ── */}
+                      {!isDelivered && !isCancelled && (
+                        <div className="mt-4 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between shadow-xs">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                            <ShieldCheck size={14} className="text-emerald-600" /> Delivery Verification OTP:
+                          </span>
+                          <span className="font-mono font-black text-sm text-emerald-700 tracking-widest bg-white px-3 py-1 rounded-xl border border-emerald-200 shadow-2xs">
+                            {order?.otp || '----'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-stone-100 gap-2 flex-wrap">
+                        <button
+                          onClick={() => toggleOrder(orderId)}
+                          className="text-xs text-stone-600 hover:text-emerald-700 inline-flex items-center gap-1.5 font-bold cursor-pointer bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-xl transition"
+                        >
+                          <span>{expanded ? 'Hide Items' : 'View Ordered Items'}</span>
+                          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isPending && (
                             <button
-                              onClick={() => handleEditAddress(address)}
-                              className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
-                              title="Edit"
+                              onClick={() => handleCancelOrder(order)}
+                              disabled={cancellingOrderId === orderId}
+                              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-black text-rose-700 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5 transition"
                             >
-                              <Edit className="w-3.5 h-3.5" />
+                              {cancellingOrderId === orderId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                              <span>Cancel Order</span>
                             </button>
+                          )}
+
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-black cursor-pointer shadow-sm transition"
+                          >
+                            Track & Details
+                          </button>
+
+                          {isDelivered && (
                             <button
-                              onClick={() => handleDeleteAddress(address)}
-                              disabled={deletingAddressId === address.id}
-                              className="p-1.5 rounded-lg bg-stone-100 hover:bg-rose-100 text-stone-600 hover:text-rose-600 disabled:opacity-50 cursor-pointer"
-                              title="Delete"
+                              onClick={() => handleReorder(order)}
+                              disabled={reorderingOrderId === orderId}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-600/20 transition active:scale-95"
                             >
-                              {deletingAddressId === address.id ? (
+                              {reorderingOrderId === orderId ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <RefreshCw className="w-3.5 h-3.5" />
                               )}
+                              <span>Reorder</span>
                             </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 space-y-1 text-stone-600">
-                          <p className="font-medium">
-                            {[address.house_no, address.ward_no_name, address.address].filter(Boolean).join(', ')}
-                          </p>
-                          <p className="text-stone-400">
-                            {[address.city, address.state, address.pincode].filter(Boolean).join(', ')}
-                          </p>
-                          {address.phone && (
-                            <p className="text-stone-700 flex items-center gap-1 pt-0.5 font-bold">
-                              <Phone className="w-3 h-3 text-blue-600" /> {address.phone}
-                            </p>
                           )}
                         </div>
-
-                        {!address.is_default && (
-                          <div className="mt-3 pt-2 border-t border-stone-100 flex justify-end">
-                            <button
-                              onClick={() => handleSetDefaultAddress(address)}
-                              className="text-[11px] text-blue-600 hover:text-blue-700 font-black cursor-pointer inline-flex items-center gap-1"
-                            >
-                              Set Default <ArrowRight size={11} />
-                            </button>
-                          </div>
-                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.section>
-          )}
+                    </div>
 
+                    <AnimatePresence>
+                      {expanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="border-t border-stone-100 bg-stone-50/70 p-4 space-y-2.5"
+                        >
+                          {items.map((item, index) => {
+                            const product = item?.products;
+                            const variant = findOrderItemVariant(item, product);
+                            const image =
+                              product?.image_url ||
+                              product?.image ||
+                              product?.images?.[0] ||
+                              product?.gallery?.[0] ||
+                              '';
 
-          {/* =================================================
-              TAB CONTENT: ORDERS
-          ================================================= */}
-          {activeTab === 'orders' && (
-            <motion.section
-              key="orders"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.15 }}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                <div>
-                  <h2 className="font-black text-stone-900 text-sm">My Orders</h2>
-                </div>
-
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search orders..."
-                    className="w-full bg-white border border-stone-200 rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-
-              {loadingOrders ? (
-                <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-emerald-600 mx-auto mb-2" />
-                  <p className="text-stone-500 font-bold">Loading orders...</p>
-                </div>
-              ) : filteredOrders.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
-                  <Package className="w-10 h-10 text-stone-300 mx-auto mb-2" />
-                  <p className="font-black text-stone-900">No orders found</p>
-                  {!searchTerm && (
-                    <button
-                      onClick={() => navigate('/')}
-                      className="mt-3 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
-                    >
-                      Shop Now
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredOrders.map((order) => {
-                    const orderId = getOrderId(order);
-                    const status = getOrderStatus(order);
-                    const items = Array.isArray(order?.order_items) ? order.order_items : [];
-                    const subtotal = getOrderItemsSubtotal(order);
-                    const total = getOrderTotal(order);
-                    const expanded = Boolean(expandedOrders[orderId]);
-                    const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
-                    const isCancelled = normalizeOrderStatus(status) === 'CANCELLED';
-                    const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
-
-                    return (
-                      <div
-                        key={orderId}
-                        className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden"
-                      >
-                        <div className="p-3.5 sm:p-4">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <Package className="w-5 h-5" />
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-black text-stone-900">
-                                    {getDisplayOrderId(order)}
-                                  </span>
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-md font-black uppercase tracking-wider ${
-                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : isCancelled ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {formatStatus(status)}
-                                  </span>
-                                </div>
-                                <p className="text-[10px] text-stone-400 mt-0.5 flex items-center gap-1 font-medium">
-                                  <Clock size={11} /> {formatDateTime(order?.created_at)}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="text-right shrink-0">
-                              <span className="font-black text-emerald-700 text-sm">{formatCurrency(total)}</span>
-                              <span className="text-[10px] text-stone-400 block font-medium">{items.length} items</span>
-                            </div>
-                          </div>
-
-                          {/* ── OTP BANNER ── */}
-                          {!isDelivered && !isCancelled && (
-                            <div className="mt-3 bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between">
-                              <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
-                                <ShieldCheck size={12} /> OTP:
-                              </span>
-                              <span className="font-mono font-black text-sm text-emerald-700 tracking-wider">
-                                {order?.otp || '----'}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100 gap-2 flex-wrap">
-                            <button
-                              onClick={() => toggleOrder(orderId)}
-                              className="text-[11px] text-stone-600 hover:text-emerald-700 inline-flex items-center gap-1 font-bold cursor-pointer"
-                            >
-                              <span>{expanded ? 'Hide Items' : 'View Items'}</span>
-                              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            </button>
-
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {isPending && (
-                                <button
-                                  onClick={() => handleCancelOrder(order)}
-                                  disabled={cancellingOrderId === orderId}
-                                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-[11px] font-black text-rose-700 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1"
-                                >
-                                  {cancellingOrderId === orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
-                                  <span>Cancel</span>
-                                </button>
-                              )}
-
-                              <button
-                                onClick={() => setSelectedOrder(order)}
-                                className="px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-[11px] font-black text-stone-800 cursor-pointer"
+                            return (
+                              <div
+                                key={item?.id || index}
+                                className="bg-white rounded-2xl border border-stone-200/80 p-3 flex items-center gap-3.5 shadow-2xs"
                               >
-                                Track / Details
-                              </button>
-
-                              {isDelivered && (
-                                <button
-                                  onClick={() => handleReorder(order)}
-                                  disabled={reorderingOrderId === orderId}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black disabled:opacity-50 cursor-pointer"
-                                >
-                                  {reorderingOrderId === orderId ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
+                                  {image ? (
+                                    <img src={image} alt="" className="w-full h-full object-contain" />
                                   ) : (
-                                    <RefreshCw className="w-3 h-3" />
+                                    <Package className="w-5 h-5 text-stone-300" />
                                   )}
-                                  <span>Reorder</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {expanded && (
-                          <div className="border-t border-stone-100 bg-stone-50/70 p-3 space-y-2">
-                            {items.map((item, index) => {
-                              const product = item?.products;
-                              const variant = findOrderItemVariant(item, product);
-                              const image =
-                                product?.image_url ||
-                                product?.image ||
-                                product?.images?.[0] ||
-                                product?.gallery?.[0] ||
-                                '';
-
-                              return (
-                                <div
-                                  key={item?.id || index}
-                                  className="bg-white rounded-xl border border-stone-200/80 p-2.5 flex items-center gap-3"
-                                >
-                                  <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
-                                    {image ? (
-                                      <img src={image} alt="" className="w-full h-full object-contain" />
-                                    ) : (
-                                      <Package className="w-4 h-4 text-stone-300" />
-                                    )}
-                                  </div>
-
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-stone-900 truncate">
-                                      {product?.name || 'Product'}
-                                    </p>
-                                    {variant && (
-                                      <p className="text-[10px] text-stone-500 font-medium">{getVariantLabel(variant)}</p>
-                                    )}
-                                    <p className="text-[10px] text-stone-400 font-bold">Qty: {Number(item?.quantity) || 1}</p>
-                                  </div>
-
-                                  <div className="text-right shrink-0">
-                                    <p className="font-black text-stone-900">{formatCurrency(item?.price)}</p>
-                                  </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </motion.section>
+
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-stone-900 text-xs truncate">
+                                    {product?.name || 'Product'}
+                                  </p>
+                                  {variant && (
+                                    <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
+                                  )}
+                                  <p className="text-[10px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <p className="font-black text-stone-900 text-xs">{formatCurrency(item?.price)}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </div>
           )}
-        </AnimatePresence>
+        </section>
 
       </main>
 
@@ -2064,32 +1249,12 @@ const CustomerOrdersPage = () => {
           </button>
 
           <button
-            onClick={() => { setActiveTab('orders'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className="flex flex-col items-center p-1.5 cursor-pointer group"
             title="Orders"
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'orders' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
               <Package size={18} />
-            </div>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('addresses'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-1.5 cursor-pointer group"
-            title="Addresses"
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'addresses' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <MapPin size={18} />
-            </div>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-1.5 cursor-pointer group"
-            title="Profile"
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === 'profile' ? 'bg-purple-600 text-white' : 'bg-stone-100 text-stone-700'}`}>
-              <UserCircle size={18} />
             </div>
           </button>
         </div>
@@ -2100,193 +1265,40 @@ const CustomerOrdersPage = () => {
 
 
       {/* ===================================================
-          ADDRESS MODAL
-      =================================================== */}
-
-      {showAddressForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100">
-            <div className="sticky top-0 bg-white border-b border-stone-100 px-4 py-3 flex items-center justify-between z-10">
-              <h2 className="font-black text-stone-900">
-                {editingAddress ? 'Edit Address' : 'Add Address'}
-              </h2>
-              <button
-                onClick={() => {
-                  setShowAddressForm(false);
-                  setEditingAddress(null);
-                }}
-                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddressSubmit} className="p-4 space-y-3">
-              <div>
-                <label className="block font-bold text-stone-600 mb-1">Label</label>
-                <select
-                  value={addressForm.title}
-                  onChange={(e) => setAddressForm((prev) => ({ ...prev, title: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                >
-                  <option value="Home">Home</option>
-                  <option value="Work">Work</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">House / Flat *</label>
-                  <input
-                    type="text"
-                    value={addressForm.house_no}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, house_no: e.target.value }))}
-                    required
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Area / Locality</label>
-                  <input
-                    type="text"
-                    value={addressForm.ward_no_name}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, ward_no_name: e.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-stone-600 mb-1">Landmark / Street</label>
-                <textarea
-                  value={addressForm.address}
-                  onChange={(e) => setAddressForm((prev) => ({ ...prev, address: e.target.value }))}
-                  rows={2}
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 resize-none font-medium"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">City *</label>
-                  <input
-                    type="text"
-                    value={addressForm.city}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, city: e.target.value }))}
-                    required
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">State *</label>
-                  <input
-                    type="text"
-                    value={addressForm.state}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, state: e.target.value }))}
-                    required
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Pincode *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={addressForm.pincode}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, pincode: e.target.value.replace(/\D/g, '') }))}
-                    required
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={addressForm.phone}
-                    onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 font-medium"
-                  />
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={Boolean(addressForm.is_default)}
-                  onChange={(e) => setAddressForm((prev) => ({ ...prev, is_default: e.target.checked }))}
-                  className="h-3.5 w-3.5 rounded border-stone-300 text-blue-600"
-                />
-                <span className="text-stone-700 font-bold">Default Address</span>
-              </label>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddressForm(false);
-                    setEditingAddress(null);
-                  }}
-                  className="px-3.5 py-2 rounded-xl border border-stone-200 text-stone-700 font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingAddress}
-                  className="px-4.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 font-bold cursor-pointer inline-flex items-center gap-1"
-                >
-                  {savingAddress && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
-      {/* ===================================================
           ORDER DETAILS & TRACKING MODAL
       =================================================== */}
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100"
           >
-            <div className="sticky top-0 z-10 bg-white border-b border-stone-100 px-4 py-3 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
               <div>
-                <h2 className="font-black text-stone-900">
+                <h2 className="font-black text-stone-900 text-sm">
                   Order {getDisplayOrderId(selectedOrder)}
                 </h2>
-                <p className="text-[10px] text-stone-400">
+                <p className="text-[11px] text-stone-400 font-medium">
                   {formatDateTime(selectedOrder?.created_at)}
                 </p>
               </div>
 
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
+                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-6 space-y-5">
               {/* TRACKING PROGRESS */}
-              <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                <h3 className="font-black text-stone-900 mb-3 text-[10px] uppercase">Tracking</h3>
+              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                <h3 className="font-black text-stone-900 mb-3 text-[11px] uppercase tracking-wider">Live Tracking Status</h3>
                 <div className="overflow-x-auto pb-1">
-                  <div className="flex min-w-[400px]">
+                  <div className="flex min-w-[420px]">
                     {getTrackingSteps(selectedOrder).map((step, index, allSteps) => {
                       const Icon = step.icon;
 
@@ -2294,18 +1306,18 @@ const CustomerOrdersPage = () => {
                         <div key={step.key} className="flex-1 relative">
                           <div className="flex items-center">
                             <div
-                              className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 ${
+                              className={`w-8 h-8 rounded-full flex items-center justify-center border shrink-0 transition-all ${
                                 step.completed || step.active
-                                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/30'
                                   : 'bg-white border-stone-300 text-stone-400'
                               }`}
                             >
-                              <Icon className="w-3 h-3" />
+                              <Icon className="w-3.5 h-3.5" />
                             </div>
 
                             {index < allSteps.length - 1 && (
                               <div
-                                className={`h-0.5 flex-1 mx-1 rounded-full ${
+                                className={`h-1 flex-1 mx-1.5 rounded-full ${
                                   step.completed ? 'bg-emerald-600' : 'bg-stone-200'
                                 }`}
                               />
@@ -2313,8 +1325,8 @@ const CustomerOrdersPage = () => {
                           </div>
 
                           <p
-                            className={`text-[10px] mt-1.5 font-bold truncate ${
-                              step.active ? 'text-emerald-700' : 'text-stone-500'
+                            className={`text-[11px] mt-2 font-bold truncate ${
+                              step.active ? 'text-emerald-700 font-black' : 'text-stone-500'
                             }`}
                           >
                             {step.label}
@@ -2328,11 +1340,11 @@ const CustomerOrdersPage = () => {
 
               {/* ── OTP BANNER IN MODAL ── */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
-                    <ShieldCheck size={13} /> Delivery OTP:
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-600" /> Delivery Verification OTP:
                   </span>
-                  <span className="font-mono font-black text-base text-emerald-700 tracking-wider">
+                  <span className="font-mono font-black text-lg text-emerald-700 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
                     {selectedOrder?.otp || '----'}
                   </span>
                 </div>
@@ -2340,17 +1352,17 @@ const CustomerOrdersPage = () => {
 
               {/* FULFILLMENT DURATION */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (
-                <div className="bg-emerald-600 text-white rounded-xl p-3 flex items-center justify-between">
-                  <span className="font-bold flex items-center gap-1">
-                    <Check size={14} /> Delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
+                  <span className="font-black flex items-center gap-2 text-xs">
+                    <CheckCircle2 size={18} /> Successfully delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
                   </span>
                 </div>
               )}
 
               {/* ITEMS IN MODAL */}
               <div>
-                <h3 className="font-black text-stone-900 mb-2 text-[10px] uppercase">Items</h3>
-                <div className="space-y-2">
+                <h3 className="font-black text-stone-900 mb-3 text-[11px] uppercase tracking-wider">Ordered Items</h3>
+                <div className="space-y-2.5">
                   {(Array.isArray(selectedOrder?.order_items) ? selectedOrder.order_items : []).map((item, index) => {
                     const product = item?.products;
                     const variant = findOrderItemVariant(item, product);
@@ -2364,28 +1376,28 @@ const CustomerOrdersPage = () => {
                     return (
                       <div
                         key={item?.id || index}
-                        className="flex items-center gap-3 border border-stone-200/80 rounded-xl p-2.5 bg-white"
+                        className="flex items-center gap-3.5 border border-stone-200/80 rounded-2xl p-3 bg-white shadow-2xs"
                       >
-                        <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
+                        <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
                           {image ? (
                             <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
-                            <Package className="w-4 h-4 text-stone-300" />
+                            <Package className="w-5 h-5 text-stone-300" />
                           )}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-stone-900 truncate">
+                          <p className="font-black text-stone-900 text-xs truncate">
                             {product?.name || 'Product'}
                           </p>
                           {variant && (
-                            <p className="text-[10px] text-stone-500 font-medium">{getVariantLabel(variant)}</p>
+                            <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
                           )}
-                          <p className="text-[10px] text-stone-400 font-bold">Qty: {Number(item?.quantity) || 1}</p>
+                          <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <p className="font-black text-stone-900">{formatCurrency(item?.price)}</p>
+                          <p className="font-black text-stone-900 text-xs">{formatCurrency(item?.price)}</p>
                         </div>
                       </div>
                     );
@@ -2394,81 +1406,81 @@ const CustomerOrdersPage = () => {
               </div>
 
               {/* ADDRESS & PAYMENT INFO */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="bg-stone-50 rounded-xl p-3 border border-stone-200/70">
-                  <h4 className="font-black text-stone-600 mb-1 flex items-center gap-1 text-[10px] uppercase">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Address
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
+                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Delivery Address
                   </h4>
-                  <p className="text-stone-700 font-medium leading-relaxed">
+                  <p className="text-stone-700 font-medium leading-relaxed text-xs">
                     {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
                   </p>
                 </div>
 
-                <div className="bg-stone-50 rounded-xl p-3 border border-stone-200/70">
-                  <h4 className="font-black text-stone-600 mb-1 flex items-center gap-1 text-[10px] uppercase">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment
+                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
+                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment Info
                   </h4>
-                  <p className="font-bold text-stone-900">COD</p>
-                  <p className={`font-black text-[10px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid' : 'Pending'}
+                  <p className="font-black text-stone-900 text-xs">Cash on Delivery (COD)</p>
+                  <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid / Completed' : 'Pending Payment'}
                   </p>
                 </div>
               </div>
 
               {/* BILLING BREAKDOWN */}
-              <div className="border-t border-stone-200 pt-3 space-y-1.5 px-0.5">
-                <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Subtotal</span>
+              <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/70 space-y-2">
+                <div className="flex justify-between text-stone-600 font-medium text-xs">
+                  <span>Items Subtotal</span>
                   <span>{formatCurrency(getOrderItemsSubtotal(selectedOrder))}</span>
                 </div>
 
                 {getDiscount(selectedOrder) > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>Discount</span>
+                  <div className="flex justify-between text-emerald-600 font-bold text-xs">
+                    <span>Discount Applied</span>
                     <span>-{formatCurrency(getDiscount(selectedOrder))}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between text-stone-600 font-medium">
-                  <span>Delivery</span>
+                <div className="flex justify-between text-stone-600 font-medium text-xs">
+                  <span>Delivery Charges</span>
                   <span>{getDeliveryCharge(selectedOrder) > 0 ? formatCurrency(getDeliveryCharge(selectedOrder)) : 'FREE'}</span>
                 </div>
 
-                <div className="flex justify-between pt-2 border-t border-stone-200 font-black text-sm">
-                  <span>Total</span>
-                  <span className="text-emerald-700">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                <div className="flex justify-between pt-3 border-t border-stone-200 font-black text-sm">
+                  <span className="text-stone-900">Total Amount</span>
+                  <span className="text-emerald-700 text-base">{formatCurrency(getOrderTotal(selectedOrder))}</span>
                 </div>
               </div>
 
               {/* MODAL ACTIONS */}
-              <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-stone-100">
+              <div className="flex flex-wrap justify-end gap-2.5 pt-2">
                 {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && (
                   <>
                     <button
                       onClick={() => setInvoiceOrder(selectedOrder)}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-stone-300 hover:bg-stone-50 font-bold text-stone-800 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 font-black text-stone-800 cursor-pointer transition text-xs shadow-2xs"
                     >
-                      <FileText className="w-3.5 h-3.5 text-emerald-600" /> Invoice
+                      <FileText className="w-4 h-4 text-emerald-600" /> Download Invoice
                     </button>
 
                     <button
                       onClick={() => openRatingModal(selectedOrder)}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 font-bold cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 font-black cursor-pointer transition text-xs shadow-2xs"
                     >
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" /> Rate
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-500" /> Rate Order
                     </button>
 
                     <button
                       onClick={() => handleReorder(selectedOrder)}
                       disabled={reorderingOrderId === getOrderId(selectedOrder)}
-                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-bold cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-600/20 active:scale-95"
                     >
                       {reorderingOrderId === getOrderId(selectedOrder) ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <RefreshCw className="w-4 h-4" />
                       )}
-                      <span>Reorder</span>
+                      <span>Reorder All</span>
                     </button>
                   </>
                 )}
@@ -2484,23 +1496,27 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {ratingOrder && (
-        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100">
-            <div className="p-4 border-b border-stone-100 flex items-center justify-between bg-stone-50 sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100"
+          >
+            <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="font-black text-stone-900">Rate Products</h2>
-                <p className="text-[10px] text-stone-400">Order {getDisplayOrderId(ratingOrder)}</p>
+                <h2 className="font-black text-stone-900 text-sm">Rate & Review Products</h2>
+                <p className="text-[11px] text-stone-400 font-medium">Order {getDisplayOrderId(ratingOrder)}</p>
               </div>
 
               <button
                 onClick={() => setRatingOrder(null)}
-                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
+                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-6 space-y-4">
               <div className="space-y-3">
                 {(Array.isArray(ratingOrder?.order_items) ? ratingOrder.order_items : []).map((item, index) => {
                   const product = item?.products;
@@ -2511,69 +1527,69 @@ const CustomerOrdersPage = () => {
                   const image = product?.image_url || product?.image || product?.images?.[0] || '';
 
                   return (
-                    <div key={prodId || index} className="p-3 bg-stone-50 rounded-xl border border-stone-200/80 space-y-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center overflow-hidden shrink-0 border border-stone-200">
+                    <div key={prodId || index} className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 space-y-3 shadow-2xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-stone-200 shadow-2xs">
                           {image ? (
                             <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
-                            <Package className="w-4 h-4 text-stone-300" />
+                            <Package className="w-5 h-5 text-stone-300" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-black text-stone-900 truncate">{product?.name || 'Product'}</p>
-                          <p className="text-[10px] text-stone-400">Qty: {item.quantity}</p>
+                          <p className="font-black text-stone-900 text-xs truncate">{product?.name || 'Product'}</p>
+                          <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {item.quantity}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 pt-1">
+                      <div className="flex items-center gap-1.5 pt-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
                             type="button"
                             onClick={() => handleProductRatingChange(prodId, 'rating', star)}
-                            className="cursor-pointer"
+                            className="cursor-pointer hover:scale-110 transition-transform"
                           >
                             <Star
-                              className={`w-5 h-5 ${
+                              className={`w-6 h-6 ${
                                 star <= currentData.rating ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
                               }`}
                             />
                           </button>
                         ))}
-                        <span className="ml-1 text-[11px] font-black text-stone-700">{currentData.rating}/5</span>
+                        <span className="ml-2 text-xs font-black text-stone-700 bg-amber-100 text-amber-900 px-2 py-0.5 rounded-lg">{currentData.rating}/5 Stars</span>
                       </div>
 
                       <input
                         type="text"
                         value={currentData.comment}
                         onChange={(e) => handleProductRatingChange(prodId, 'comment', e.target.value)}
-                        placeholder="Write a review..."
-                        className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                        placeholder="Write a helpful review for this product..."
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium transition"
                       />
                     </div>
                   );
                 })}
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-100">
                 <button
                   onClick={() => setRatingOrder(null)}
-                  className="px-3.5 py-2 rounded-xl border border-stone-200 font-bold text-stone-700 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-stone-200 font-black text-stone-700 cursor-pointer hover:bg-stone-100 transition text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitAllProductRatings}
                   disabled={savingRating}
-                  className="px-4.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-bold inline-flex items-center gap-1 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition text-xs"
                 >
-                  {savingRating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Submit Reviews
+                  {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Submit All Reviews
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 

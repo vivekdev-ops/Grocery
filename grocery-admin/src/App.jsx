@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, LogOut, Store, Truck,
   Tag, Image, MessageSquareQuote, FolderTree, Flame, MapPin, MessageSquare,
   PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, TrendingUp,
-  Sparkles, Search, Moon, Sun, Power
+  Sparkles, Search, Moon, Sun, Power, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,6 +41,11 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
 import AdminReports from './components/AdminReports';
 import CustomerOrdersPage from './components/CustomerOrdersPage';
+import ProfilePage from './components/pages/ProfilePage';
+import AddressBookPage from './components/pages/AddressBookPage';
+import WishlistPage from './components/pages/WishlistPage';
+import AboutPage from './components/pages/AboutPage';
+import AdminAboutUs from './components/AdminAboutUs';
 
 
 /* ─────────────────────────────────────────────
@@ -300,6 +305,7 @@ function AdminLayout() {
         { id: 'deliveryFees',   label: 'Delivery Fees',   icon: Truck },
         { id: 'storeLocation',  label: 'Store Location',  icon: MapPin },
         { id: 'storeStatus',    label: 'Portal Status & Maintenance', icon: Power },
+        { id: 'about_us', label: 'About Us Page', icon: FileText },
       ],
     },
     {
@@ -320,7 +326,7 @@ function AdminLayout() {
       categories: <CategoryManager />, orders: <Orders />, staff: <Staff />,
       customers: <CustomerManagement />, shopkeeperDetails: <ShopkeeperDetailsAdmin />,
       deliveryFees: <DeliveryFeeManager />, storeLocation: <StoreLocationManager />,
-      storeStatus: <StoreStatusManager />,
+      storeStatus: <StoreStatusManager />, about_us: <AdminAboutUs />,
       coupons: <CouponManager />, banners: <BannerManager />, flashSales: <FlashSaleManager />,
       testimonials: <TestimonialManager />, feedback: <AdminFeedbacks />,
     };
@@ -547,6 +553,10 @@ function AnimatedRoutes() {
         <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
         <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />
         <Route path="/account/orders" element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
+        <Route path="/account/profile" element={<ProfilePage />} />
+        <Route path="/account/wishlist" element={<WishlistPage />} />
+        <Route path="/account/address" element={<AddressBookPage />} />
+        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </AnimatePresence>
   );

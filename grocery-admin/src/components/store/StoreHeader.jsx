@@ -1,6 +1,6 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect, useRef } from 'react';
-import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree, UserCircle } from 'lucide-react';
+import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree, UserCircle, Heart, Info, Share2, FileText, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -318,17 +318,54 @@ export default function StoreHeader({
                           <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
                         </div>
                       </div>
+
                       <div className="py-1">
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Package size={15} className="text-stone-400" /> My Orders
+                        {/* 1. Profile */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <User size={15} className="text-stone-400" /> Profile
                         </button>
+                        {/* 2. Orders */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <MapPin size={15} className="text-stone-400" /> Saved Addresses
+                          <Package size={15} className="text-stone-400" /> Orders
+                        </button>
+                        {/* 3. Address Book */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/address'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <MapPin size={15} className="text-stone-400" /> Address Book
+                        </button>
+                        {/* 4. Wishlist */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <Heart size={15} className="text-stone-400" /> Wishlist
+                        </button>
+                        {/* 5. Share the app */}
+                        <button onClick={() => { 
+                          setIsAccountMenuOpen(false); 
+                          if (navigator.share) {
+                            navigator.share({ title: 'KD Store', url: window.location.origin }).catch(() => {});
+                          } else {
+                            navigator.clipboard.writeText(window.location.origin);
+                            alert('App link copied to clipboard!');
+                          }
+                        }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <Share2 size={15} className="text-stone-400" /> Share the app
+                        </button>
+                        {/* 6. Term and condition */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/terms'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <FileText size={15} className="text-stone-400" /> Term and condition
+                        </button>
+                        {/* 7. Privacy Policy */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <Shield size={15} className="text-stone-400" /> Privacy Policy
+                        </button>
+                        {/* 8. About Us */}
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/about'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
+                          <Info size={15} className="text-stone-400" /> About Us
                         </button>
                       </div>
+
+                      {/* 9. Logout */}
                       <div className="border-t border-stone-100 pt-1 mt-1">
                         <button onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }} className="w-full text-left px-5 py-2.5 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-3 transition cursor-pointer">
-                          <LogOut size={15} /> Log Out
+                          <LogOut size={15} /> Logout
                         </button>
                       </div>
                     </motion.div>
@@ -418,10 +455,10 @@ export default function StoreHeader({
               {session ? (
                 <div className="pt-3 border-t border-stone-100 flex flex-col gap-2">
                   <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left py-2 font-bold text-stone-700 flex items-center gap-2">
-                    <Package size={16} /> My Orders
+                    <Package size={16} /> Orders
                   </button>
                   <button onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }} className="w-full text-left py-2 font-bold text-rose-600 flex items-center gap-2">
-                    <LogOut size={16} /> Log Out
+                    <LogOut size={16} /> Logout
                   </button>
                 </div>
               ) : (
