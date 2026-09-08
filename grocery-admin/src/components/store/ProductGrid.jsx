@@ -223,7 +223,6 @@ export default function ProductGrid({
   const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
 
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
-  const [mobileSubDrawerOpen, setMobileSubDrawerOpen] = useState(false);
 
   return (
     <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-20 md:pb-12 text-slate-900 overflow-visible">
@@ -312,22 +311,6 @@ export default function ProductGrid({
       {isAnyCategorySelected ? (
         <div className="grid grid-cols-1 md:grid-cols-[15%_85%] gap-4 items-start">
           
-          {/* MOBILE TOGGLE BUTTON FOR SUBCATEGORIES */}
-          {!query && currentSubcategories.length > 0 && (
-            <div className="md:hidden col-span-full flex items-center justify-between bg-white px-3 py-2.5 rounded-xl border border-stone-200 shadow-2xs">
-              <span className="text-xs font-black text-stone-900 truncate">
-                {activeSubcategoryObj ? activeSubcategoryObj.name : activeCategoryObj?.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => setMobileSubDrawerOpen(true)}
-                className="bg-emerald-50 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                <LayoutGrid size={12} /> Subcategories
-              </button>
-            </div>
-          )}
-
           {/* DESKTOP 15% VERTICAL SUB-SIDEBAR (FULL CIRCLE IMAGES) */}
           {!query && currentSubcategories.length > 0 && (
             <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-stone-200/90 p-1.5 space-y-1 shadow-2xs sticky top-16">
@@ -370,34 +353,53 @@ export default function ProductGrid({
             </div>
           )}
 
-          {/* MOBILE DRAWER FOR SUBCATEGORIES */}
-          <AnimatePresence>
-            {mobileSubDrawerOpen && (
-              <>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileSubDrawerOpen(false)} className="fixed inset-0 bg-slate-950/60 z-[150] md:hidden" />
-                <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 250 }} className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[160] p-4 space-y-3 max-h-[75vh] overflow-y-auto md:hidden shadow-2xl border-t border-emerald-100">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                    <h4 className="font-black text-xs uppercase tracking-wider text-stone-900">Subcategories</h4>
-                    <button type="button" onClick={() => setMobileSubDrawerOpen(false)} className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 font-bold text-xs">✕</button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); setMobileSubDrawerOpen(false); }} className={`flex items-center gap-2 p-2.5 rounded-xl border text-left ${activeSubcategoryId === 'All' ? 'bg-emerald-600 text-white font-black' : 'bg-stone-50 text-stone-800'}`}>
-                      <span className="text-xs font-black truncate">All</span>
-                    </button>
-                    {currentSubcategories.map((sub) => (
-                      <button key={sub.id} onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); setMobileSubDrawerOpen(false); }} className={`flex items-center gap-2 p-2.5 rounded-xl border text-left ${activeSubcategoryId === sub.id ? 'bg-emerald-600 text-white font-black' : 'bg-stone-50 text-stone-800'}`}>
-                        <span className="text-xs font-black truncate">{sub.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-
           {/* 85% PRODUCTS AREA */}
           <div className="flex-1 w-full space-y-3 min-w-0">
             
+            {/* MOBILE 4x2 SUBCATEGORY GRID (EXACT 4 COLUMNS x 2 ROWS = 8 ITEMS, SQUARE SHAPE WITH FILLED IMAGE) */}
+            {!query && currentSubcategories.length > 0 && (
+              <div className="block md:hidden bg-white p-3 rounded-2xl border border-stone-200 shadow-2xs mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-black text-xs text-stone-900 uppercase tracking-wider">Subcategories</h3>
+                  <span className="text-[10px] text-emerald-700 font-bold">{currentSubcategories.length} available</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {/* 'All' option card */}
+                  <div
+                    onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                    className={`flex flex-col items-center bg-stone-50 rounded-xl p-1.5 border cursor-pointer transition ${
+                      activeSubcategoryId === 'All' ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200'
+                    }`}
+                  >
+                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
+                      <Sparkles size={18} />
+                    </div>
+                    <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">All</span>
+                  </div>
+
+                  {/* Subcategory cards (takes up to 7 items to fit precisely in the 4x2 grid alongside 'All') */}
+                  {currentSubcategories.slice(0, 7).map((sub, index) => {
+                    const isSubSelected = activeSubcategoryId === sub.id;
+                    const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
+                        className={`flex flex-col items-center bg-stone-50 rounded-xl p-1.5 border cursor-pointer transition ${
+                          isSubSelected ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="w-full aspect-square rounded-lg overflow-hidden bg-stone-100 mb-1 shadow-2xs">
+                          <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white px-4 py-3 rounded-2xl border border-stone-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
               <div>
                 <h2 className="font-black text-stone-900 text-sm sm:text-base tracking-tight">
@@ -524,17 +526,11 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH PRODUCTS UNDERNEATH EACH SECTION (FULL CIRCLE IMAGES) */
+        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH SUBCATEGORIES IN 4x2 MOBILE GRID (NO PRODUCTS) */
         <div className="space-y-6">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
             if (subcats.length === 0) return null;
-
-            // Get products belonging to this parent category or its subcategories to show in the section
-            const subIds = subcats.map(s => s.id);
-            const categoryProducts = activeProducts.filter(p => 
-              p.category_id === parent.id || p.category === parent.id || subIds.includes(p.category_id)
-            );
 
             return (
               <div key={parent.id} className="bg-white rounded-3xl border border-stone-200/80 shadow-2xs p-4 sm:p-5 space-y-4">
@@ -545,8 +541,41 @@ export default function ProductGrid({
                   </button>
                 </div>
 
-                {/* Subcategories Scroll Strip (Full Circle Images) */}
-                <div className="flex overflow-x-auto pb-1 gap-3 scrollbar-none snap-x">
+                {/* MOBILE 4x2 SUBCATEGORY GRID FOR LANDING PAGE SECTIONS (EXACT 4 COLUMNS x 2 ROWS = 8 ITEMS, SQUARE SHAPE WITH FILLED IMAGE) */}
+                <div className="block md:hidden bg-stone-50/70 p-2.5 rounded-2xl border border-stone-200/80 mb-3">
+                  <div className="grid grid-cols-4 gap-2">
+                    {/* 'All / View All' option card */}
+                    <div
+                      onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                      className="flex flex-col items-center bg-white rounded-xl p-1.5 border border-stone-200 cursor-pointer transition hover:border-emerald-400"
+                    >
+                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
+                        <Sparkles size={16} />
+                      </div>
+                      <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">View All</span>
+                    </div>
+
+                    {/* Subcategory cards (takes up to 7 items to fit precisely in the 4x2 grid alongside 'View All') */}
+                    {subcats.slice(0, 7).map((sub, index) => {
+                      const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
+                      return (
+                        <div
+                          key={sub.id}
+                          onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
+                          className="flex flex-col items-center bg-white rounded-xl p-1.5 border border-stone-200 cursor-pointer transition hover:border-emerald-400"
+                        >
+                          <div className="w-full aspect-square rounded-lg overflow-hidden bg-stone-100 mb-1 shadow-2xs">
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* DESKTOP SUBCATEGORIES SCROLL STRIP (Full Circle Images) */}
+                <div className="hidden md:flex overflow-x-auto pb-1 gap-3 scrollbar-none snap-x">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
@@ -556,7 +585,7 @@ export default function ProductGrid({
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
                         className="flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-20 snap-start"
                       >
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-1 flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-1 flex items-center justify-center">
                           {sub.image_url ? (
                             <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
                           ) : (
@@ -570,28 +599,6 @@ export default function ProductGrid({
                     );
                   })}
                 </div>
-
-                {/* Sample Product Cards Grid for this category section */}
-                {categoryProducts.length > 0 && (
-                  <div className="pt-2 border-t border-stone-100">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                      {categoryProducts.slice(0, 6).map(product => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          wishlistIds={wishlistIds}
-                          toggleWishlist={toggleWishlist}
-                          selectedVariants={selectedVariants}
-                          setSelectedVariants={setSelectedVariants}
-                          cart={cart}
-                          addToCart={addToCart}
-                          updateQuantity={updateQuantity}
-                          onSelectProduct={onSelectProduct}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
