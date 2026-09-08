@@ -66,7 +66,12 @@ export default function ProductManager() {
     name: '',
     category_id: '',
     description: '',
-    is_active: true
+    is_active: true,
+    brand: '',
+    diet_type: 'Vegetarian',
+    shelf_life: '',
+    ingredients: '',
+    nutritional_info: ''
   });
 
   // =========================================================
@@ -866,7 +871,12 @@ export default function ProductManager() {
       name: '',
       category_id: '',
       description: '',
-      is_active: true
+      is_active: true,
+      brand: '',
+      diet_type: 'Vegetarian',
+      shelf_life: '',
+      ingredients: '',
+      nutritional_info: ''
     });
 
     setImageFiles([]);
@@ -887,6 +897,8 @@ export default function ProductManager() {
 
     setEditingProduct(product);
 
+    const specs = product.specifications || {};
+
     setForm({
       name:
         product.name || '',
@@ -898,7 +910,13 @@ export default function ProductManager() {
         product.description || '',
 
       is_active:
-        product.is_active !== false
+        product.is_active !== false,
+
+      brand: specs.brand || '',
+      diet_type: specs.diet_type || 'Vegetarian',
+      shelf_life: specs.shelf_life || '',
+      ingredients: specs.ingredients || '',
+      nutritional_info: specs.nutritional_info || ''
     });
 
     setExistingImages(
@@ -1327,7 +1345,15 @@ export default function ProductManager() {
             'approved',
 
           is_active:
-            form.is_active
+            form.is_active,
+
+          specifications: {
+            brand: form.brand.trim(),
+            diet_type: form.diet_type,
+            shelf_life: form.shelf_life.trim(),
+            ingredients: form.ingredients.trim(),
+            nutritional_info: form.nutritional_info.trim()
+          }
 
         };
 
@@ -1484,7 +1510,12 @@ export default function ProductManager() {
           name: '',
           category_id: '',
           description: '',
-          is_active: true
+          is_active: true,
+          brand: '',
+          diet_type: 'Vegetarian',
+          shelf_life: '',
+          ingredients: '',
+          nutritional_info: ''
         });
 
         await fetchData();
@@ -2273,7 +2304,7 @@ export default function ProductManager() {
                   {editingProduct ? 'Edit Product & Variants' : 'Add New Product'}
                 </h3>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  Price, MRP and stock are managed separately for each variant pack size.
+                  Price, MRP, stock and specifications are managed here.
                 </p>
               </div>
 
@@ -2298,7 +2329,7 @@ export default function ProductManager() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Aashirvaad Superior MP Atta"
+                  placeholder="e.g. B Natural Coconut Cola Soft Drink"
                   className="w-full border border-emerald-200 p-3.5 rounded-2xl outline-none focus:border-emerald-600 text-xs bg-emerald-50/20 font-bold text-stone-900"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
@@ -2435,6 +2466,73 @@ export default function ProductManager() {
                 </div>
               </div>
 
+              {/* DETAILED SPECIFICATIONS (Brand, Ingredients, Nutrition, etc.) */}
+              <div className="pt-4 border-t border-emerald-100 space-y-4">
+                <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers size={15} className="text-emerald-700" /> Detailed Product Specifications
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-700 uppercase mb-1">Brand Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. B Natural"
+                      className="w-full border border-emerald-200 bg-white p-3 rounded-2xl text-xs font-bold outline-none text-stone-900"
+                      value={form.brand}
+                      onChange={e => setForm({ ...form, brand: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-700 uppercase mb-1">Diet Type</label>
+                    <select
+                      className="w-full border border-emerald-200 bg-white p-3 rounded-2xl text-xs font-bold outline-none text-stone-900 cursor-pointer"
+                      value={form.diet_type}
+                      onChange={e => setForm({ ...form, diet_type: e.target.value })}
+                    >
+                      <option value="Vegetarian">Vegetarian</option>
+                      <option value="Non-Vegetarian">Non-Vegetarian</option>
+                      <option value="Vegan">Vegan</option>
+                      <option value="Gluten-Free">Gluten-Free</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-700 uppercase mb-1">Shelf Life</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 180 Days"
+                      className="w-full border border-emerald-200 bg-white p-3 rounded-2xl text-xs font-bold outline-none text-stone-900"
+                      value={form.shelf_life}
+                      onChange={e => setForm({ ...form, shelf_life: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-stone-700 uppercase mb-1">Nutritional Information</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Energy: 42 kcal, Carbs: 10.5g"
+                      className="w-full border border-emerald-200 bg-white p-3 rounded-2xl text-xs font-bold outline-none text-stone-900"
+                      value={form.nutritional_info}
+                      onChange={e => setForm({ ...form, nutritional_info: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-stone-700 uppercase mb-1">Ingredients</label>
+                  <textarea
+                    rows="2"
+                    placeholder="e.g. Carbonated Water, Sugar, Coconut Water (2%), Acidity Regulator..."
+                    className="w-full border border-emerald-200 bg-white p-3 rounded-2xl text-xs font-medium outline-none text-stone-900 resize-none"
+                    value={form.ingredients}
+                    onChange={e => setForm({ ...form, ingredients: e.target.value })}
+                  />
+                </div>
+              </div>
+
               {/* VARIANTS SECTION */}
 
               <div className="pt-4 border-t border-emerald-100 space-y-4">
@@ -2485,7 +2583,7 @@ export default function ProductManager() {
                             <input
                               type="text"
                               required
-                              placeholder="e.g. 1 kg"
+                              placeholder="e.g. 250 ml"
                               className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
                               value={variant.unit_label || ''}
                               onChange={e => updateVariantRow(index, 'unit_label', e.target.value)}
@@ -2499,7 +2597,7 @@ export default function ProductManager() {
                               min="0"
                               step="0.01"
                               required
-                              placeholder="55.00"
+                              placeholder="37.00"
                               className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
                               value={variant.price ?? ''}
                               onChange={e => updateVariantRow(index, 'price', e.target.value)}
@@ -2513,7 +2611,7 @@ export default function ProductManager() {
                               min="0"
                               step="0.01"
                               required
-                              placeholder="60.00"
+                              placeholder="40.00"
                               className="w-full border border-emerald-200 bg-white p-2.5 rounded-xl text-xs font-bold outline-none text-stone-900"
                               value={variant.mrp ?? ''}
                               onChange={e => updateVariantRow(index, 'mrp', e.target.value)}

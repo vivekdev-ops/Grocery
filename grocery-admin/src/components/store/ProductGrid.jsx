@@ -225,7 +225,7 @@ export default function ProductGrid({
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
 
   return (
-    <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-20 md:pb-12 text-slate-900 overflow-visible">
+    <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-24 md:pb-12 text-slate-900 overflow-y-auto">
       
       {/* ── TOP CATEGORIES STRIP (EXPLORE BY CATEGORY - FULL CIRCLE IMAGES) ── */}
       {!isAnyCategorySelected && (
@@ -313,7 +313,7 @@ export default function ProductGrid({
           
           {/* DESKTOP 15% VERTICAL SUB-SIDEBAR (FULL CIRCLE IMAGES) */}
           {!query && currentSubcategories.length > 0 && (
-            <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-stone-200/90 p-1.5 space-y-1 shadow-2xs sticky top-16">
+            <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-stone-200/90 p-1.5 space-y-1 shadow-2xs sticky top-16 max-h-[calc(100vh-100px)] overflow-y-auto">
               <button
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
                 className={`w-full flex flex-col items-center p-2.5 rounded-xl text-center transition cursor-pointer border ${
@@ -328,7 +328,7 @@ export default function ProductGrid({
                 <span className="text-[10px] leading-tight truncate w-full">All Items</span>
               </button>
 
-              <div className="max-h-[calc(100vh-220px)] overflow-y-auto scrollbar-none space-y-1">
+              <div className="space-y-1">
                 {currentSubcategories.map((sub, index) => {
                   const isSubSelected = activeSubcategoryId === sub.id;
                   const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];

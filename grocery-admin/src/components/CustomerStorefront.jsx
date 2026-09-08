@@ -6,13 +6,14 @@ import {
   Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, 
   FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, 
   Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck,
-  Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen
+  Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen, ZoomIn, ZoomOut
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
+import { motion, AnimatePresence } from 'framer-motion'; // Added motion import
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -123,6 +124,7 @@ export default function CustomerStorefront() {
   // Product Details Modal State & Gallery Preview & Reviews
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   const [activeGalleryImage, setActiveGalleryImage] = useState('');
+  const [imageZoomScale, setImageZoomScale] = useState(1);
   const [productReviews, setProductReviews] = useState([]);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -1964,6 +1966,7 @@ export default function CustomerStorefront() {
         setIsDescriptionExpanded(false);
         const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
         setActiveGalleryImage(pImages[0] || '');
+        setImageZoomScale(1);
         await fetchProductReviews(product.id);
       }}
     />
@@ -1973,6 +1976,7 @@ export default function CustomerStorefront() {
       const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
       const variants = selectedProductDetails.variants || selectedProductDetails.product_variants || [];
       const hasVariants = variants.length > 0;
+      const specs = selectedProductDetails.specifications || {};
 
       const currentVariantKey = selectedVariants[selectedProductDetails.id] || (hasVariants ? (variants[0].id || variants[0].label || variants[0].unit_label) : null);
       const modalActiveVariant = variants.find(
@@ -2022,21 +2026,55 @@ export default function CustomerStorefront() {
               {/* Top Section: Image Gallery & Main Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 
-                {/* Left: Image Viewer & Thumbnails */}
+                {/* Left: Image Viewer with Zoom Controls & Thumbnails */}
                 <div className="space-y-4">
                   <div className="aspect-[4/3] bg-stone-50 rounded-3xl border border-stone-100 overflow-hidden flex items-center justify-center p-6 relative group shadow-xs">
-                    {activeGalleryImage ? (
-                      <img src={activeGalleryImage} alt={selectedProductDetails.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <Package size={48} className="text-stone-300" />
-                    )}
+                    
+                    {/* Zoom In / Out Overlay Buttons */}
+                    <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-white/90 backdrop-blur-md p-1 rounded-xl shadow-md border border-stone-200">
+                      <button 
+                        type="button"
+                        onClick={() => setImageZoomScale(prev => Math.max(1, prev - 0.5))}
+                        disabled={imageZoomScale <= 1}
+                        className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-700 disabled:opacity-40 transition cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut size={15} />
+                      </button>
+                      <span className="text-[10px] font-mono font-bold px-1 text-stone-700">{imageZoomScale}x</span>
+                      <button 
+                        type="button"
+                        onClick={() => setImageZoomScale(prev => Math.min(3, prev + 0.5))}
+                        disabled={imageZoomScale >= 3}
+                        className="p-1.5 hover:bg-stone-100 rounded-lg text-stone-700 disabled:opacity-40 transition cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <ZoomIn size={15} />
+                      </button>
+                    </div>
+
+                    <div className="w-full h-full flex items-center justify-center overflow-hidden cursor-zoom-in">
+                      {activeGalleryImage ? (
+                        <motion.img 
+                          src={activeGalleryImage} 
+                          alt={selectedProductDetails.name} 
+                          animate={{ scale: imageZoomScale }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                          className="w-full h-full object-contain origin-center" 
+                          onClick={() => setImageZoomScale(prev => (prev >= 2.5 ? 1 : prev + 0.5))}
+                        />
+                      ) : (
+                        <Package size={48} className="text-stone-300" />
+                      )}
+                    </div>
+
                     {discountPct > 0 && (
-                      <span className="absolute top-3 left-3 bg-emerald-600 text-white font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs">
+                      <span className="absolute top-3 left-3 bg-emerald-600 text-white font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs z-20">
                         {discountPct}% OFF
                       </span>
                     )}
                     {isModalOutOfStock && (
-                      <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center">
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center z-30">
                         <span className="bg-stone-900 text-white text-xs font-black px-4 py-1 rounded-full uppercase tracking-widest">Sold Out</span>
                       </div>
                     )}
@@ -2047,7 +2085,7 @@ export default function CustomerStorefront() {
                       {modalImages.map((imgUrl, i) => (
                         <button 
                           key={i} 
-                          onClick={() => setActiveGalleryImage(imgUrl)}
+                          onClick={() => { setActiveGalleryImage(imgUrl); setImageZoomScale(1); }}
                           className={`w-14 h-14 rounded-2xl border-2 overflow-hidden shrink-0 transition bg-stone-50 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
                         >
                           <img src={imgUrl} alt="" className="w-full h-full object-cover" />
@@ -2164,6 +2202,45 @@ export default function CustomerStorefront() {
                   {/* Product Details Specs Section */}
                   <div className="space-y-3 pt-2 border-t border-stone-100">
                     <h3 className="font-black text-xs uppercase tracking-wider text-stone-900">Product Details & Assurances</h3>
+                    
+                    {/* Blinkit-Style Specs Table */}
+                    <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2 text-xs">
+                      {specs.brand && (
+                        <div className="flex justify-between py-1 border-b border-stone-200/60">
+                          <span className="text-stone-500 font-bold">Brand</span>
+                          <span className="font-bold text-stone-800">{specs.brand}</span>
+                        </div>
+                      )}
+                      {specs.diet_type && (
+                        <div className="flex justify-between py-1 border-b border-stone-200/60">
+                          <span className="text-stone-500 font-bold">Diet Type</span>
+                          <span className="font-bold text-stone-800">{specs.diet_type}</span>
+                        </div>
+                      )}
+                      {specs.shelf_life && (
+                        <div className="flex justify-between py-1 border-b border-stone-200/60">
+                          <span className="text-stone-500 font-bold">Shelf Life</span>
+                          <span className="font-bold text-stone-800">{specs.shelf_life}</span>
+                        </div>
+                      )}
+                      {specs.nutritional_info && (
+                        <div className="flex justify-between py-1 border-b border-stone-200/60">
+                          <span className="text-stone-500 font-bold">Nutritional Info</span>
+                          <span className="font-bold text-stone-800">{specs.nutritional_info}</span>
+                        </div>
+                      )}
+                      {specs.ingredients && (
+                        <div className="py-1 border-b border-stone-200/60 space-y-0.5">
+                          <span className="text-stone-500 font-bold block">Ingredients</span>
+                          <p className="font-medium text-stone-800 leading-relaxed">{specs.ingredients}</p>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-1">
+                        <span className="text-stone-500 font-bold">Seller</span>
+                        <span className="font-bold text-stone-800">{selectedProductDetails.shopkeeper_profiles?.store_name || 'KD Store'}</span>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100 flex items-center gap-2.5">
                         <Banknote size={18} className="text-emerald-600 shrink-0" />
@@ -2195,13 +2272,6 @@ export default function CustomerStorefront() {
                           <span className="font-black text-stone-900 block text-[11px]">Assured Product</span>
                           <span className="text-[10px] text-stone-500 font-bold">100% Quality checked</span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-1 text-xs mt-2">
-                      <div className="flex justify-between py-1">
-                        <span className="text-stone-500 font-bold">Seller</span>
-                        <span className="font-bold text-stone-800">{selectedProductDetails.shopkeeper_profiles?.store_name || 'KD Store'}</span>
                       </div>
                     </div>
 
@@ -2247,6 +2317,7 @@ export default function CustomerStorefront() {
                             setSelectedProductDetails(p);
                             setIsDescriptionExpanded(false);
                             setActiveGalleryImage(pImgs[0] || '');
+                            setImageZoomScale(1);
                             await fetchProductReviews(p.id);
                           }}
                           className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-emerald-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
@@ -2330,6 +2401,7 @@ export default function CustomerStorefront() {
                             setSelectedProductDetails(p);
                             setIsDescriptionExpanded(false);
                             setActiveGalleryImage(pImgs[0] || '');
+                            setImageZoomScale(1);
                             await fetchProductReviews(p.id);
                           }}
                           className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-emerald-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"

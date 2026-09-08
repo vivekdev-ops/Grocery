@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import {
   Truck, Package, CheckCircle, Clock, MapPin, Phone, DollarSign, LogOut,
   ShieldCheck, Mail, Lock, Eye, X, Navigation, ExternalLink, Calendar,
-  Printer, Filter, TrendingUp, Zap, ChevronRight, AlertCircle, Star, UserCircle, Bike, Loader2, Upload, Receipt, ArrowUpRight, BarChart3, LayoutDashboard, FileText
+  Printer, Filter, TrendingUp, Zap, ChevronRight, AlertCircle, Star, UserCircle, Bike, Loader2, Upload, Receipt, ArrowUpRight, BarChart3, LayoutDashboard, FileText, Menu
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,15 +59,15 @@ function StatCard({ icon: Icon, value, label, color = 'emerald', sub }) {
     <motion.div
       whileHover={{ y: -2 }}
       transition={{ duration: 0.15 }}
-      className={`${c.bg} rounded-2xl p-4 shadow-md flex items-center justify-between`}
+      className={`${c.bg} rounded-3xl p-5 shadow-sm flex items-center justify-between`}
     >
       <div className="space-y-1">
         <p className="text-[10px] font-black uppercase tracking-wider opacity-80">{label}</p>
-        <p className={`text-xl font-black leading-none ${c.val}`}>{value}</p>
-        {sub && <p className="text-[9px] opacity-90">{sub}</p>}
+        <p className={`text-2xl font-black leading-none ${c.val}`}>{value}</p>
+        {sub && <p className="text-[10px] opacity-90">{sub}</p>}
       </div>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
-        <Icon size={18} />
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${c.icon}`}>
+        <Icon size={20} />
       </div>
     </motion.div>
   );
@@ -84,20 +84,20 @@ function OrderCard({ order, staffProfile, commissionRules, children }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl border border-stone-200/80 shadow-2xs hover:shadow-md transition-all overflow-hidden text-xs"
+      className="bg-white rounded-3xl border border-stone-200/80 shadow-2xs hover:shadow-md transition-all overflow-hidden text-xs"
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 bg-stone-50/60">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-black">
-            <Package size={14} />
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100 bg-stone-50/60">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center font-black">
+            <Package size={16} />
           </div>
           <div>
             <p className="font-mono font-black text-stone-900 text-xs">#{order.id.slice(0, 8)}</p>
             <p className="text-[10px] text-stone-400 font-medium">{new Date(order.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${st.bg} ${st.text}`}>
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${st.bg} ${st.text}`}>
             {st.label}
           </span>
           <div className="text-right">
@@ -107,15 +107,15 @@ function OrderCard({ order, staffProfile, commissionRules, children }) {
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        <div className="flex items-start gap-2 text-stone-700 font-medium">
-          <MapPin size={14} className="text-stone-400 mt-0.5 shrink-0" />
+      <div className="p-5 space-y-3.5">
+        <div className="flex items-start gap-2.5 text-stone-700 font-medium">
+          <MapPin size={15} className="text-stone-400 mt-0.5 shrink-0" />
           <span className="leading-relaxed line-clamp-2">{addressText}</span>
         </div>
 
         {order.phone && (
-          <div className="flex items-center gap-2 text-stone-600 font-bold">
-            <Phone size={13} className="text-stone-400 shrink-0" />
+          <div className="flex items-center gap-2.5 text-stone-600 font-bold">
+            <Phone size={14} className="text-stone-400 shrink-0" />
             <a href={`tel:${order.phone}`} className="text-emerald-700 hover:underline">{order.phone}</a>
           </div>
         )}
@@ -124,9 +124,9 @@ function OrderCard({ order, staffProfile, commissionRules, children }) {
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`}
             target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-black text-emerald-800 transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-xs font-black text-emerald-800 transition shadow-2xs"
           >
-            <Navigation size={13} /> Open in Google Maps <ExternalLink size={11} />
+            <Navigation size={14} /> Open in Google Maps <ExternalLink size={12} />
           </a>
         )}
 
@@ -146,6 +146,7 @@ export default function DeliveryPortal() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [datePreset, setDatePreset] = useState('all');
   const [startDate, setStartDate] = useState('');
@@ -193,74 +194,71 @@ export default function DeliveryPortal() {
   };
 
   const fetchStaffProfileAndDependencies = async (user) => {
-  setLoading(true);
-  try {
-    // 1. Block if user has a shopkeeper profile
-    const { data: shopkeeperCheck } = await supabase
-      .from('shopkeeper_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    setLoading(true);
+    try {
+      const { data: shopkeeperCheck } = await supabase
+        .from('shopkeeper_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (shopkeeperCheck) {
-      alert("Access Denied: Shopkeepers cannot access the Delivery Partner portal.");
-      await supabase.auth.signOut({ scope: 'local' });
-      setSession(null);
-      setStaffProfile(null);
-      setLoading(false);
-      navigate('/login', { replace: true });
-      return;
-    }
+      if (shopkeeperCheck) {
+        alert("Access Denied: Shopkeepers cannot access the Delivery Partner portal.");
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setStaffProfile(null);
+        setLoading(false);
+        navigate('/login', { replace: true });
+        return;
+      }
 
-    // 2. Fetch staff profile data
-    let staffRes = await supabase
-      .from('staff_profiles')
-      .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!staffRes.data && user.email) {
-      staffRes = await supabase
+      let staffRes = await supabase
         .from('staff_profiles')
         .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
-        .eq('email', user.email)
+        .eq('user_id', user.id)
         .maybeSingle();
-    }
 
-    // 3. Strict Role Verification: Ensure role is delivery-related
-    const userRole = (staffRes.data?.role || '').toLowerCase();
-    const allowedRoles = ['delivery', 'delivery_partner', 'rider', 'delivery boy'];
-    
-    if (staffRes.data && userRole && !allowedRoles.some(r => userRole.includes(r))) {
-      alert("Access Denied: This portal is strictly restricted to Delivery Partners.");
-      await supabase.auth.signOut({ scope: 'local' });
-      setSession(null);
-      setStaffProfile(null);
+      if (!staffRes.data && user.email) {
+        staffRes = await supabase
+          .from('staff_profiles')
+          .select('id, user_id, email, role, custom_commission_pct, name, full_name, phone, avatar_url')
+          .eq('email', user.email)
+          .maybeSingle();
+      }
+
+      const userRole = (staffRes.data?.role || '').toLowerCase();
+      const allowedRoles = ['delivery', 'delivery_partner', 'rider', 'delivery boy'];
+      
+      if (staffRes.data && userRole && !allowedRoles.some(r => userRole.includes(r))) {
+        alert("Access Denied: This portal is strictly restricted to Delivery Partners.");
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setStaffProfile(null);
+        setLoading(false);
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      const rulesRes = await supabase.from('cart_commission_rules').select('*').eq('is_active', true);
+
+      if (staffRes.data) {
+        setStaffProfile(staffRes.data);
+        setProfileForm({
+          full_name: staffRes.data.full_name || staffRes.data.name || '',
+          phone: staffRes.data.phone || '',
+          avatar_url: staffRes.data.avatar_url || ''
+        });
+      }
+      if (rulesRes.data) setCommissionRules(rulesRes.data);
+      
+      registerPushToken(user.id, 'delivery');
+      await fetchDeliveryOrders(session || { user }, staffRes.data);
+    } catch (err) {
+      console.error('Error loading staff profile & rules:', err);
+    } finally {
       setLoading(false);
-      navigate('/login', { replace: true });
-      return;
     }
-
-    const rulesRes = await supabase.from('cart_commission_rules').select('*').eq('is_active', true);
-
-    if (staffRes.data) {
-      setStaffProfile(staffRes.data);
-      setProfileForm({
-        full_name: staffRes.data.full_name || staffRes.data.name || '',
-        phone: staffRes.data.phone || '',
-        avatar_url: staffRes.data.avatar_url || ''
-      });
-    }
-    if (rulesRes.data) setCommissionRules(rulesRes.data);
-    
-    registerPushToken(user.id, 'delivery');
-    await fetchDeliveryOrders(session || { user }, staffRes.data);
-  } catch (err) {
-    console.error('Error loading staff profile & rules:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const fetchDeliveryOrders = async (currentSession, currentStaff) => {
     const activeSession = currentSession || session;
@@ -492,451 +490,470 @@ export default function DeliveryPortal() {
   ];
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-24 md:pb-8 text-xs selection:bg-emerald-500 selection:text-white">
-      {/* Top Header */}
-      <header className="bg-white border-b border-stone-200 px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-2xs print:hidden">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-emerald-600/30 shrink-0">
-            KD
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-black text-stone-900 text-sm">KD Store</span>
-              <span className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">Partner Portal</span>
+    <div className="min-h-screen bg-[#F8FAFC] font-sans text-stone-900 pb-28 md:pb-8 text-xs selection:bg-emerald-500 selection:text-white flex flex-col md:flex-row overflow-x-hidden">
+      
+      {/* ── DESKTOP & MOBILE SIDEBAR ── */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-200 flex flex-col shadow-xl transition-transform duration-300 md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-16 flex items-center px-5 border-b border-stone-100 justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-emerald-600/30 shrink-0">
+              KD
             </div>
-            <p className="text-[11px] text-stone-500 font-bold">{staffProfile?.full_name || staffProfile?.name || session.user.email}</p>
+            <div>
+              <span className="font-black text-stone-900 text-sm block">KD Store</span>
+              <span className="text-[9px] text-emerald-800 font-bold uppercase tracking-wider">Delivery Portal</span>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <NotificationBell session={session} size={18} />
-          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-3 py-2 rounded-xl font-bold cursor-pointer transition shadow-2xs">
-            <Printer size={13} /> Print
-          </button>
-          <button onClick={handleLogout} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-xl font-bold cursor-pointer transition border border-rose-200 shadow-2xs" title="Sign Out">
-            <LogOut size={13} /> <span className="hidden sm:inline">Logout</span>
+          <button onClick={() => setIsMobileSidebarOpen(false)} className="md:hidden text-stone-400 hover:text-stone-700 p-1">
+            <X size={20} />
           </button>
         </div>
-      </header>
 
-      {/* ── PRINTABLE PROFESSIONAL SALARY SLIP (Hidden on normal screen, shown during window.print()) ── */}
-      <div className="hidden print:block p-8 bg-white text-stone-900 font-sans text-sm space-y-6">
-        <div className="flex justify-between items-start border-b-2 border-emerald-600 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs">KD</div>
-              <h1 className="text-xl font-black text-stone-900 tracking-tight">KD Store Delivery & Logistics</h1>
-            </div>
-            <p className="text-stone-500 text-xs mt-1">Official Delivery Partner Salary & Payout Statement</p>
-          </div>
-          <div className="text-right">
-            <p className="font-black text-stone-900">Statement Date: {new Date().toLocaleDateString('en-IN')}</p>
-            <p className="text-stone-500 text-xs capitalize">Filter: {datePreset} period</p>
-          </div>
+        <div className="p-4 border-b border-stone-100 bg-emerald-50/30">
+          <p className="text-[10px] font-black uppercase text-stone-400">Logged in Agent</p>
+          <p className="font-bold text-stone-900 truncate text-xs mt-0.5">{staffProfile?.full_name || staffProfile?.name || session.user.email}</p>
         </div>
 
-        {/* Delivery Partner Details */}
-        <div className="grid grid-cols-2 gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200">
-          <div>
-            <p className="text-[10px] font-black text-stone-400 uppercase">1. Delivery Partner Name</p>
-            <p className="font-black text-stone-900 text-base">{staffProfile?.full_name || staffProfile?.name || 'Agent'}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-stone-400 uppercase">2. Contact Number</p>
-            <p className="font-black text-stone-900 text-base">{staffProfile?.phone || session.user.email}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-stone-400 uppercase">3. Period / Date Range</p>
-            <p className="font-bold text-stone-800 capitalize">Preset: {datePreset} {startDate && endDate ? `(${startDate} to ${endDate})` : ''}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-stone-400 uppercase">Total Deliveries in Period</p>
-            <p className="font-bold text-stone-800">{filteredCompletedOrders.length} completed orders</p>
-          </div>
-        </div>
-
-        {/* 4. Order Line items, cart total and payout % */}
-        <div>
-          <h3 className="font-black text-stone-900 text-sm mb-2">4. Order Line Items & Payout Summary</h3>
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr className="bg-emerald-600 text-white text-left">
-                <th className="p-2 border border-emerald-700">Order ID</th>
-                <th className="p-2 border border-emerald-700">Delivery Address</th>
-                <th className="p-2 border border-emerald-700 text-right">Cart Total</th>
-                <th className="p-2 border border-emerald-700 text-right">Payout %</th>
-                <th className="p-2 border border-emerald-700 text-right">Earned Payout</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCompletedOrders.map(order => {
-                const cartAmount = Number(order.total_amount || 0);
-                const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
-                const earnedFee = (cartAmount * tierPct) / 100;
-                return (
-                  <tr key={order.id} className="border-b border-stone-200">
-                    <td className="p-2 border border-stone-200 font-mono font-bold">#{order.id.slice(0, 8)}</td>
-                    <td className="p-2 border border-stone-200 truncate max-w-[220px]">{order.delivery_address || order.shipping_address || order.address}</td>
-                    <td className="p-2 border border-stone-200 text-right">₹{cartAmount.toFixed(2)}</td>
-                    <td className="p-2 border border-stone-200 text-right">{tierPct}%</td>
-                    <td className="p-2 border border-stone-200 text-right font-black text-emerald-700">₹{earnedFee.toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 5. Grand Total */}
-        <div className="flex justify-end pt-2">
-          <div className="w-72 bg-emerald-50 border-2 border-emerald-600 p-4 rounded-2xl flex justify-between items-center">
-            <span className="font-black text-stone-900 text-sm">5. Grand Total Payout:</span>
-            <span className="font-black text-emerald-700 text-lg">₹{filteredEarnings.toFixed(2)}</span>
-          </div>
-        </div>
-
-        {/* 6. KD Store Sign */}
-        <div className="pt-12 flex justify-between items-end border-t border-stone-200">
-          <div>
-            <p className="text-xs text-stone-500 font-medium">This is a computer-generated salary slip and requires no physical signature.</p>
-            <p className="text-xs font-bold text-stone-800 mt-1">KD Store Logistics Department</p>
-          </div>
-          <div className="text-center space-y-2">
-            <div className="h-12 border-b border-dashed border-stone-400 w-48 mx-auto flex items-center justify-center">
-              <span className="font-serif italic font-bold text-emerald-800 text-sm">KD Store Auth. Sign</span>
-            </div>
-            <p className="font-black text-stone-800 text-xs">6. Authorized Signatory</p>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-3xl mx-auto px-3 sm:px-4 py-4 space-y-4 print:hidden">
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-1.5 flex gap-1 shadow-2xs overflow-x-auto scrollbar-none">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 min-w-[70px] flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-black transition cursor-pointer ${
-                  isActive ? 'bg-emerald-600 text-white shadow-xs' : 'text-stone-600 hover:bg-stone-100'
+                onClick={() => { setActiveTab(tab.id); setIsMobileSidebarOpen(false); }}
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl font-black transition cursor-pointer ${
+                  isActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'text-stone-600 hover:bg-stone-50'
                 }`}
               >
-                <Icon size={14} />
-                <span className="truncate">{tab.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon size={18} />
+                  <span className="text-xs">{tab.label}</span>
+                </div>
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${isActive ? 'bg-white text-emerald-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${isActive ? 'bg-white text-emerald-900' : 'bg-emerald-100 text-emerald-900'}`}>
                     {tab.count}
                   </span>
                 )}
               </button>
             );
           })}
+        </nav>
+
+        <div className="p-3 border-t border-stone-100 space-y-1 shrink-0">
+          <button onClick={() => window.print()} className="w-full flex items-center gap-3 px-3.5 py-2.5 text-stone-600 hover:bg-stone-50 rounded-xl font-bold transition cursor-pointer">
+            <Printer size={16} /> Print Slip
+          </button>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-black transition cursor-pointer">
+            <LogOut size={16} /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Backdrop */}
+      {isMobileSidebarOpen && (
+        <div onClick={() => setIsMobileSidebarOpen(false)} className="fixed inset-0 bg-slate-950/50 z-40 md:hidden backdrop-blur-xs" />
+      )}
+
+      {/* ── MAIN CONTENT WRAPPER ── */}
+      <div className="flex-1 md:pl-64 flex flex-col min-w-0">
+        
+        {/* Top Header */}
+        <header className="bg-white border-b border-stone-200 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-2xs print:hidden">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setIsMobileSidebarOpen(true)} className="md:hidden p-2 rounded-xl bg-stone-100 text-stone-700 cursor-pointer">
+              <Menu size={18} />
+            </button>
+            <h1 className="font-black text-stone-900 text-sm md:text-base capitalize">{activeTab} Dashboard</h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <NotificationBell session={session} size={18} />
+            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs border border-emerald-200">
+              {staffProfile?.full_name?.[0] || 'D'}
+            </div>
+          </div>
+        </header>
+
+        {/* Printable Salary Slip / Statement */}
+        <div className="hidden print:block p-8 bg-white text-stone-900 font-sans text-sm space-y-6">
+          <div className="flex justify-between items-start border-b-2 border-emerald-600 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs">KD</div>
+                <h1 className="text-xl font-black text-stone-900 tracking-tight">KD Store Delivery & Logistics</h1>
+              </div>
+              <p className="text-stone-500 text-xs mt-1">Official Delivery Partner Salary & Payout Statement</p>
+            </div>
+            <div className="text-right">
+              <p className="font-black text-stone-900">Statement Date: {new Date().toLocaleDateString('en-IN')}</p>
+              <p className="text-stone-500 text-xs capitalize">Filter: {datePreset} period</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200">
+            <div>
+              <p className="text-[10px] font-black text-stone-400 uppercase">1. Delivery Partner Name</p>
+              <p className="font-black text-stone-900 text-base">{staffProfile?.full_name || staffProfile?.name || 'Agent'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-stone-400 uppercase">2. Contact Number</p>
+              <p className="font-black text-stone-900 text-base">{staffProfile?.phone || session.user.email}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-stone-400 uppercase">3. Period / Date Range</p>
+              <p className="font-bold text-stone-800 capitalize">Preset: {datePreset} {startDate && endDate ? `(${startDate} to ${endDate})` : ''}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-stone-400 uppercase">Total Deliveries in Period</p>
+              <p className="font-bold text-stone-800">{filteredCompletedOrders.length} completed orders</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-black text-stone-900 text-sm mb-2">4. Order Line Items & Payout Summary</h3>
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-emerald-600 text-white text-left">
+                  <th className="p-2 border border-emerald-700">Order ID</th>
+                  <th className="p-2 border border-emerald-700">Delivery Address</th>
+                  <th className="p-2 border border-emerald-700 text-right">Cart Total</th>
+                  <th className="p-2 border border-emerald-700 text-right">Payout %</th>
+                  <th className="p-2 border border-emerald-700 text-right">Earned Payout</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCompletedOrders.map(order => {
+                  const cartAmount = Number(order.total_amount || 0);
+                  const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+                  const earnedFee = (cartAmount * tierPct) / 100;
+                  return (
+                    <tr key={order.id} className="border-b border-stone-200">
+                      <td className="p-2 border border-stone-200 font-mono font-bold">#{order.id.slice(0, 8)}</td>
+                      <td className="p-2 border border-stone-200 truncate max-w-[220px]">{order.delivery_address || order.shipping_address || order.address}</td>
+                      <td className="p-2 border border-stone-200 text-right">₹{cartAmount.toFixed(2)}</td>
+                      <td className="p-2 border border-stone-200 text-right">{tierPct}%</td>
+                      <td className="p-2 border border-stone-200 text-right font-black text-emerald-700">₹{earnedFee.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <div className="w-72 bg-emerald-50 border-2 border-emerald-600 p-4 rounded-2xl flex justify-between items-center">
+              <span className="font-black text-stone-900 text-sm">5. Grand Total Payout:</span>
+              <span className="font-black text-emerald-700 text-lg">₹{filteredEarnings.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
 
-        {/* ── TAB 0: DASHBOARD ── */}
-        {activeTab === 'dashboard' && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-            <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-5 text-white shadow-lg space-y-3 relative overflow-hidden">
-              <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">KD Store Delivery Earnings</p>
-                  <p className="text-2xl sm:text-3xl font-black text-white mt-1">₹{totalLifetimeEarnings.toFixed(2)}</p>
-                </div>
-                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-amber-400 border border-white/20">
-                  <Zap size={22} className="fill-amber-400" />
-                </div>
-              </div>
-              <div className="flex items-center gap-4 pt-2 border-t border-white/10 text-xs">
-                <div>
-                  <span className="text-stone-400 font-medium">Completed: </span>
-                  <span className="font-bold text-emerald-300">{myCompletedOrders.length} orders</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 font-medium">Active Deliveries: </span>
-                  <span className="font-bold text-sky-300">{myActiveOrders.length} orders</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <StatCard icon={Package} value={availableOrders.length} label="Available Pickups" color="emerald" sub="Ready to accept" />
-              <StatCard icon={Clock} value={myActiveOrders.length} label="In Progress" color="blue" sub="Assigned to you" />
-              <StatCard icon={CheckCircle} value={myCompletedOrders.length} label="Delivered" color="purple" sub="Successfully completed" />
-            </div>
-
-            {/* Recent Active Orders Quick View */}
-            <div className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                <h3 className="font-black text-stone-900 text-sm">Active Queue Quick Preview</h3>
-                <button onClick={() => setActiveTab('active')} className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
-                  View All →
-                </button>
-              </div>
-
-              {myActiveOrders.length === 0 ? (
-                <p className="text-stone-400 text-center py-6 font-medium">No active deliveries right now. Check Available tab to accept orders.</p>
-              ) : (
-                <div className="space-y-2">
-                  {myActiveOrders.slice(0, 3).map(order => (
-                    <div key={order.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-100">
-                      <div>
-                        <p className="font-mono font-black text-stone-900">#{order.id.slice(0, 8)}</p>
-                        <p className="text-[10px] text-stone-500 truncate max-w-[200px]">{order.delivery_address || order.shipping_address || order.address}</p>
-                      </div>
-                      <button onClick={() => setActiveTab('active')} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-bold cursor-pointer text-[10px]">
-                        Manage
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── TAB 1: AVAILABLE ── */}
-        {activeTab === 'available' && (
-          <div className="space-y-3">
-            <h2 className="font-black text-stone-900 text-sm">Available Pickups ({availableOrders.length})</h2>
-            {availableOrders.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 border border-stone-200 text-center text-stone-400 font-bold shadow-2xs">
-                No orders waiting for pickup
-              </div>
-            ) : (
-              availableOrders.map(order => (
-                <OrderCard key={order.id} order={order} staffProfile={staffProfile} commissionRules={commissionRules}>
-                  <div className="flex justify-between items-center pt-2 border-t border-stone-100">
-                    <button onClick={() => setSelectedOrderDetails(order)}
-                      className="text-emerald-700 font-black inline-flex items-center gap-1 cursor-pointer">
-                      <Eye size={13} /> View Full Details ({order.order_items?.length || 0})
-                    </button>
-                    <button onClick={() => handleUpdateStatus(order.id, 'accepted')}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl font-black cursor-pointer shadow-md shadow-emerald-600/25 active:scale-95 transition">
-                      Accept Order
-                    </button>
+        <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 w-full print:hidden">
+          
+          {/* ── TAB 0: DASHBOARD ── */}
+          {activeTab === 'dashboard' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              
+              <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl space-y-3 relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Delivery Partner Earnings</p>
+                    <p className="text-3xl font-black text-white mt-1">₹{totalLifetimeEarnings.toFixed(2)}</p>
                   </div>
-                </OrderCard>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ── TAB 2: ACTIVE ── */}
-        {activeTab === 'active' && (
-          <div className="space-y-3">
-            <h2 className="font-black text-stone-900 text-sm">Active Deliveries ({myActiveOrders.length})</h2>
-            {myActiveOrders.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 border border-stone-200 text-center text-stone-400 font-bold shadow-2xs">
-                No active deliveries in progress
-              </div>
-            ) : (
-              myActiveOrders.map(order => (
-                <OrderCard key={order.id} order={order} staffProfile={staffProfile} commissionRules={commissionRules}>
-                  <div className="flex flex-wrap justify-between items-center pt-2 border-t border-stone-100 gap-2">
-                    <button onClick={() => setSelectedOrderDetails(order)}
-                      className="text-emerald-700 font-black inline-flex items-center gap-1 cursor-pointer">
-                      <Eye size={13} /> Full Details ({order.order_items?.length || 0} items)
-                    </button>
-
-                    <div className="flex gap-1.5 flex-wrap">
-                      {(order.status === 'accepted' || order.status === 'shipped' || order.status === 'processing' || order.status === 'pending') && (
-                        <button onClick={() => handleUpdateStatus(order.id, 'pickup')}
-                          className="bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-xl font-black cursor-pointer shadow-xs">
-                          Reached Store
-                        </button>
-                      )}
-                      {order.status === 'pickup' && (
-                        <button onClick={() => handleUpdateStatus(order.id, 'out_for_delivery')}
-                          className="bg-violet-600 hover:bg-violet-700 text-white px-3.5 py-2 rounded-xl font-black cursor-pointer shadow-xs">
-                          Dispatched
-                        </button>
-                      )}
-                      {order.status === 'out_for_delivery' && (
-                        <button onClick={() => { setVerifyingOrder(order); setEnteredOtp(''); }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-black cursor-pointer shadow-md shadow-emerald-600/20">
-                          Enter OTP
-                        </button>
-                      )}
-                    </div>
+                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-amber-400 border border-white/20">
+                    <Zap size={22} className="fill-amber-400" />
                   </div>
-                </OrderCard>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ── TAB 3: PAYOUTS & SALARY SLIP ── */}
-        {activeTab === 'payouts' && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-lg space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-1 rounded-full">KD Store Payout Portal</span>
-                <span className="font-mono text-xs opacity-90">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
-              </div>
-              <div>
-                <p className="text-2xl font-black mt-1">₹{filteredEarnings.toFixed(2)}</p>
-                <p className="text-[11px] opacity-90">Calculated earnings for selected filter range</p>
-              </div>
-            </div>
-
-            {/* Working Filter Controls */}
-            <div className="bg-white rounded-2xl border border-stone-200 p-3.5 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-stone-700 font-bold">
-                  <Filter size={14} className="text-emerald-600" />
-                  <span>Filter Payout Statement</span>
                 </div>
-                <button
-                  onClick={() => window.print()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
-                >
-                  <FileText size={14} /> Download PDF Salary Slip
-                </button>
+                <div className="flex items-center gap-4 pt-2 border-t border-white/10 text-xs">
+                  <div>
+                    <span className="text-stone-400 font-medium">Completed: </span>
+                    <span className="font-bold text-emerald-300">{myCompletedOrders.length} orders</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 font-medium">Active Deliveries: </span>
+                    <span className="font-bold text-sky-300">{myActiveOrders.length} orders</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex gap-1.5 flex-wrap pt-1">
-                {['today', 'week', 'month', 'custom', 'all'].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setDatePreset(d)}
-                    className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase transition cursor-pointer ${
-                      datePreset === d ? 'bg-stone-900 text-white shadow-xs' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                    }`}
-                  >
-                    {d}
+              {/* Stat Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <StatCard icon={Package} value={availableOrders.length} label="Available Pickups" color="emerald" sub="Ready to accept" />
+                <StatCard icon={Clock} value={myActiveOrders.length} label="In Progress" color="blue" sub="Assigned to you" />
+                <StatCard icon={CheckCircle} value={myCompletedOrders.length} label="Delivered" color="purple" sub="Successfully completed" />
+              </div>
+
+              {/* Recent Active Orders Quick View */}
+              <div className="bg-white rounded-3xl border border-stone-200/80 p-6 space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  <h3 className="font-black text-stone-900 text-sm">Active Queue Quick Preview</h3>
+                  <button onClick={() => setActiveTab('active')} className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                    View All →
                   </button>
-                ))}
-              </div>
-
-              {datePreset === 'custom' && (
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
-                  <div>
-                    <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">From Date</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                      className="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">To Date</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                      className="w-full bg-stone-50 border border-stone-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
-                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Payout breakdown table */}
-            <div className="bg-white rounded-3xl border border-stone-200/80 p-4 shadow-2xs space-y-3">
-              <h3 className="font-black text-stone-900 text-sm">Statement Breakdown ({filteredCompletedOrders.length} Deliveries)</h3>
-
-              {filteredCompletedOrders.length === 0 ? (
-                <div className="p-8 text-center text-stone-400 font-medium">No completed deliveries found for this period.</div>
-              ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto scrollbar-none pr-1">
-                  {filteredCompletedOrders.map(order => {
-                    const cartAmount = Number(order.total_amount || 0);
-                    const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
-                    const earnedFee = (cartAmount * tierPct) / 100;
-                    return (
-                      <div key={order.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-2xl border border-stone-100">
+                {myActiveOrders.length === 0 ? (
+                  <p className="text-stone-400 text-center py-6 font-medium">No active deliveries right now. Check Available tab to accept orders.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {myActiveOrders.slice(0, 3).map(order => (
+                      <div key={order.id} className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-100">
                         <div>
                           <p className="font-mono font-black text-stone-900">#{order.id.slice(0, 8)}</p>
-                          <p className="text-[10px] text-stone-400">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          <p className="text-[10px] text-stone-500 truncate max-w-[200px]">{order.delivery_address || order.shipping_address || order.address}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-black text-emerald-700">+₹{earnedFee.toFixed(2)}</p>
-                          <p className="text-[9px] text-stone-400 font-bold">Order Value: ₹{cartAmount.toFixed(0)} ({tierPct}%)</p>
-                        </div>
+                        <button onClick={() => setActiveTab('active')} className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl font-bold cursor-pointer text-[10px]">
+                          Manage
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── TAB 4: PROFILE SETTINGS ── */}
-        {activeTab === 'profile' && (
-          <div className="bg-white rounded-3xl border border-stone-200 p-5 shadow-2xs space-y-4 max-w-md mx-auto w-full">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h2 className="font-black text-stone-900 text-sm">Agent Profile</h2>
-              {!editingProfile && (
-                <button onClick={() => setEditingProfile(true)} className="bg-purple-50 text-purple-700 px-3.5 py-1.5 rounded-xl font-black cursor-pointer text-xs">
-                  Edit Profile
-                </button>
-              )}
-            </div>
-
-            {editingProfile ? (
-              <form onSubmit={handleSaveProfile} className="space-y-3.5">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-stone-100 overflow-hidden border border-stone-200 shadow-2xs">
-                    {profileForm.avatar_url ? (
-                      <img src={profileForm.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserCircle className="w-full h-full text-stone-400" />
-                    )}
+                    ))}
                   </div>
-                  <label className="bg-stone-900 hover:bg-stone-800 text-white px-3.5 py-2 rounded-xl font-bold cursor-pointer text-xs shadow-2xs">
-                    <Upload size={12} className="inline mr-1.5" /> {uploadingAvatar ? 'Uploading...' : 'Upload Avatar'}
-                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                  </label>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── TAB 1: AVAILABLE ── */}
+          {activeTab === 'available' && (
+            <div className="space-y-4">
+              <h2 className="font-black text-stone-900 text-sm">Available Pickups ({availableOrders.length})</h2>
+              {availableOrders.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 border border-stone-200 text-center text-stone-400 font-bold shadow-2xs">
+                  No orders waiting for pickup
+                </div>
+              ) : (
+                availableOrders.map(order => (
+                  <OrderCard key={order.id} order={order} staffProfile={staffProfile} commissionRules={commissionRules}>
+                    <div className="flex justify-between items-center pt-3 border-t border-stone-100">
+                      <button onClick={() => setSelectedOrderDetails(order)}
+                        className="text-emerald-700 font-black inline-flex items-center gap-1 cursor-pointer">
+                        <Eye size={13} /> View Full Details ({order.order_items?.length || 0})
+                      </button>
+                      <button onClick={() => handleUpdateStatus(order.id, 'accepted')}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black cursor-pointer shadow-md shadow-emerald-600/25 active:scale-95 transition">
+                        Accept Order
+                      </button>
+                    </div>
+                  </OrderCard>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* ── TAB 2: ACTIVE ── */}
+          {activeTab === 'active' && (
+            <div className="space-y-4">
+              <h2 className="font-black text-stone-900 text-sm">Active Deliveries ({myActiveOrders.length})</h2>
+              {myActiveOrders.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 border border-stone-200 text-center text-stone-400 font-bold shadow-2xs">
+                  No active deliveries in progress
+                </div>
+              ) : (
+                myActiveOrders.map(order => (
+                  <OrderCard key={order.id} order={order} staffProfile={staffProfile} commissionRules={commissionRules}>
+                    <div className="flex flex-wrap justify-between items-center pt-3 border-t border-stone-100 gap-2">
+                      <button onClick={() => setSelectedOrderDetails(order)}
+                        className="text-emerald-700 font-black inline-flex items-center gap-1 cursor-pointer">
+                        <Eye size={13} /> Full Details ({order.order_items?.length || 0} items)
+                      </button>
+
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(order.status === 'accepted' || order.status === 'shipped' || order.status === 'processing' || order.status === 'pending') && (
+                          <button onClick={() => handleUpdateStatus(order.id, 'pickup')}
+                            className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-xl font-black cursor-pointer shadow-xs">
+                            Reached Store
+                          </button>
+                        )}
+                        {order.status === 'pickup' && (
+                          <button onClick={() => handleUpdateStatus(order.id, 'out_for_delivery')}
+                            className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl font-black cursor-pointer shadow-xs">
+                            Dispatched
+                          </button>
+                        )}
+                        {order.status === 'out_for_delivery' && (
+                          <button onClick={() => { setVerifyingOrder(order); setEnteredOtp(''); }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4.5 py-2 rounded-xl font-black cursor-pointer shadow-md shadow-emerald-600/20">
+                            Enter OTP
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </OrderCard>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* ── TAB 3: PAYOUTS & SALARY SLIP ── */}
+          {activeTab === 'payouts' && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white shadow-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-1 rounded-full">KD Store Payout Portal</span>
+                  <span className="font-mono text-xs opacity-90">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</span>
+                </div>
+                <div>
+                  <p className="text-2xl font-black mt-1">₹{filteredEarnings.toFixed(2)}</p>
+                  <p className="text-[11px] opacity-90">Calculated earnings for selected filter range</p>
+                </div>
+              </div>
+
+              {/* Working Filter Controls */}
+              <div className="bg-white rounded-3xl border border-stone-200 p-4 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-stone-700 font-bold">
+                    <Filter size={14} className="text-emerald-600" />
+                    <span>Filter Payout Statement</span>
+                  </div>
+                  <button
+                    onClick={() => window.print()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
+                  >
+                    <FileText size={14} /> Download PDF Salary Slip
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Full Name</label>
-                  <input type="text" value={profileForm.full_name} onChange={e => setProfileForm(p => ({ ...p, full_name: e.target.value }))}
-                    className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-50 font-bold" required />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Phone Number</label>
-                  <input type="tel" value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-50 font-bold" />
-                </div>
-                <div>
-                  <label className="block font-bold text-stone-600 mb-1">Email</label>
-                  <input type="email" value={session.user.email} disabled className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-100 text-stone-500 cursor-not-allowed font-medium" />
+                <div className="flex gap-1.5 flex-wrap pt-1">
+                  {['today', 'week', 'month', 'custom', 'all'].map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setDatePreset(d)}
+                      className={`px-3.5 py-2 rounded-xl font-black text-[10px] uppercase transition cursor-pointer ${
+                        datePreset === d ? 'bg-stone-900 text-white shadow-xs' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button type="button" onClick={() => setEditingProfile(false)} className="px-4 py-2 border rounded-xl font-bold cursor-pointer">Cancel</button>
-                  <button type="submit" disabled={savingProfile} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-black cursor-pointer shadow-md shadow-purple-600/20">Save</button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-stone-100 overflow-hidden border border-stone-200 shadow-2xs">
-                    {staffProfile?.avatar_url ? (
-                      <img src={staffProfile.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserCircle className="w-full h-full text-stone-400" />
-                    )}
+                {datePreset === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100">
+                    <div>
+                      <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">From Date</label>
+                      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 p-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-stone-400 uppercase mb-1">To Date</label>
+                      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 p-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-500" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Payout breakdown table */}
+              <div className="bg-white rounded-3xl border border-stone-200/80 p-5 space-y-3 shadow-2xs">
+                <h3 className="font-black text-stone-900 text-sm">Statement Breakdown ({filteredCompletedOrders.length} Deliveries)</h3>
+
+                {filteredCompletedOrders.length === 0 ? (
+                  <div className="p-8 text-center text-stone-400 font-medium">No completed deliveries found for this period.</div>
+                ) : (
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-none pr-1">
+                    {filteredCompletedOrders.map(order => {
+                      const cartAmount = Number(order.total_amount || 0);
+                      const tierPct = getApplicableCommissionPct(staffProfile, commissionRules, 'delivery', cartAmount);
+                      const earnedFee = (cartAmount * tierPct) / 100;
+                      return (
+                        <div key={order.id} className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-100">
+                          <div>
+                            <p className="font-mono font-black text-stone-900">#{order.id.slice(0, 8)}</p>
+                            <p className="text-[10px] text-stone-400">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-emerald-700">+₹{earnedFee.toFixed(2)}</p>
+                            <p className="text-[9px] text-stone-400 font-bold">Order Value: ₹{cartAmount.toFixed(0)} ({tierPct}%)</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 4: PROFILE SETTINGS ── */}
+          {activeTab === 'profile' && (
+            <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-2xs space-y-4 max-w-md mx-auto w-full">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <h2 className="font-black text-stone-900 text-sm">Agent Profile</h2>
+                {!editingProfile && (
+                  <button onClick={() => setEditingProfile(true)} className="bg-purple-50 text-purple-700 px-3.5 py-1.5 rounded-xl font-black cursor-pointer text-xs">
+                    Edit Profile
+                  </button>
+                )}
+              </div>
+
+              {editingProfile ? (
+                <form onSubmit={handleSaveProfile} className="space-y-3.5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-stone-100 overflow-hidden border border-stone-200 shadow-2xs">
+                      {profileForm.avatar_url ? (
+                        <img src={profileForm.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <UserCircle className="w-full h-full text-stone-400" />
+                      )}
+                    </div>
+                    <label className="bg-stone-900 hover:bg-stone-800 text-white px-3.5 py-2 rounded-xl font-bold cursor-pointer text-xs shadow-2xs">
+                      <Upload size={12} className="inline mr-1.5" /> {uploadingAvatar ? 'Uploading...' : 'Upload Avatar'}
+                      <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-600 mb-1">Full Name</label>
+                    <input type="text" value={profileForm.full_name} onChange={e => setProfileForm(p => ({ ...p, full_name: e.target.value }))}
+                      className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-50 font-bold" required />
                   </div>
                   <div>
-                    <p className="font-black text-stone-900 text-base">{staffProfile?.full_name || staffProfile?.name || 'Agent'}</p>
-                    <p className="text-stone-400 text-xs font-medium">{session.user.email}</p>
+                    <label className="block font-bold text-stone-600 mb-1">Phone Number</label>
+                    <input type="tel" value={profileForm.phone} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
+                      className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-50 font-bold" />
                   </div>
-                </div>
+                  <div>
+                    <label className="block font-bold text-stone-600 mb-1">Email</label>
+                    <input type="email" value={session.user.email} disabled className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 bg-stone-100 text-stone-500 cursor-not-allowed font-medium" />
+                  </div>
 
-                <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-100 space-y-1">
-                  <p className="text-stone-400 text-[10px] font-black uppercase">Registered Phone</p>
-                  <p className="font-bold text-stone-800">{staffProfile?.phone || 'Not provided'}</p>
-                </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setEditingProfile(false)} className="px-4 py-2 border rounded-xl font-bold cursor-pointer">Cancel</button>
+                    <button type="submit" disabled={savingProfile} className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-black cursor-pointer shadow-md shadow-purple-600/20">Save</button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-stone-100 overflow-hidden border border-stone-200 shadow-2xs">
+                      {staffProfile?.avatar_url ? (
+                        <img src={staffProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <UserCircle className="w-full h-full text-stone-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-black text-stone-900 text-base">{staffProfile?.full_name || staffProfile?.name || 'Agent'}</p>
+                      <p className="text-stone-400 text-xs font-medium">{session.user.email}</p>
+                    </div>
+                  </div>
 
-                <button onClick={handleLogout} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3 rounded-2xl cursor-pointer transition flex items-center justify-center gap-2">
-                  <LogOut size={15} /> Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
+                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-100 space-y-1">
+                    <p className="text-stone-400 text-[10px] font-black uppercase">Registered Phone</p>
+                    <p className="font-bold text-stone-800">{staffProfile?.phone || 'Not provided'}</p>
+                  </div>
+
+                  <button onClick={handleLogout} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black py-3.5 rounded-2xl cursor-pointer transition flex items-center justify-center gap-2">
+                    <LogOut size={15} /> Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* ── OTP MODAL ── */}
       <AnimatePresence>
