@@ -320,23 +320,18 @@ export default function StoreHeader({
                       </div>
 
                       <div className="py-1">
-                        {/* 1. Profile */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <User size={15} className="text-stone-400" /> Profile
                         </button>
-                        {/* 2. Orders */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <Package size={15} className="text-stone-400" /> Orders
                         </button>
-                        {/* 3. Address Book */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/address'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <MapPin size={15} className="text-stone-400" /> Address Book
                         </button>
-                        {/* 4. Wishlist */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <Heart size={15} className="text-stone-400" /> Wishlist
                         </button>
-                        {/* 5. Share the app */}
                         <button onClick={() => { 
                           setIsAccountMenuOpen(false); 
                           if (navigator.share) {
@@ -348,21 +343,17 @@ export default function StoreHeader({
                         }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <Share2 size={15} className="text-stone-400" /> Share the app
                         </button>
-                        {/* 6. Term and condition */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/terms'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <FileText size={15} className="text-stone-400" /> Term and condition
                         </button>
-                        {/* 7. Privacy Policy */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <Shield size={15} className="text-stone-400" /> Privacy Policy
                         </button>
-                        {/* 8. About Us */}
                         <button onClick={() => { setIsAccountMenuOpen(false); navigate('/about'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
                           <Info size={15} className="text-stone-400" /> About Us
                         </button>
                       </div>
 
-                      {/* 9. Logout */}
                       <div className="border-t border-stone-100 pt-1 mt-1">
                         <button onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }} className="w-full text-left px-5 py-2.5 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-3 transition cursor-pointer">
                           <LogOut size={15} /> Logout
@@ -425,8 +416,9 @@ export default function StoreHeader({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-white border-t border-stone-200 overflow-hidden px-4 py-4 space-y-4"
+              className="lg:hidden bg-white border-t border-stone-200 overflow-hidden px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto"
             >
+              {/* Categories Section in Mobile */}
               <div className="space-y-1">
                 <p className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Store Categories</p>
                 <div className="grid grid-cols-2 gap-2 pt-2">
@@ -452,18 +444,78 @@ export default function StoreHeader({
                 </div>
               </div>
 
+              {/* Account Navigation Links in Mobile */}
               {session ? (
-                <div className="pt-3 border-t border-stone-100 flex flex-col gap-2">
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left py-2 font-bold text-stone-700 flex items-center gap-2">
-                    <Package size={16} /> Orders
+                <div className="pt-3 border-t border-stone-100 space-y-1">
+                  <p className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-2">My Account</p>
+                  
+                  <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-2xl mb-3 border border-stone-100">
+                    <div className="w-9 h-9 rounded-full bg-stone-200 overflow-hidden flex items-center justify-center shrink-0">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <UserCircle size={20} className="text-stone-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-black text-stone-900 text-xs truncate">{customerProfile?.full_name || 'My Account'}</p>
+                      <p className="text-stone-500 text-[10px] truncate">{userPhone}</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <User size={16} className="text-stone-400" /> Profile
                   </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }} className="w-full text-left py-2 font-bold text-rose-600 flex items-center gap-2">
-                    <LogOut size={16} /> Logout
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <Package size={16} className="text-stone-400" /> Orders
                   </button>
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/address'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <MapPin size={16} className="text-stone-400" /> Address Book
+                  </button>
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <Heart size={16} className="text-stone-400" /> Wishlist
+                  </button>
+                  <button onClick={() => { 
+                    setIsMobileMenuOpen(false); 
+                    if (navigator.share) {
+                      navigator.share({ title: 'KD Store', url: window.location.origin }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(window.location.origin);
+                      alert('App link copied to clipboard!');
+                    }
+                  }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <Share2 size={16} className="text-stone-400" /> Share the app
+                  </button>
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <FileText size={16} className="text-stone-400" /> Term and condition
+                  </button>
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <Shield size={16} className="text-stone-400" /> Privacy Policy
+                  </button>
+                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
+                    <Info size={16} className="text-stone-400" /> About Us
+                  </button>
+
+                  <div className="pt-2">
+                    <button onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }} className="w-full text-left py-3 px-3 rounded-xl font-black text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition">
+                      <LogOut size={16} /> Logout
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="pt-3 border-t border-stone-100">
-                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full py-3 bg-emerald-600 text-white text-center font-black rounded-xl">
+                <div className="pt-3 border-t border-stone-100 space-y-2">
+                  <div className="space-y-1 mb-3">
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
+                      <FileText size={15} /> Term and condition
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
+                      <Shield size={15} /> Privacy Policy
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
+                      <Info size={15} /> About Us
+                    </button>
+                  </div>
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-center font-black rounded-2xl shadow-md">
                     Login / Sign Up
                   </Link>
                 </div>
