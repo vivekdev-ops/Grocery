@@ -1,6 +1,6 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect, useRef } from 'react';
-import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree, UserCircle, Heart, Info, Share2, FileText, Shield, SlidersHorizontal } from 'lucide-react';
+import { Search, User, ShoppingCart, MapPin, ChevronDown, Loader2, Zap, Mic, MicOff, Package, Gift, HelpCircle, LogOut, Sparkles, Menu, X, FolderTree, UserCircle, Heart, Info, Share2, FileText, Shield, SlidersHorizontal, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../supabaseClient';
@@ -108,74 +108,129 @@ export default function StoreHeader({
     ? customerProfile.full_name.split(' ')[0]
     : session?.user?.email?.split('@')[0];
 
+  const activeCategories = (categories || []).filter(c => c.is_active !== false);
+  const activeCategoryObj = activeCategories.find(c => c.id === activeCategory);
+  const isAnyCategorySelected = activeCategory !== 'All';
+
   return (
     <header className="bg-white sticky top-0 z-40 font-sans transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3.5">
 
-        {/* Top Bar: Location & Shopping Bag */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0">
-              <MapPin size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-1 cursor-pointer">
-                <span className="font-bold text-slate-900 text-sm">Home</span>
-                <ChevronDown size={14} className="text-slate-800 font-bold" />
-              </div>
-              <p className="text-[11px] text-stone-400 font-medium truncate max-w-[260px] sm:max-w-md">{locationName}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {session && <NotificationBell session={session} size={18} />}
-
-            {/* Shopping Bag Icon Button */}
-            <motion.button
-              onClick={onOpenCart}
-              animate={cartBounce ? { scale: [1, 1.2, 1] } : {}}
-              className="relative p-2.5 rounded-full text-slate-800 hover:bg-stone-100 transition cursor-pointer"
+        {/* If category is selected, show custom header with back arrow, category title, search icon, and cart icon */}
+        {isAnyCategorySelected ? (
+          <div className="flex items-center justify-between py-1">
+            <button 
+              onClick={() => setActiveCategory('All')}
+              className="p-2 -ml-2 rounded-full hover:bg-stone-100 text-slate-900 transition cursor-pointer"
+              title="Back"
             >
-              <ShoppingCart size={22} className="stroke-[2.2]" />
-              <AnimatePresence>
-                {totalItemsCount > 0 && (
-                  <motion.span
-                    key={totalItemsCount}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                    className="absolute top-1 right-1 bg-emerald-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs"
-                  >
-                    {totalItemsCount}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
-          </div>
-        </div>
+              <ArrowLeft size={22} className="stroke-[2.5]" />
+            </button>
 
-        {/* Search Bar & Filter Button matching reference screenshot */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex-1 relative bg-[#F4F5F7] rounded-2xl flex items-center px-4 py-3 shadow-inner">
-            <Search size={18} className="text-stone-400 mr-3 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search"
-              className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none placeholder-stone-400"
-              value={searchQuery}
-              onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
-            />
-          </div>
+            <h2 className="font-black text-slate-900 text-base sm:text-lg tracking-tight truncate max-w-[220px] sm:max-w-md">
+              {activeCategoryObj?.name || 'Category'}
+            </h2>
 
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen(prev => !prev)}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white p-3.5 rounded-2xl transition cursor-pointer shadow-md shadow-emerald-500/20 flex items-center justify-center shrink-0"
-            title="Filters / Menu"
-          >
-            <SlidersHorizontal size={20} className="stroke-[2.5]" />
-          </button>
-        </div>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => {}} 
+                className="p-2 rounded-full hover:bg-stone-100 text-slate-900 transition cursor-pointer"
+                title="Search"
+              >
+                <Search size={22} className="stroke-[2.5]" />
+              </button>
+
+              <motion.button
+                onClick={onOpenCart}
+                animate={cartBounce ? { scale: [1, 1.2, 1] } : {}}
+                className="relative p-2 rounded-full text-slate-900 hover:bg-stone-100 transition cursor-pointer"
+                title="Cart"
+              >
+                <ShoppingCart size={22} className="stroke-[2.2]" />
+                <AnimatePresence>
+                  {totalItemsCount > 0 && (
+                    <motion.span
+                      key={totalItemsCount}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      className="absolute top-0.5 right-0.5 bg-emerald-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs"
+                    >
+                      {totalItemsCount}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Top Bar: Location & Shopping Bag */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 cursor-pointer">
+                    <span className="font-bold text-slate-900 text-sm">Home</span>
+                    <ChevronDown size={14} className="text-slate-800 font-bold" />
+                  </div>
+                  <p className="text-[11px] text-stone-400 font-medium truncate max-w-[260px] sm:max-w-md">{locationName}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {session && <NotificationBell session={session} size={18} />}
+
+                {/* Shopping Bag Icon Button */}
+                <motion.button
+                  onClick={onOpenCart}
+                  animate={cartBounce ? { scale: [1, 1.2, 1] } : {}}
+                  className="relative p-2.5 rounded-full text-slate-800 hover:bg-stone-100 transition cursor-pointer"
+                >
+                  <ShoppingCart size={22} className="stroke-[2.2]" />
+                  <AnimatePresence>
+                    {totalItemsCount > 0 && (
+                      <motion.span
+                        key={totalItemsCount}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        className="absolute top-1 right-1 bg-emerald-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs"
+                      >
+                        {totalItemsCount}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Search Bar & Filter Button matching reference screenshot */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex-1 relative bg-[#F4F5F7] rounded-2xl flex items-center px-4 py-3 shadow-inner">
+                <Search size={18} className="text-stone-400 mr-3 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none placeholder-stone-400"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(prev => !prev)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white p-3.5 rounded-2xl transition cursor-pointer shadow-md shadow-emerald-500/20 flex items-center justify-center shrink-0"
+                title="Filters / Menu"
+              >
+                <SlidersHorizontal size={20} className="stroke-[2.5]" />
+              </button>
+            </div>
+          </>
+        )}
 
       </div>
 
@@ -186,7 +241,7 @@ export default function StoreHeader({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-white border-t border-stone-100 overflow-hidden px-4 py-4 space-y-4 max-h-[75vh] overflow-y-auto text-xs"
+            className="lg:hidden bg-white border-t border-stone-100 overflow-hidden px-4 py-4 space-y-4 max-h-[75vh] overflow-y-auto text-xs"
           >
             <div className="flex items-center justify-between pb-2 border-b border-stone-100">
               <span className="font-black uppercase tracking-wider text-[10px] text-stone-400">Quick Navigation</span>

@@ -1,6 +1,6 @@
 // src/components/store/ProductGrid.jsx
 import { useState } from 'react';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User, ArrowLeft, Search } from 'lucide-react';
+import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct }) {
@@ -211,44 +211,12 @@ export default function ProductGrid({
       {/* ── STOREFRONT VIEW: WHEN A CATEGORY IS SELECTED ── */}
       {isAnyCategorySelected ? (
         <div className="space-y-4">
-          
-          <div className="flex items-center justify-between py-2 border-b border-stone-100 mb-4">
-            <button 
-              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); }}
-              className="p-2 rounded-full hover:bg-stone-100 text-slate-800 transition cursor-pointer"
-            >
-              <ArrowLeft size={20} className="stroke-[2.5]" />
-            </button>
-            <h2 className="font-black text-slate-900 text-base sm:text-lg tracking-tight">
-              {activeCategoryObj?.name || 'Category'}
-            </h2>
-            <button 
-              onClick={() => {}} 
-              className="p-2 rounded-full hover:bg-stone-100 text-slate-800 transition cursor-pointer"
-            >
-              <Search size={20} className="stroke-[2.5]" />
-            </button>
-          </div>
 
-          <div className="grid grid-cols-[85px_1fr] sm:grid-cols-[110px_1fr] gap-4 items-start">
+          <div className="grid grid-cols-[85px_1fr] sm:grid-cols-[110px_1fr] gap-4 items-start pt-2">
             
             <div className="flex flex-col space-y-3 sticky top-20 max-h-[calc(100vh-120px)] overflow-y-auto pr-1">
-              <button
-                onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                className={`flex flex-col items-center p-2.5 rounded-2xl text-center transition cursor-pointer border ${
-                  activeSubcategoryId === 'All' 
-                    ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950 font-black shadow-xs' 
-                    : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
-                }`}
-              >
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-1.5 shadow-xs shrink-0">
-                  <Sparkles size={18} />
-                </div>
-                <span className="text-[10px] leading-tight truncate w-full">All Items</span>
-              </button>
-
-              {parentCategories.concat(currentSubcategories).map((sub, index) => {
-                const isSubSelected = activeSubcategoryId === sub.id || activeCategory === sub.id;
+              {parentCategories.map((sub, index) => {
+                const isSubSelected = activeCategory === sub.id;
                 const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                 return (
                   <button
@@ -316,18 +284,7 @@ export default function ProductGrid({
             </div>
             
             <div className="grid grid-cols-4 gap-3 sm:gap-4">
-              <motion.button
-                whileHover={{ y: -2 }}
-                onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                className="flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shadow-xs border-stone-100 bg-[#F4F5F7] hover:border-emerald-300 text-slate-800"
-              >
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-2 shrink-0 bg-white text-emerald-600 shadow-xs">
-                  <Sparkles size={20} />
-                </div>
-                <span className="text-[10px] sm:text-[11px] font-bold truncate w-full text-center">All</span>
-              </motion.button>
-
-              {parentCategories.slice(0, 7).map((cat, index) => {
+              {parentCategories.slice(0, 8).map((cat, index) => {
                 const img = cat.image_url || fallbackImages[index % fallbackImages.length];
                 return (
                   <motion.button
