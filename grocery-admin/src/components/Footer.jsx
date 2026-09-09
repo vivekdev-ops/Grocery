@@ -1,7 +1,8 @@
 // src/components/store/Footer.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ShoppingBag, ShieldCheck, Clock, Headphones, ArrowRight, Heart } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, Clock, Headphones, ArrowRight, Heart, Download, Sparkles, Send, ExternalLink } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Footer({ onSelectCategory, onNavigate }) {
   const [footerCategories, setFooterCategories] = useState([]);
@@ -16,7 +17,7 @@ export default function Footer({ onSelectCategory, onNavigate }) {
         .from('categories')
         .select('*')
         .order('name')
-        .limit(5); // Strictly cap at 5 categories as requested
+        .limit(5);
 
       if (!error && data) {
         setFooterCategories(data);
@@ -27,77 +28,118 @@ export default function Footer({ onSelectCategory, onNavigate }) {
   };
 
   return (
-    <footer className="bg-gradient-to-b from-white to-purple-50/50 border-t border-purple-100 font-sans pt-16 pb-28 md:pb-12 mt-20 text-slate-700">
-      <div className="max-w-7xl mx-auto px-4 space-y-12">
+    <footer className="bg-gradient-to-b from-purple-950 via-slate-950 to-slate-950 text-white font-sans pt-20 pb-32 md:pb-16 mt-20 relative overflow-hidden border-t border-purple-500/20">
+      
+      {/* Decorative background ambient lighting */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 relative z-10">
         
-        {/* Top Feature Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-12 border-b border-purple-100">
-          <div className="flex items-center gap-4 p-4 rounded-3xl bg-white border border-purple-100 shadow-sm">
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0 border border-purple-200">
+        {/* Top Interactive Feature Badges */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-12 border-b border-purple-900/50">
+          <motion.div 
+            whileHover={{ y: -4 }}
+            className="flex items-center gap-4 p-5 rounded-3xl bg-white/5 border border-purple-500/20 backdrop-blur-md shadow-lg transition group"
+          >
+            <div className="w-12 h-12 bg-purple-600/20 text-purple-300 rounded-2xl flex items-center justify-center shrink-0 border border-purple-500/30 group-hover:scale-110 transition-transform">
               <Clock size={22} />
             </div>
             <div>
-              <h4 className="font-black text-xs uppercase tracking-wider text-slate-900">Lightning Fast</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Delivered right to your doorstep in minutes.</p>
+              <h4 className="font-black text-xs uppercase tracking-wider text-white">Lightning Fast</h4>
+              <p className="text-[11px] text-purple-200/70 mt-0.5">Delivered in 13 minutes flat.</p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-4 p-4 rounded-3xl bg-white border border-purple-100 shadow-sm">
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0 border border-purple-200">
+          <motion.div 
+            whileHover={{ y: -4 }}
+            className="flex items-center gap-4 p-5 rounded-3xl bg-white/5 border border-purple-500/20 backdrop-blur-md shadow-lg transition group"
+          >
+            <div className="w-12 h-12 bg-indigo-600/20 text-indigo-300 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-500/30 group-hover:scale-110 transition-transform">
               <ShieldCheck size={22} />
             </div>
             <div>
-              <h4 className="font-black text-xs uppercase tracking-wider text-slate-900">100% Authentic</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Fresh grocery items sourced directly from trusted partners.</p>
+              <h4 className="font-black text-xs uppercase tracking-wider text-white">100% Authentic</h4>
+              <p className="text-[11px] text-purple-200/70 mt-0.5">Sourced from trusted partners.</p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-4 p-4 rounded-3xl bg-white border border-purple-100 shadow-sm">
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0 border border-purple-200">
+          <motion.div 
+            whileHover={{ y: -4 }}
+            className="flex items-center gap-4 p-5 rounded-3xl bg-white/5 border border-purple-500/20 backdrop-blur-md shadow-lg transition group"
+          >
+            <div className="w-12 h-12 bg-pink-600/20 text-pink-300 rounded-2xl flex items-center justify-center shrink-0 border border-pink-500/30 group-hover:scale-110 transition-transform">
               <ShoppingBag size={22} />
             </div>
             <div>
-              <h4 className="font-black text-xs uppercase tracking-wider text-slate-900">Best Prices</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Competitive pricing and massive discounts daily.</p>
+              <h4 className="font-black text-xs uppercase tracking-wider text-white">Best Prices</h4>
+              <p className="text-[11px] text-purple-200/70 mt-0.5">Massive daily discounts.</p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-4 p-4 rounded-3xl bg-white border border-purple-100 shadow-sm">
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shrink-0 border border-purple-200">
+          <motion.div 
+            whileHover={{ y: -4 }}
+            className="flex items-center gap-4 p-5 rounded-3xl bg-white/5 border border-purple-500/20 backdrop-blur-md shadow-lg transition group"
+          >
+            <div className="w-12 h-12 bg-teal-600/20 text-teal-300 rounded-2xl flex items-center justify-center shrink-0 border border-teal-500/30 group-hover:scale-110 transition-transform">
               <Headphones size={22} />
             </div>
             <div>
-              <h4 className="font-black text-xs uppercase tracking-wider text-slate-900">24/7 Support</h4>
-              <p className="text-[11px] text-slate-500 mt-0.5">Dedicated customer care for smooth assistance.</p>
+              <h4 className="font-black text-xs uppercase tracking-wider text-white">24/7 Support</h4>
+              <p className="text-[11px] text-purple-200/70 mt-0.5">Always here to help you out.</p>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Main Footer Links Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           
-          {/* Brand Info */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-purple-600 text-white rounded-xl flex items-center justify-center font-black shadow-md">
+          {/* Brand Info & APK Download Banner */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-gradient-to-tr from-purple-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center font-black shadow-xl text-sm">
                 KD
               </div>
-              <span className="font-black text-lg text-slate-900 tracking-tight">KD Store</span>
+              <div>
+                <span className="font-black text-lg tracking-tight text-white block">KD Store</span>
+                <span className="inline-flex items-center gap-1 text-[9px] text-purple-300 font-extrabold bg-purple-900/50 px-2 py-0.5 rounded-full border border-purple-700/50">
+                  <Sparkles size={9} className="animate-pulse" /> Quick Commerce
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-purple-200/70 leading-relaxed">
               Your ultimate quick-commerce platform delivering groceries, dairy, fresh produce, and essentials in minutes.
             </p>
-            <div className="text-xs text-slate-400 font-mono">
-              © {new Date().getFullYear()} KD Store Inc. All rights reserved.
-            </div>
+
+            {/* Glowing APK Download Card */}
+            <motion.a 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              href="/downloads/kd-store.apk" 
+              download="KDStore.apk"
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 border border-purple-400/30 hover:border-purple-400 text-white transition shadow-lg group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-purple-600 text-white rounded-xl flex items-center justify-center shadow-md shrink-0 group-hover:rotate-12 transition-transform">
+                  <Download size={16} />
+                </div>
+                <div>
+                  <span className="font-black text-xs block text-purple-100">Get Android App</span>
+                  <span className="text-[10px] text-purple-300/80 font-medium">Download APK Direct</span>
+                </div>
+              </div>
+              <ExternalLink size={14} className="text-purple-300 group-hover:translate-x-0.5 transition-transform" />
+            </motion.a>
           </div>
 
-          {/* Admin Managed Categories (Strictly Top 5) */}
-          <div className="space-y-3">
-            <h4 className="font-black text-xs uppercase tracking-widest text-slate-900">Top Categories</h4>
-            <ul className="space-y-2 text-xs font-bold">
+          {/* Admin Managed Categories */}
+          <div className="space-y-4">
+            <h4 className="font-black text-xs uppercase tracking-widest text-purple-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" /> Top Categories
+            </h4>
+            <ul className="space-y-2.5 text-xs font-bold">
               {footerCategories.length === 0 ? (
-                <li className="text-slate-400 italic">No categories available</li>
+                <li className="text-purple-400/50 italic">No categories available</li>
               ) : (
                 footerCategories.map(cat => (
                   <li key={cat.id}>
@@ -106,10 +148,10 @@ export default function Footer({ onSelectCategory, onNavigate }) {
                         if (onSelectCategory) onSelectCategory(cat.id);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="text-slate-600 hover:text-purple-700 transition flex items-center gap-1.5 cursor-pointer text-left"
+                      className="text-purple-200/70 hover:text-white transition flex items-center gap-2 cursor-pointer text-left group"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0" />
-                      {cat.name}
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500/50 group-hover:bg-purple-400 transition-colors shrink-0" />
+                      <span className="group-hover:translate-x-1 transition-transform">{cat.name}</span>
                     </button>
                   </li>
                 ))
@@ -118,16 +160,18 @@ export default function Footer({ onSelectCategory, onNavigate }) {
           </div>
 
           {/* Useful Links */}
-          <div className="space-y-3">
-            <h4 className="font-black text-xs uppercase tracking-widest text-slate-900">Customer Links</h4>
-            <ul className="space-y-2 text-xs font-bold">
+          <div className="space-y-4">
+            <h4 className="font-black text-xs uppercase tracking-widest text-purple-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" /> Customer Links
+            </h4>
+            <ul className="space-y-2.5 text-xs font-bold">
               <li>
                 <button 
                   onClick={() => {
                     if (onNavigate) onNavigate('shop');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-slate-600 hover:text-purple-700 transition cursor-pointer"
+                  className="text-purple-200/70 hover:text-white transition cursor-pointer hover:translate-x-1 inline-block duration-150 text-left"
                 >
                   Explore Catalog
                 </button>
@@ -138,7 +182,7 @@ export default function Footer({ onSelectCategory, onNavigate }) {
                     if (onNavigate) onNavigate('profile');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-slate-600 hover:text-purple-700 transition cursor-pointer"
+                  className="text-purple-200/70 hover:text-white transition cursor-pointer hover:translate-x-1 inline-block duration-150 text-left"
                 >
                   My Orders & Profile
                 </button>
@@ -149,18 +193,19 @@ export default function Footer({ onSelectCategory, onNavigate }) {
                     if (onNavigate) onNavigate('wishlist');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-slate-600 hover:text-purple-700 transition cursor-pointer"
+                  className="text-purple-200/70 hover:text-white transition cursor-pointer hover:translate-x-1 inline-block duration-150 text-left"
                 >
                   My Wishlist
                 </button>
               </li>
+              
               <li>
-                <a href="#privacy" onClick={(e) => { e.preventDefault(); alert("KD Store Privacy Policy: All customer transaction data is securely encrypted."); }} className="text-slate-600 hover:text-purple-700 transition">
+                <a href="/privacy" onClick={(e) => { e.preventDefault(); if(onNavigate) onNavigate('privacy'); else window.location.href='/privacy'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-purple-200/70 hover:text-white transition hover:translate-x-1 inline-block duration-150">
                   Privacy Policy
                 </a>
               </li>
               <li>
-                <a href="#terms" onClick={(e) => { e.preventDefault(); alert("KD Store Terms of Service: Deliveries are bound by our 10-minute SLA window."); }} className="text-slate-600 hover:text-purple-700 transition">
+                <a href="/terms" onClick={(e) => { e.preventDefault(); if(onNavigate) onNavigate('terms'); else window.location.href='/terms'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-purple-200/70 hover:text-white transition hover:translate-x-1 inline-block duration-150">
                   Terms of Service
                 </a>
               </li>
@@ -168,20 +213,24 @@ export default function Footer({ onSelectCategory, onNavigate }) {
           </div>
 
           {/* Newsletter / Quick Contact */}
-          <div className="space-y-3">
-            <h4 className="font-black text-xs uppercase tracking-widest text-slate-900">Stay Connected</h4>
-            <p className="text-xs text-slate-500">Subscribe to get instant updates on flash sales and discount drops.</p>
+          <div className="space-y-4">
+            <h4 className="font-black text-xs uppercase tracking-widest text-purple-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-pink-500 animate-ping" /> Stay Connected
+            </h4>
+            <p className="text-xs text-purple-200/70">Subscribe to get instant updates on flash sales and discount drops.</p>
             
-            <form onSubmit={(e) => { e.preventDefault(); alert("Subscribed successfully! Welcome to KD Store."); e.target.reset(); }} className="space-y-2">
-              <input 
-                type="email" 
-                required 
-                placeholder="Enter your email..." 
-                className="w-full bg-white border border-purple-200 rounded-2xl px-3.5 py-2.5 text-xs outline-none focus:border-purple-600 text-slate-800 shadow-2xs"
-              />
+            <form onSubmit={(e) => { e.preventDefault(); alert("Subscribed successfully! Welcome to KD Store."); e.target.reset(); }} className="space-y-2.5">
+              <div className="relative">
+                <input 
+                  type="email" 
+                  required 
+                  placeholder="Enter your email..." 
+                  className="w-full bg-white/5 border border-purple-500/30 rounded-2xl px-4 py-3 text-xs outline-none focus:border-purple-400 text-white placeholder-purple-300/40 shadow-inner backdrop-blur-sm transition"
+                />
+              </div>
               <button 
                 type="submit"
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-xs py-2.5 rounded-2xl transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs py-3 rounded-2xl transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                 title="Subscribe"
               >
                 <ShoppingBag size={14} /> Subscribe <ArrowRight size={14} />
@@ -192,12 +241,13 @@ export default function Footer({ onSelectCategory, onNavigate }) {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-purple-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-          <p className="flex items-center gap-1">
-            Crafted with <Heart size={14} className="fill-rose-500 text-rose-500" /> for instant deliveries.
+        <div className="pt-8 border-t border-purple-900/50 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-purple-300/60">
+          <p className="flex items-center gap-1.5 font-medium">
+            Crafted with <Heart size={14} className="fill-rose-500 text-rose-500 animate-pulse" /> for instant deliveries.
           </p>
-          <div className="flex gap-4 font-bold">
-            <span className="cursor-pointer hover:text-purple-700" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to Top</span>
+          <div className="flex items-center gap-6 font-bold">
+            <span className="text-purple-200/40 font-mono">© {new Date().getFullYear()} KD Store Inc.</span>
+            <span className="cursor-pointer hover:text-white transition" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to Top ↑</span>
           </div>
         </div>
 
