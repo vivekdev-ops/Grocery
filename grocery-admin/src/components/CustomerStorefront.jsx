@@ -1078,32 +1078,50 @@ export default function CustomerStorefront() {
   const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
-  // Prevent flash while status is checking, then block if portal is inactive
-  if (checkingStatus) {
-    return <div className="min-h-screen bg-stone-950 flex items-center justify-center text-white text-xs">Checking store availability...</div>;
+  // Full-screen loading splash screen until categories, subcategories, and products are fully loaded
+  if (checkingStatus || loading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 z-[9999] flex items-center justify-center overflow-hidden">
+        <img 
+          src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&auto=format&fit=crop&q=80" 
+          alt="Loading Store" 
+          className="w-full h-full object-cover filter brightness-75 animate-pulse"
+        />
+        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs flex flex-col items-center justify-center space-y-3">
+          <div className="w-12 h-12 bg-purple-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl animate-bounce">
+            KD
+          </div>
+          <p className="text-white font-black text-xs uppercase tracking-widest bg-slate-900/80 px-4 py-2 rounded-full border border-purple-500/30">
+            Opening KD Store...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (!storeStatus.active) {
     return (
-      <div className="min-h-screen bg-stone-950 text-white flex items-center justify-center p-6 font-sans text-center">
-        <div className="max-w-md w-full space-y-4 bg-stone-900 border border-stone-800 p-8 rounded-3xl shadow-2xl">
-          {storeStatus.image ? (
-            <img 
-              src={storeStatus.image} 
-              alt="Store Maintenance" 
-              className="w-full h-48 object-cover rounded-2xl mb-4 border border-stone-800 shadow-md" 
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-full h-32 bg-stone-800 rounded-2xl mb-4 flex items-center justify-center border border-stone-700 text-stone-500 text-[11px] font-bold">
-              Maintenance Mode
-            </div>
-          )}
-          <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/30 font-black text-lg">
+      <div className="fixed inset-0 bg-slate-950 text-white flex items-center justify-center p-6 font-sans text-center z-[9999] overflow-hidden">
+        {storeStatus.image ? (
+          <img 
+            src={storeStatus.image} 
+            alt="Store Maintenance" 
+            className="absolute inset-0 w-full h-full object-cover filter brightness-50"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        ) : (
+          <img 
+            src="https://images.unsplash.com/photo-1550583724-b2692b85b150?w=1200&auto=format&fit=crop&q=80" 
+            alt="Maintenance" 
+            className="absolute inset-0 w-full h-full object-cover filter brightness-50"
+          />
+        )}
+        <div className="relative z-10 max-w-md w-full space-y-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/30 p-8 rounded-3xl shadow-2xl">
+          <div className="w-14 h-14 bg-purple-600 text-white rounded-2xl flex items-center justify-center mx-auto border border-purple-400/30 font-black text-xl shadow-xl">
             KD
           </div>
           <h1 className="text-xl font-black tracking-tight text-white">We'll be back soon!</h1>
-          <p className="text-stone-400 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
+          <p className="text-purple-200 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
         </div>
       </div>
     );
