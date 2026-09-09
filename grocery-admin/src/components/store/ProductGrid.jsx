@@ -37,6 +37,8 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
   const stock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
   const isWishlisted = wishlistIds?.includes(product.id);
+  
+  const productRating = product.avgRating != null ? Number(product.avgRating) : product.rating != null ? Number(product.rating) : null;
 
   const variantIdentifier = activeVariant ? (activeVariant.id || activeVariant.unit_label || activeVariant.label || 'default') : 'default';
   const cartItemId = `${product.id}-${variantIdentifier}`;
@@ -100,7 +102,15 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 
       <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between gap-2 bg-white">
         <div className="space-y-1">
+          {productRating != null && !isNaN(productRating) && (
+            <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-md w-fit border border-amber-200/60 shadow-2xs">
+              <Star size={10} className="text-amber-500 fill-amber-500" />
+              <span className="font-black text-[9px] text-amber-900">{productRating.toFixed(1)}</span>
+            </div>
+          )}
+
           <p className="font-bold text-slate-900 text-[11px] sm:text-xs line-clamp-2 leading-tight group-hover:text-emerald-700 transition-colors">{product.name}</p>
+
           {hasVariants ? (
             <div onClick={e => e.stopPropagation()} className="pt-0.5">
               <select
@@ -184,7 +194,6 @@ export default function ProductGrid({
 
   const query = searchQuery.toLowerCase().trim();
 
-  // Filter products based on category/subcategory and search query
   const sourceProducts = activeProducts.filter(p => {
     const matchesSearch = !query || p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
     if (!matchesSearch) return false;
@@ -197,7 +206,6 @@ export default function ProductGrid({
     return p.category_id === activeCategory || p.category === activeCategory || subIds.includes(p.category_id);
   });
 
-  // Apply restricted sorting: Price: Low to High, Price: High to Low, Ratings
   const sortedProducts = [...sourceProducts].sort((a, b) => {
     if (sortBy === 'price_asc') {
       const priceA = Number(a.variants?.[0]?.price ?? a.price ?? 0);
@@ -227,23 +235,23 @@ export default function ProductGrid({
   return (
     <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-24 md:pb-12 text-slate-900 overflow-y-auto text-xs">
       
-      {/* ── TOP CATEGORIES STRIP (EXPLORE BY CATEGORY - FULL CIRCLE IMAGES) ── */}
+      {/* ── TOP CATEGORIES STRIP (FIXED HORIZONTAL SCROLL ON MOBILE) ── */}
       {!isAnyCategorySelected && (
         <div className="space-y-2 mb-4">
           <div className="flex items-center justify-between px-1">
             <h3 className="font-black text-xs sm:text-sm text-stone-950 tracking-tight uppercase">Explore Categories</h3>
           </div>
-          <div className="flex sm:grid sm:grid-cols-6 md:grid-cols-8 gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex overflow-x-auto gap-2.5 pb-2 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
             <motion.button
               whileHover={{ y: -2 }}
               onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-16 sm:w-auto transition-all
+              className={`inline-flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 transition-all
                 ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-600/20' : 'border-emerald-100 bg-white hover:border-emerald-400'}`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 shrink-0 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
                 <Sparkles size={15} />
               </div>
-              <span className={`text-[10px] font-black truncate w-full ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
+              <span className={`text-[10px] font-black truncate w-full text-center ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
             </motion.button>
 
             {parentCategories.map((cat, index) => {
@@ -254,13 +262,13 @@ export default function ProductGrid({
                   whileHover={{ y: -2 }}
                   key={cat.id}
                   onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-16 sm:w-auto transition-all
+                  className={`inline-flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 transition-all
                     ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-600/20' : 'border-emerald-100 bg-white hover:border-emerald-400'}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-stone-100 overflow-hidden mb-1 border border-stone-200 shrink-0 shadow-2xs">
                     <img src={img} alt={cat.name} className="w-full h-full object-cover rounded-full" />
                   </div>
-                  <span className={`text-[10px] font-black truncate w-full ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
+                  <span className={`text-[10px] font-black truncate w-full text-center ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
                 </motion.button>
               );
             })}
@@ -311,7 +319,7 @@ export default function ProductGrid({
       {isAnyCategorySelected ? (
         <div className="grid grid-cols-1 md:grid-cols-[15%_85%] gap-4 items-start">
           
-          {/* DESKTOP 15% VERTICAL SUB-SIDEBAR (FULL CIRCLE IMAGES) */}
+          {/* DESKTOP 15% VERTICAL SUB-SIDEBAR */}
           {!query && currentSubcategories.length > 0 && (
             <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-emerald-100 p-1.5 space-y-1 shadow-2xs sticky top-16 max-h-[calc(100vh-100px)] overflow-y-auto">
               <button
@@ -356,41 +364,39 @@ export default function ProductGrid({
           {/* 85% PRODUCTS AREA */}
           <div className="flex-1 w-full space-y-3 min-w-0">
             
-            {/* MOBILE 4x2 SUBCATEGORY GRID (EXACT 4 COLUMNS x 2 ROWS = 8 ITEMS, SQUARE SHAPE WITH FILLED IMAGE) */}
+            {/* MOBILE HORIZONTAL SUBCATEGORY SCROLL STRIP */}
             {!query && currentSubcategories.length > 0 && (
               <div className="block md:hidden bg-white p-3 rounded-2xl border border-emerald-100 shadow-2xs mb-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-black text-[11px] text-stone-900 uppercase tracking-wider">Subcategories</h3>
                   <span className="text-[10px] text-emerald-700 font-bold">{currentSubcategories.length} available</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {/* 'All' option card */}
+                <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <div
                     onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                    className={`flex flex-col items-center bg-stone-50 rounded-xl p-1.5 border cursor-pointer transition ${
+                    className={`inline-flex flex-col items-center bg-stone-50 rounded-xl p-2 border cursor-pointer shrink-0 w-20 transition ${
                       activeSubcategoryId === 'All' ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200'
                     }`}
                   >
-                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
                       <Sparkles size={15} />
                     </div>
                     <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">All</span>
                   </div>
 
-                  {/* Subcategory cards (takes up to 7 items to fit precisely in the 4x2 grid alongside 'All') */}
-                  {currentSubcategories.slice(0, 7).map((sub, index) => {
+                  {currentSubcategories.map((sub, index) => {
                     const isSubSelected = activeSubcategoryId === sub.id;
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
                       <div
                         key={sub.id}
                         onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className={`flex flex-col items-center bg-stone-50 rounded-xl p-1.5 border cursor-pointer transition ${
+                        className={`inline-flex flex-col items-center bg-stone-50 rounded-xl p-2 border cursor-pointer shrink-0 w-20 transition ${
                           isSubSelected ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200 hover:border-emerald-300'
                         }`}
                       >
-                        <div className="w-full aspect-square rounded-lg overflow-hidden bg-stone-100 mb-1 shadow-2xs">
-                          <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-100 mb-1 shadow-2xs border border-stone-200">
+                          <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
                         </div>
                         <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
                       </div>
@@ -520,7 +526,7 @@ export default function ProductGrid({
 
         </div>
       ) : (
-        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH SUBCATEGORIES IN 4x2 MOBILE GRID (NO PRODUCTS) */
+        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH HORIZONTAL SUBCATEGORY SCROLL */
         <div className="space-y-4">
           {parentCategories.map(parent => {
             const subcats = getSubcategories(parent.id);
@@ -535,31 +541,29 @@ export default function ProductGrid({
                   </button>
                 </div>
 
-                {/* MOBILE 4x2 SUBCATEGORY GRID FOR LANDING PAGE SECTIONS (EXACT 4 COLUMNS x 2 ROWS = 8 ITEMS, SQUARE SHAPE WITH FILLED IMAGE) */}
+                {/* MOBILE HORIZONTAL SUBCATEGORY SCROLL STRIP */}
                 <div className="block md:hidden bg-emerald-50/30 p-2 rounded-xl border border-emerald-100 mb-2">
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {/* 'All / View All' option card */}
+                  <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div
                       onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                      className="flex flex-col items-center bg-white rounded-lg p-1 border border-stone-200 cursor-pointer transition hover:border-emerald-400"
+                      className="inline-flex flex-col items-center bg-white rounded-xl p-2 border border-stone-200 cursor-pointer shrink-0 w-20 transition hover:border-emerald-400"
                     >
-                      <div className="w-full aspect-square rounded-md overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
                         <Sparkles size={14} />
                       </div>
                       <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">View All</span>
                     </div>
 
-                    {/* Subcategory cards (takes up to 7 items to fit precisely in the 4x2 grid alongside 'View All') */}
-                    {subcats.slice(0, 7).map((sub, index) => {
+                    {subcats.map((sub, index) => {
                       const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                       return (
                         <div
                           key={sub.id}
                           onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                          className="flex flex-col items-center bg-white rounded-lg p-1 border border-stone-200 cursor-pointer transition hover:border-emerald-400"
+                          className="inline-flex flex-col items-center bg-white rounded-xl p-2 border border-stone-200 cursor-pointer shrink-0 w-20 transition hover:border-emerald-400"
                         >
-                          <div className="w-full aspect-square rounded-md overflow-hidden bg-stone-100 mb-1 shadow-2xs">
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover" />
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-100 mb-1 shadow-2xs border border-stone-200">
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
                           </div>
                           <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
                         </div>
@@ -568,8 +572,8 @@ export default function ProductGrid({
                   </div>
                 </div>
 
-                {/* DESKTOP SUBCATEGORIES SCROLL STRIP (Full Circle Images) */}
-                <div className="hidden md:flex overflow-x-auto pb-1 gap-2.5 scrollbar-none snap-x">
+                {/* DESKTOP SUBCATEGORIES SCROLL STRIP */}
+                <div className="hidden md:flex overflow-x-auto pb-1 gap-2.5 scrollbar-none snap-x whitespace-nowrap">
                   {subcats.map((sub, index) => {
                     const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
                     return (
@@ -577,7 +581,7 @@ export default function ProductGrid({
                         whileHover={{ y: -1 }}
                         key={sub.id}
                         onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className="flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-16 snap-start"
+                        className="inline-flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-16 snap-start"
                       >
                         <div className="w-12 h-12 rounded-full bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-0.5 flex items-center justify-center">
                           {sub.image_url ? (

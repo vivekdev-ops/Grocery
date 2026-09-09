@@ -13,7 +13,7 @@ import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
-import { motion, AnimatePresence } from 'framer-motion'; // Added motion import
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -1092,7 +1092,7 @@ export default function CustomerStorefront() {
               src={storeStatus.image} 
               alt="Store Maintenance" 
               className="w-full h-48 object-cover rounded-2xl mb-4 border border-stone-800 shadow-md" 
-              onError={(e) => { e.target.style.display = 'none'; }} // Fallback if URL fails to load
+              onError={(e) => { e.target.style.display = 'none'; }}
             />
           ) : (
             <div className="w-full h-32 bg-stone-800 rounded-2xl mb-4 flex items-center justify-center border border-stone-700 text-stone-500 text-[11px] font-bold">
@@ -1109,7 +1109,7 @@ export default function CustomerStorefront() {
     );
   }
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50/50 via-[#F0FDF4] to-teal-50/40 text-slate-900 pb-36 font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50/60 via-purple-50/40 to-pink-50/50 text-slate-900 pb-36 font-sans selection:bg-purple-600 selection:text-white">
        
       {/* 1. Header Component */}
       <StoreHeader 
@@ -1127,18 +1127,18 @@ export default function CustomerStorefront() {
 
       {personalizedDeals.length > 0 && activeCategory === 'All' && !searchQuery && (
         <div className="max-w-7xl mx-auto px-4 mt-6">
-          <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl space-y-5 border border-emerald-700/40 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl space-y-5 border border-purple-500/30 relative overflow-hidden">
             <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
               <Sparkles size={180} />
             </div>
             <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-amber-400/20 rounded-2xl flex items-center justify-center border border-amber-400/30">
-                  <Sparkles className="text-amber-400 fill-amber-400 animate-pulse" size={20} />
+                <div className="w-9 h-9 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-400/30 text-purple-300">
+                  <Sparkles size={20} className="animate-pulse" />
                 </div>
-                <h3 className="font-black text-base md:text-xl tracking-tight">Deals Picked For Your Routine</h3>
+                <h3 className="font-black text-base md:text-xl tracking-tight text-purple-100">Deals Picked For Your Routine</h3>
               </div>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-black px-3.5 py-1.5 rounded-full border border-emerald-500/30 uppercase tracking-widest shadow-inner">Limited Time</span>
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 font-black px-3.5 py-1.5 rounded-full border border-purple-500/30 uppercase tracking-widest shadow-inner">Limited Time</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
@@ -1168,32 +1168,33 @@ export default function CustomerStorefront() {
                 const productWithDealPrice = { ...prod, price: finalPrice, mrp: displayMrp || originalPrice };
 
                 return (
-                  <div key={deal.id} className="bg-emerald-900/40 hover:bg-emerald-900/60 p-4 rounded-3xl border border-emerald-700/40 flex flex-col justify-between space-y-3 backdrop-blur-md transition-all duration-300 group shadow-lg">
+                  <div key={deal.id} className="bg-white/10 hover:bg-white/15 p-4 rounded-3xl border border-purple-500/20 flex flex-col justify-between space-y-3 backdrop-blur-md transition-all duration-300 group shadow-lg">
                     <div className="space-y-2">
-                      <div className="relative h-36 rounded-2xl overflow-hidden bg-black/20 flex items-center justify-center p-2 border border-emerald-700/30">
+                      <div className="relative h-36 rounded-2xl overflow-hidden bg-black/20 flex items-center justify-center p-2 border border-purple-500/20">
                         <img src={pImages[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
                          
                         {badgeText && (
-                          <span className="absolute top-2 left-2 bg-rose-600 text-white font-black text-[9px] px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider">
+                          <span className="absolute top-2 left-2 bg-pink-600 text-white font-black text-[9px] px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider">
                             {badgeText}
                           </span>
                         )}
                       </div>
-                      <h4 className="font-bold text-xs text-white line-clamp-1 group-hover:text-emerald-300 transition">{prod.name}</h4>
+                      <h4 className="font-bold text-xs text-white line-clamp-1 group-hover:text-purple-200 transition">{prod.name}</h4>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-emerald-800/40">
+                    <div className="flex items-center justify-between pt-2 border-t border-purple-500/20">
                       <div>
-                        <span className="font-black text-sm md:text-base text-emerald-300">₹{finalPrice}</span>
+                        <span className="font-black text-sm md:text-base text-purple-200">₹{finalPrice}</span>
                         {displayMrp && displayMrp > finalPrice && (
-                          <span className="text-[10px] text-emerald-400/60 line-through ml-1.5 font-bold">₹{displayMrp}</span>
+                          <span className="text-[10px] text-purple-300/60 line-through ml-1.5 font-bold">₹{displayMrp}</span>
                         )}
                       </div>
                       <button 
                         onClick={() => addToCart(productWithDealPrice)}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
+                        className="bg-purple-600 hover:bg-purple-500 text-white px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
+                        title="Add"
                       >
-                        + Add
+                        <Package size={14} />
                       </button>
                     </div>
                   </div>
@@ -1208,28 +1209,28 @@ export default function CustomerStorefront() {
       {isProfileOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-[999] transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
-            <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
+            <div className="p-6 border-b border-purple-100 flex justify-between items-center bg-purple-50/50">
               <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5">
-                <User size={20} className="text-emerald-700 shrink-0" /> 
+                <User size={20} className="text-purple-600 shrink-0" /> 
                 <span className="truncate">My Account & Dashboard</span>
               </h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer" title="Close"><X size={16} /></button>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-purple-100/60 rounded-full text-slate-600 hover:bg-purple-100 transition cursor-pointer" title="Close"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
-                <p className="text-[10px] text-emerald-800 uppercase font-black tracking-widest">Signed in as</p>
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 p-4 rounded-2xl shadow-2xs">
+                <p className="text-[10px] text-purple-700 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
 
               {/* Edit Profile Section */}
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'profile_edit' ? null : 'profile_edit')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <User size={16} className="text-emerald-700 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
+                    <User size={16} className="text-purple-600 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
                   </span>
                   {openSection === 'profile_edit' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
@@ -1254,7 +1255,7 @@ export default function CustomerStorefront() {
                       setCustomerProfile(updates);
                       alert('Profile updated successfully!');
                     }
-                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
+                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100">
                     <div className="space-y-1 pt-2">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Full Name</label>
                       <input 
@@ -1262,7 +1263,7 @@ export default function CustomerStorefront() {
                         name="fullName"
                         placeholder="Enter your name" 
                         defaultValue={customerProfile?.full_name || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
                       />
                     </div>
                     <div className="space-y-1">
@@ -1272,7 +1273,7 @@ export default function CustomerStorefront() {
                         name="phone"
                         placeholder="+91 98765 43210" 
                         defaultValue={customerProfile?.phone || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
                       />
                     </div>
                      
@@ -1294,8 +1295,8 @@ export default function CustomerStorefront() {
                               const urlInput = document.getElementById('avatarUrlInput');
                               if (urlInput) urlInput.value = presetUrl;
                             }}
-                            className="w-10 h-10 rounded-full border-2 border-emerald-200 overflow-hidden shrink-0 hover:scale-105 transition bg-emerald-50 cursor-pointer flex items-center justify-center"
-                            title="Click to select avatar preset"
+                            className="w-10 h-10 rounded-full border-2 border-purple-200 overflow-hidden shrink-0 hover:scale-105 transition bg-purple-50 cursor-pointer flex items-center justify-center"
+                            title="Select preset avatar"
                           >
                             <img src={presetUrl} alt="Preset" className="w-full h-full object-cover" />
                           </button>
@@ -1308,7 +1309,7 @@ export default function CustomerStorefront() {
                         name="avatarUrl"
                         placeholder="https://example.com/avatar.jpg" 
                         defaultValue={customerProfile?.avatar_url || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
                       />
                     </div>
 
@@ -1319,10 +1320,10 @@ export default function CustomerStorefront() {
                         rows="2"
                         placeholder="e.g. Organic, Snacks, Dairy..." 
                         defaultValue={customerProfile?.interests || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium resize-none" 
+                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium resize-none" 
                       />
                     </div>
-                    <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
+                    <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
                       Save Profile Changes
                     </button>
                   </form>
@@ -1330,20 +1331,21 @@ export default function CustomerStorefront() {
               </div>
 
               {predictedRefillItems.length > 0 && (
-                <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 rounded-2xl border border-emerald-800 space-y-2 shadow-md">
-                  <div className="flex items-center gap-2 text-amber-400 font-black">
+                <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-4 rounded-2xl border border-purple-700 space-y-2 shadow-md">
+                  <div className="flex items-center gap-2 text-pink-300 font-black">
                     <Sparkles size={16} className="shrink-0" /> AI Smart Refill Basket
                   </div>
-                  <p className="text-[11px] text-emerald-200">Based on your past orders, you might need these staples soon:</p>
+                  <p className="text-[11px] text-purple-200">Based on your past orders, you might need these staples soon:</p>
                   <div className="space-y-1.5 pt-1">
                     {predictedRefillItems.map(p => (
-                      <div key={p.id} className="bg-emerald-900/60 p-2 rounded-xl flex items-center justify-between border border-emerald-700/50">
+                      <div key={p.id} className="bg-white/10 p-2 rounded-xl flex items-center justify-between border border-purple-500/30">
                         <span className="font-bold truncate max-w-[180px]">{p.name}</span>
                         <button 
                           onClick={() => addToCart(p)}
-                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
+                          className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
+                          title="Add"
                         >
-                          + Add
+                          <Package size={12} />
                         </button>
                       </div>
                     ))}
@@ -1352,13 +1354,13 @@ export default function CustomerStorefront() {
               )}
 
               {/* My Orders Section */}
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Package size={16} className="text-emerald-700 shrink-0" /> 
+                    <Package size={16} className="text-purple-600 shrink-0" /> 
                     <span className="truncate">My Orders ({myOrders.length})</span>
                   </span>
                   {openSection === 'orders' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
@@ -1373,7 +1375,7 @@ export default function CustomerStorefront() {
                     const showOtp = order.status !== 'delivered' && order.status !== 'cancelled';
 
                     return (
-                      <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
+                      <div key={order.id} className="p-3.5 bg-purple-50/20 rounded-2xl border border-purple-100 space-y-2">
                         <div className="flex justify-between items-center gap-2">
                           <span className="font-mono font-bold text-slate-900 truncate">#{order.id.slice(0, 8)}</span>
                           <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black shrink-0 ${
@@ -1383,14 +1385,14 @@ export default function CustomerStorefront() {
                         </div>
 
                         {showOtp && (
-                          <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-2.5 flex items-center justify-between">
+                          <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-purple-200 rounded-2xl p-2.5 flex items-center justify-between">
                             <div>
-                              <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-purple-800 block">
                                 Delivery OTP
                               </span>
                               <p className="text-[9px] text-stone-500">Show to delivery partner</p>
                             </div>
-                            <div className="bg-white px-3 py-1 rounded-xl border border-emerald-300 font-mono font-black text-sm text-emerald-700 tracking-widest shadow-2xs">
+                            <div className="bg-white px-3 py-1 rounded-xl border border-purple-300 font-mono font-black text-sm text-purple-700 tracking-widest shadow-2xs">
                               {order.otp || '----'}
                             </div>
                           </div>
@@ -1403,7 +1405,7 @@ export default function CustomerStorefront() {
                         <div className="flex gap-1.5 pt-1">
                           <button 
                             onClick={() => setSelectedProfileOrder(order)}
-                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
+                            className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-purple-200 cursor-pointer"
                           >
                             <FileText size={14} className="shrink-0" />
                             <span>Details</span>
@@ -1414,16 +1416,16 @@ export default function CustomerStorefront() {
                   };
 
                   return (
-                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100 text-xs">
+                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100 text-xs">
                       {myOrders.length === 0 ? (
                         <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
                       ) : (
                         <>
-                          <div className="flex gap-1 bg-emerald-50/70 p-1 rounded-2xl border border-emerald-100 mt-2">
+                          <div className="flex gap-1 bg-purple-50/70 p-1 rounded-2xl border border-purple-100 mt-2">
                             <button
                               onClick={() => setOrderTab('active')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'active' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'active' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Active ({activeOrders.length})
@@ -1431,7 +1433,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('delivered')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'delivered' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'delivered' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Delivered ({deliveredOrders.length})
@@ -1439,7 +1441,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('cancelled')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'cancelled' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'cancelled' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Cancelled ({cancelledOrders.length})
@@ -1478,39 +1480,40 @@ export default function CustomerStorefront() {
                 })()}
               </div>
 
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Heart size={16} className="text-rose-600 shrink-0" /> 
+                    <Heart size={16} className="text-pink-600 shrink-0" /> 
                     <span className="truncate">My Wishlist ({wishlistProducts.length})</span>
                   </span>
                   {openSection === 'wishlist' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'wishlist' && (
-                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-emerald-100">
+                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-purple-100">
                     {wishlistProducts.length === 0 ? (
                       <p className="text-slate-400 italic py-3 text-center">Your wishlist is empty.</p>
                     ) : (
                       wishlistProducts.map(p => {
                         const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
                         return (
-                          <div key={p.id} className="p-3 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
+                          <div key={p.id} className="p-3 bg-purple-50/20 rounded-2xl border border-purple-100 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
+                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-purple-200 bg-white shrink-0" />
                               <div className="min-w-0">
                                 <span className="font-bold text-slate-900 block truncate">{p.name}</span>
-                                <span className="font-black text-emerald-700">₹{p.price}</span>
+                                <span className="font-black text-purple-700">₹{p.price}</span>
                               </div>
                             </div>
                             <button 
                               onClick={() => addToCart(p)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
+                              className="bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
+                              title="Add"
                             >
-                              Add
+                              <Package size={14} />
                             </button>
                           </div>
                         );
@@ -1520,45 +1523,45 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin size={16} className="text-emerald-700 shrink-0" /> 
+                    <MapPin size={16} className="text-purple-600 shrink-0" /> 
                     <span className="truncate">Saved Addresses ({savedAddresses.length})</span>
                   </span>
                   {openSection === 'addresses' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'addresses' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-emerald-700 font-black hover:underline cursor-pointer">
+                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-purple-600 font-black hover:underline cursor-pointer">
                         {showAddAddressBox ? 'Cancel' : '+ Add Address'}
                       </button>
                     </div>
 
                     {showAddAddressBox && (
-                      <form onSubmit={handleAddAddress} className="bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-200 space-y-2.5">
-                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
+                      <form onSubmit={handleAddAddress} className="bg-purple-50/30 p-3.5 rounded-2xl border border-purple-200 space-y-2.5">
+                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
                          
-                        <div className="p-2.5 bg-emerald-50 text-emerald-800 rounded-xl font-bold flex items-center gap-1.5 border border-emerald-200 text-[11px]">
+                        <div className="p-2.5 bg-purple-50 text-purple-800 rounded-xl font-bold flex items-center gap-1.5 border border-purple-200 text-[11px]">
                           <Navigation size={13} className="shrink-0" />
                           <span>{newAddressForm.latitude ? 'GPS Location automatically detected!' : 'Detecting GPS location...'}</span>
                         </div>
 
-                        <input type="text" placeholder="House No." required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
-                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
-                        <input type="tel" placeholder="Phone Number" required className="w-full border border-emerald-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                        <button type="submit" className="w-full bg-emerald-700 text-white py-2.5 rounded-xl font-black cursor-pointer">Save Address</button>
+                        <input type="text" placeholder="House No." required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
+                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
+                        <input type="tel" placeholder="Phone Number" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
+                        <button type="submit" className="w-full bg-purple-600 text-white py-2.5 rounded-xl font-black cursor-pointer">Save Address</button>
                       </form>
                     )}
 
                     {savedAddresses.map(addr => (
-                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start gap-2">
+                      <div key={addr.id} className="p-3.5 bg-purple-50/20 rounded-2xl border border-purple-200 flex justify-between items-start gap-2">
                         <div className="min-w-0">
                           <span className="font-black text-slate-900 block truncate">{addr.title}</span>
                           <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
@@ -1573,10 +1576,10 @@ export default function CustomerStorefront() {
 
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
-                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
+                className="w-full bg-purple-50/60 hover:bg-purple-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-purple-200 transition cursor-pointer"
               >
                 <span className="flex items-center gap-2.5 truncate">
-                  <MessageSquarePlus size={16} className="text-emerald-700 shrink-0" /> 
+                  <MessageSquarePlus size={16} className="text-purple-600 shrink-0" /> 
                   <span className="truncate">Send Feedback & Suggestions</span>
                 </span>
                 <ChevronRight size={16} className="shrink-0" />
@@ -1584,7 +1587,7 @@ export default function CustomerStorefront() {
 
             </div>
 
-            <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
+            <div className="p-6 border-t border-purple-100 bg-purple-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
                 className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer shadow-2xs"
@@ -1599,14 +1602,14 @@ export default function CustomerStorefront() {
       {/* Order Details Modal */}
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fadeIn font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-purple-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-purple-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
-              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center">
+              <div className="bg-purple-50/40 p-3.5 rounded-2xl border border-purple-100 flex justify-between items-center">
                 <span className="text-slate-500 font-bold">Order Status:</span>
                 <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
                   selectedProfileOrder.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
@@ -1615,26 +1618,26 @@ export default function CustomerStorefront() {
               </div>
 
               {selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
-                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
+                <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-purple-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-purple-800 block">
                       Delivery Verification OTP
                     </span>
                     <p className="text-[10px] text-stone-600 font-medium">
                       Share this code with the delivery partner
                     </p>
                   </div>
-                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
+                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-purple-300 font-mono font-black text-base text-purple-700 tracking-widest shadow-sm">
                     {selectedProfileOrder.otp || '----'}
                   </div>
                 </div>
               )}
 
               {myComplaintsMap[selectedProfileOrder.id] && (
-                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-2xl border border-indigo-200 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-teal-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                      <LifeBuoy size={14} className="text-teal-700" /> Support Ticket Status
+                    <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                      <LifeBuoy size={14} className="text-indigo-600" /> Support Ticket Status
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
                       myComplaintsMap[selectedProfileOrder.id].status === 'resolved' ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
@@ -1660,10 +1663,10 @@ export default function CustomerStorefront() {
               {selectedProfileOrder.status === 'delivered' && !myComplaintsMap[selectedProfileOrder.id] && (
                 <button
                   onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: null })}
-                  className="w-full bg-teal-50 hover:bg-teal-100 text-teal-800 p-3 rounded-2xl border border-teal-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-900 p-3 rounded-2xl border border-indigo-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
                 >
                   <span className="flex items-center gap-2">
-                    <LifeBuoy size={16} className="text-teal-700" /> Need Help with this Whole Order?
+                    <LifeBuoy size={16} className="text-indigo-600" /> Need Help with this Whole Order?
                   </span>
                   <ChevronRight size={14} />
                 </button>
@@ -1671,7 +1674,7 @@ export default function CustomerStorefront() {
 
               <div className="space-y-1">
                 <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Items</span>
-                <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100">
+                <div className="space-y-2 bg-purple-50/30 p-3.5 rounded-2xl border border-purple-100">
                   {selectedProfileOrder.order_items?.map(item => {
                     const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
                     const itemImg = itemImages[0] || '';
@@ -1698,15 +1701,15 @@ export default function CustomerStorefront() {
                     const discountPct = hasMrp ? Math.round(((itemMrp - itemPrice) / itemMrp) * 100) : 0;
 
                     return (
-                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
+                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-purple-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
+                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-purple-200 bg-white shrink-0" />
                             <div className="min-w-0">
                               <span className="font-black text-slate-900 block truncate">{item.products?.name || 'Item'}</span>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 {item.variant_label && (
-                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                  <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-md">
                                     {item.variant_label}
                                   </span>
                                 )}
@@ -1717,7 +1720,7 @@ export default function CustomerStorefront() {
                                   <span className="text-stone-400 line-through text-[10px]">₹{itemMrp * item.quantity}</span>
                                 )}
                                 {discountPct > 0 && (
-                                  <span className="text-[9px] text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  <span className="text-[9px] text-purple-700 font-black bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
                                     {discountPct}% OFF
                                   </span>
                                 )}
@@ -1729,7 +1732,7 @@ export default function CustomerStorefront() {
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: item.products })}
-                                className="p-2 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition flex items-center justify-center cursor-pointer"
+                                className="p-2 rounded-xl font-bold text-[11px] bg-indigo-50 text-indigo-900 border border-indigo-200 hover:bg-indigo-100 transition flex items-center justify-center cursor-pointer"
                                 title="Item Help"
                               >
                                 <LifeBuoy size={14} className="shrink-0" />
@@ -1747,7 +1750,7 @@ export default function CustomerStorefront() {
                                 className={`p-2 rounded-xl font-bold text-[11px] transition flex items-center justify-center cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
-                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
                                 }`}
                                 title={hasReviewed ? "Review" : "Rate"}
                               >
@@ -1762,14 +1765,14 @@ export default function CustomerStorefront() {
                 </div>
               </div>
 
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
+              <div className="bg-purple-50/40 p-3.5 rounded-2xl border border-purple-100 space-y-1">
                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
                 <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
               </div>
 
-              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
+              <div className="pt-2 border-t border-purple-100 flex justify-between items-center font-black text-sm text-slate-900">
                 <span>Total Amount Paid:</span>
-                <span className="text-emerald-700">₹{selectedProfileOrder.total_amount}</span>
+                <span className="text-purple-600">₹{selectedProfileOrder.total_amount}</span>
               </div>
             </div>
 
@@ -1795,21 +1798,21 @@ export default function CustomerStorefront() {
 
     {orderHelpTarget && (
       <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-purple-100 space-y-4">
+          <div className="flex justify-between items-center border-b border-purple-100 pb-3">
             <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-              <LifeBuoy size={16} className="text-teal-700" />
+              <LifeBuoy size={16} className="text-indigo-600" />
               {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
             </h3>
-            <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+            <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
           </div>
 
           <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
-            <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
-              <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">Target Reference</span>
+            <div className="bg-indigo-50/60 p-3 rounded-2xl border border-indigo-200 space-y-1">
+              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">Target Reference</span>
               <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
               {orderHelpTarget.item && (
-                <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
+                <p className="text-indigo-700 font-bold">Product: {orderHelpTarget.item.name}</p>
               )}
             </div>
 
@@ -1818,7 +1821,7 @@ export default function CustomerStorefront() {
               <select 
                 value={helpForm.issueType} 
                 onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
-                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 font-bold outline-none cursor-pointer"
               >
                 <option value="Damaged / Defective Item">Damaged / Defective Item</option>
                 <option value="Missing Item from Package">Missing Item from Package</option>
@@ -1837,14 +1840,14 @@ export default function CustomerStorefront() {
                 required
                 value={helpForm.message}
                 onChange={e => setHelpForm({...helpForm, message: e.target.value})}
-                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 outline-none resize-none focus:border-purple-500"
               />
             </div>
 
             <button 
               type="submit" 
               disabled={submittingHelp}
-              className="w-full bg-teal-700 hover:bg-teal-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-700/20 disabled:opacity-50 cursor-pointer"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
             >
               {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
             </button>
@@ -1855,20 +1858,20 @@ export default function CustomerStorefront() {
 
     {reviewModalProduct && (
       <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-purple-100 space-y-4">
+          <div className="flex justify-between items-center border-b border-purple-100 pb-3">
             <h3 className="font-black text-sm text-slate-900">
               {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
             </h3>
-            <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer"><X size={16}/></button>
+            <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
           </div>
 
           <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
-            <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
+            <div className="flex items-center gap-3 bg-purple-50/40 p-3 rounded-2xl border border-purple-100">
               <img 
                 src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
                 alt="" 
-                className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
+                className="w-11 h-11 object-cover rounded-xl bg-white border border-purple-200" 
               />
               <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
             </div>
@@ -1878,7 +1881,7 @@ export default function CustomerStorefront() {
               <select 
                 value={newReviewForm.rating} 
                 onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
-                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 font-bold outline-none cursor-pointer"
               >
                 <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
                 <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
@@ -1896,11 +1899,11 @@ export default function CustomerStorefront() {
                 required
                 value={newReviewForm.review_text}
                 onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
-                className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 outline-none resize-none focus:border-purple-500"
               />
             </div>
 
-            <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-700/20 cursor-pointer">
+            <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-purple-600/20 cursor-pointer">
               {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
             </button>
           </form>
@@ -1910,8 +1913,8 @@ export default function CustomerStorefront() {
 
     {orderSuccess && (
       <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-emerald-100 space-y-4">
-          <div className="w-20 h-20 bg-emerald-50 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto border border-emerald-200">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-purple-100 space-y-4">
+          <div className="w-20 h-20 bg-purple-50 text-purple-600 rounded-3xl flex items-center justify-center mx-auto border border-purple-200">
             <CheckCircle size={40} />
           </div>
           <div>
@@ -1921,7 +1924,7 @@ export default function CustomerStorefront() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
-              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-700/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-purple-600/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               Track Order Status <ArrowRight size={16} />
             </button>
@@ -2009,12 +2012,13 @@ export default function CustomerStorefront() {
             {/* Modal Header Bar */}
             <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/80 sticky top-0 z-20">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
                 <span className="text-xs font-black uppercase tracking-wider text-stone-600">Delivery in 13 minutes</span>
               </div>
               <button 
                 onClick={() => { setSelectedProductDetails(null); setIsDescriptionExpanded(false); }} 
                 className="p-2 rounded-full hover:bg-stone-200/60 text-stone-500 transition cursor-pointer"
+                title="Close"
               >
                 <X size={18} />
               </button>
@@ -2069,7 +2073,7 @@ export default function CustomerStorefront() {
                     </div>
 
                     {discountPct > 0 && (
-                      <span className="absolute top-3 left-3 bg-emerald-600 text-white font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs z-20">
+                      <span className="absolute top-3 left-3 bg-pink-600 text-white font-black text-[10px] px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-xs z-20">
                         {discountPct}% OFF
                       </span>
                     )}
@@ -2086,7 +2090,7 @@ export default function CustomerStorefront() {
                         <button 
                           key={i} 
                           onClick={() => { setActiveGalleryImage(imgUrl); setImageZoomScale(1); }}
-                          className={`w-14 h-14 rounded-2xl border-2 overflow-hidden shrink-0 transition bg-stone-50 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-emerald-600 ring-2 ring-emerald-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
+                          className={`w-14 h-14 rounded-2xl border-2 overflow-hidden shrink-0 transition bg-stone-50 cursor-pointer ${activeGalleryImage === imgUrl ? 'border-purple-600 ring-2 ring-purple-600/20' : 'border-stone-200 opacity-70 hover:opacity-100'}`}
                         >
                           <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                         </button>
@@ -2099,7 +2103,7 @@ export default function CustomerStorefront() {
                 <div className="space-y-6">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      <span className="text-[10px] font-black text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
                         13 MINS DELIVERY
                       </span>
                       {selectedProductDetails.avgRating && (
@@ -2127,7 +2131,7 @@ export default function CustomerStorefront() {
                                 onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
                                 className={`px-4 py-2 rounded-xl text-xs font-black border transition cursor-pointer ${
                                   isVarSelected 
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm' 
                                     : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                                 }`}
                               >
@@ -2170,17 +2174,19 @@ export default function CustomerStorefront() {
 
                       if (modalQty > 0) {
                         return (
-                          <div className="flex items-center bg-emerald-600 text-white rounded-2xl overflow-hidden shadow-md h-12">
+                          <div className="flex items-center bg-purple-600 text-white rounded-2xl overflow-hidden shadow-md h-12">
                             <button
                               onClick={() => updateQuantity(modalCartItem.cartItemId, -1)}
-                              className="px-4 h-full hover:bg-emerald-700 font-black text-sm flex items-center justify-center cursor-pointer"
+                              className="px-4 h-full hover:bg-purple-700 font-black text-sm flex items-center justify-center cursor-pointer"
+                              title="Decrease quantity"
                             >
                               -
                             </button>
                             <span className="px-4 font-black text-sm">{modalQty}</span>
                             <button
                               onClick={() => updateQuantity(modalCartItem.cartItemId, 1)}
-                              className="px-4 h-full hover:bg-emerald-700 font-black text-sm flex items-center justify-center cursor-pointer"
+                              className="px-4 h-full hover:bg-purple-700 font-black text-sm flex items-center justify-center cursor-pointer"
+                              title="Increase quantity"
                             >
                               +
                             </button>
@@ -2191,9 +2197,9 @@ export default function CustomerStorefront() {
                       return (
                         <button 
                           onClick={() => addToCart(selectedProductDetails, modalActiveVariant)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/25 transition cursor-pointer btn-press"
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-black px-8 py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-purple-600/25 transition cursor-pointer btn-press flex items-center gap-2"
                         >
-                          Add to Cart
+                          <Package size={16} /> Add to Cart
                         </button>
                       );
                     })()}
@@ -2243,9 +2249,9 @@ export default function CustomerStorefront() {
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100 flex items-center gap-2.5">
-                        <Banknote size={18} className="text-emerald-600 shrink-0" />
+                        <Banknote size={18} className="text-purple-600 shrink-0" />
                         <div>
-                          <span className="font-black text-stone-900 block text-[11px]">COD Available</span>
+                          <span className="font-black text-stone-900 block text-[11px]">COD</span>
                           <span className="text-[10px] text-stone-500 font-bold">Pay on delivery</span>
                         </div>
                       </div>
@@ -2254,23 +2260,23 @@ export default function CustomerStorefront() {
                         <RefreshCw size={18} className="text-rose-500 shrink-0" />
                         <div>
                           <span className="font-black text-stone-900 block text-[11px]">No Return</span>
-                          <span className="text-[10px] text-stone-500 font-bold">Final sale item</span>
+                          <span className="text-[10px] text-stone-500 font-bold">Final sale</span>
                         </div>
                       </div>
 
                       <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100 flex items-center gap-2.5">
                         <DoorOpen size={18} className="text-amber-600 shrink-0" />
                         <div>
-                          <span className="font-black text-stone-900 block text-[11px]">Doorstep Cancel</span>
-                          <span className="text-[10px] text-stone-500 font-bold">Easy cancellation</span>
+                          <span className="font-black text-stone-900 block text-[11px]">Cancel</span>
+                          <span className="text-[10px] text-stone-500 font-bold">At doorstep</span>
                         </div>
                       </div>
 
                       <div className="bg-stone-50 p-3 rounded-2xl border border-stone-100 flex items-center gap-2.5">
                         <ShieldCheck size={18} className="text-teal-600 shrink-0" />
                         <div>
-                          <span className="font-black text-stone-900 block text-[11px]">Assured Product</span>
-                          <span className="text-[10px] text-stone-500 font-bold">100% Quality checked</span>
+                          <span className="font-black text-stone-900 block text-[11px]">Assured</span>
+                          <span className="text-[10px] text-stone-500 font-bold">Quality checked</span>
                         </div>
                       </div>
                     </div>
@@ -2320,7 +2326,7 @@ export default function CustomerStorefront() {
                             setImageZoomScale(1);
                             await fetchProductReviews(p.id);
                           }}
-                          className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-emerald-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
+                          className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-purple-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
                         >
                           <div>
                             <div className="aspect-[4/3] bg-stone-50 rounded-xl overflow-hidden mb-2 flex items-center justify-center p-2 relative">
@@ -2352,17 +2358,18 @@ export default function CustomerStorefront() {
                           <div className="flex items-center justify-between mt-3 pt-2 border-t border-stone-50">
                             <span className="font-black text-xs text-stone-900">₹{pPrice.toFixed(0)}</span>
                             {pQty > 0 ? (
-                              <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden text-xs h-7" onClick={e => e.stopPropagation()}>
-                                <button onClick={() => updateQuantity(pCartItem.cartItemId, -1)} className="px-2 h-full hover:bg-emerald-700 font-black">-</button>
+                              <div className="flex items-center bg-purple-600 text-white rounded-xl overflow-hidden text-xs h-7" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => updateQuantity(pCartItem.cartItemId, -1)} className="px-2 h-full hover:bg-purple-700 font-black" title="Decrease">-</button>
                                 <span className="px-1.5 font-black">{pQty}</span>
-                                <button onClick={() => updateQuantity(pCartItem.cartItemId, 1)} className="px-2 h-full hover:bg-emerald-700 font-black">+</button>
+                                <button onClick={() => updateQuantity(pCartItem.cartItemId, 1)} className="px-2 h-full hover:bg-purple-700 font-black" title="Increase">+</button>
                               </div>
                             ) : (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); addToCart(p, pActiveVar); }}
-                                className="text-[10px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white px-2.5 py-1 rounded-lg transition cursor-pointer"
+                                className="text-[10px] font-black text-purple-700 bg-purple-50 hover:bg-purple-600 hover:text-white p-1.5 rounded-lg transition cursor-pointer"
+                                title="Add"
                               >
-                                Add
+                                <Package size={12} />
                               </button>
                             )}
                           </div>
@@ -2404,7 +2411,7 @@ export default function CustomerStorefront() {
                             setImageZoomScale(1);
                             await fetchProductReviews(p.id);
                           }}
-                          className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-emerald-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
+                          className="bg-white p-3 rounded-2xl border border-stone-100 hover:border-purple-300 shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col justify-between group"
                         >
                           <div>
                             <div className="aspect-[4/3] bg-stone-50 rounded-xl overflow-hidden mb-2 flex items-center justify-center p-2 relative">
@@ -2436,17 +2443,18 @@ export default function CustomerStorefront() {
                           <div className="flex items-center justify-between mt-3 pt-2 border-t border-stone-50">
                             <span className="font-black text-xs text-stone-900">₹{pPrice.toFixed(0)}</span>
                             {pQty > 0 ? (
-                              <div className="flex items-center bg-emerald-600 text-white rounded-xl overflow-hidden text-xs h-7" onClick={e => e.stopPropagation()}>
-                                <button onClick={() => updateQuantity(pCartItem.cartItemId, -1)} className="px-2 h-full hover:bg-emerald-700 font-black">-</button>
+                              <div className="flex items-center bg-purple-600 text-white rounded-xl overflow-hidden text-xs h-7" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => updateQuantity(pCartItem.cartItemId, -1)} className="px-2 h-full hover:bg-purple-700 font-black" title="Decrease">-</button>
                                 <span className="px-1.5 font-black">{pQty}</span>
-                                <button onClick={() => updateQuantity(pCartItem.cartItemId, 1)} className="px-2 h-full hover:bg-emerald-700 font-black">+</button>
+                                <button onClick={() => updateQuantity(pCartItem.cartItemId, 1)} className="px-2 h-full hover:bg-purple-700 font-black" title="Increase">+</button>
                               </div>
                             ) : (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); addToCart(p, pActiveVar); }}
-                                className="text-[10px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white px-2.5 py-1 rounded-lg transition cursor-pointer"
+                                className="text-[10px] font-black text-purple-700 bg-purple-50 hover:bg-purple-600 hover:text-white p-1.5 rounded-lg transition cursor-pointer"
+                                title="Add"
                               >
-                                Add
+                                <Package size={12} />
                               </button>
                             )}
                           </div>
@@ -2467,32 +2475,32 @@ export default function CustomerStorefront() {
       {!isAiChatOpen ? (
         <button 
           onClick={() => setIsAiChatOpen(true)}
-          className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
+          className="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-purple-500/20"
           title="Ask AI Grocery Assistant"
         >
           <Bot size={22} className="animate-bounce" />
           <span className="hidden sm:inline">AI Assistant</span>
         </button>
       ) : (
-        <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
-          <div className="bg-gradient-to-r from-emerald-950 to-teal-950 text-white p-4 flex justify-between items-center">
+        <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-purple-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
+          <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-4 flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <div className="p-1.5 bg-purple-500/20 text-purple-300 rounded-xl border border-purple-500/30">
                 <Bot size={18} />
               </div>
               <div>
                 <h4 className="font-black text-sm">KD Store AI Concierge</h4>
-                <p className="text-[10px] text-emerald-300">Ask for recipes or grocery items</p>
+                <p className="text-[10px] text-purple-200">Ask for recipes or grocery items</p>
             </div>
           </div>
-          <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer"><X size={16}/></button>
+          <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-purple-900/60 hover:bg-purple-900 rounded-full text-purple-200 cursor-pointer" title="Close"><X size={16}/></button>
         </div>
 
-        <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
+        <div className="p-4 h-72 overflow-y-auto space-y-3 bg-purple-50/20">
           {aiChatMessages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
-                msg.sender === 'user' ? 'bg-emerald-700 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
+                msg.sender === 'user' ? 'bg-purple-600 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-purple-200 rounded-bl-none shadow-2xs font-medium'
               }`}>
                 {msg.text}
               </div>
@@ -2500,15 +2508,15 @@ export default function CustomerStorefront() {
           ))}
         </div>
 
-        <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
+        <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-purple-100 bg-white flex gap-2">
           <input 
             type="text" 
             placeholder="e.g. Add ingredients for tea..." 
             value={aiInputText}
             onChange={e => setAiInputText(e.target.value)}
-            className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
+            className="flex-1 bg-purple-50/50 border border-purple-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-purple-600 font-medium"
           />
-          <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm">
+          <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm" title="Send">
             <Send size={16} />
           </button>
         </form>
@@ -2518,18 +2526,18 @@ export default function CustomerStorefront() {
 
       {/* Floating Bottom Cart Bar */}
       {totalItemsCount > 0 && !isCartOpen && (
-        <div className="fixed bottom-6 left-4 right-4 bg-slate-900 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-emerald-800/40 animate-slideUp">
+        <div className="fixed bottom-6 left-4 right-4 bg-slate-900 text-white p-4 shadow-2xl z-40 flex items-center justify-between max-w-4xl mx-auto rounded-3xl border border-purple-800/40 animate-slideUp">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 text-slate-950 px-3 py-1 rounded-xl font-black text-xs">
-              {totalItemsCount} ITEMS
+            <div className="bg-purple-600 text-white px-3 py-1 rounded-xl font-black text-xs">
+              {totalItemsCount}
             </div>
             <span className="font-black text-base tracking-tight text-white">₹{cartTotal.toFixed(2)}</span>
           </div>
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 px-6 py-3 rounded-2xl transition duration-200 shadow-lg shadow-emerald-500/30 active:scale-95 text-slate-950 cursor-pointer"
+            className="flex items-center gap-2 font-black text-xs uppercase tracking-wider bg-purple-600 hover:bg-purple-500 px-6 py-3 rounded-2xl transition duration-200 shadow-lg shadow-purple-600/30 active:scale-95 text-white cursor-pointer"
           >
-            View Cart <ChevronRight size={16} />
+            <Package size={16} /> View Cart <ChevronRight size={16} />
           </button>
         </div>
       )}
