@@ -27,7 +27,8 @@ import {
   Sparkles,
   Calendar,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MoreVertical
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -379,8 +380,6 @@ const CustomerOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const [expandedOrders, setExpandedOrders] = useState({});
-
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, active, delivered, cancelled
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, highest
@@ -585,18 +584,6 @@ const CustomerOrdersPage = () => {
 
     return result;
   }, [orders, searchTerm, statusFilter, sortBy]);
-
-
-  /* =======================================================
-     ORDER TOGGLE
-  ======================================================= */
-
-  const toggleOrder = (orderId) => {
-    setExpandedOrders((prev) => ({
-      ...prev,
-      [orderId]: !prev[orderId],
-    }));
-  };
 
 
   /* =======================================================
@@ -944,7 +931,7 @@ const CustomerOrdersPage = () => {
 
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-emerald-600 mx-auto mb-2" />
+            <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto mb-2" />
             <p className="text-stone-500 font-bold">Loading...</p>
           </div>
         </div>
@@ -960,19 +947,48 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-stone-50/50 to-white pb-28 md:pb-12 font-sans text-stone-900 selection:bg-emerald-500 selection:text-white text-xs">
-      <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
+    <div className="min-h-screen bg-stone-50 text-stone-900 pb-28 md:pb-12 font-sans selection:bg-emerald-500 selection:text-white text-xs">
+      
+      {/* Top Header matching reference */}
+      <div className="bg-white border-b border-stone-200/80 px-4 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-2xs">
+        <button
+          onClick={() => navigate('/')}
+          className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition cursor-pointer"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <h1 className="font-black text-slate-900 text-base tracking-tight">Order History</h1>
+      </div>
 
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-6">
+      <main className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
 
        
 
         {/* =================================================
             FILTERS & SEARCH SECTION
         ================================================= */}
-        <div className="bg-white rounded-2xl border border-stone-200/80 shadow-xs p-4 mb-6 space-y-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            
+        <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-4 space-y-3">
+          {/* Search Input Bar updated to "Search Order" */}
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search Order"
+              className="w-full bg-stone-50 border border-stone-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all shadow-2xs"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
             {/* Status Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               {[
@@ -984,9 +1000,9 @@ const CustomerOrdersPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3.5 py-2 rounded-xl font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap ${
                     statusFilter === tab.id
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                      ? 'bg-emerald-500 text-white shadow-xs'
                       : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
                   }`}
                 >
@@ -997,37 +1013,16 @@ const CustomerOrdersPage = () => {
 
             {/* Sort Dropdown */}
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-bold text-stone-400 hidden sm:inline">Sort:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-stone-100 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                className="bg-stone-100 border border-stone-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-stone-800 outline-none cursor-pointer"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
                 <option value="highest">Highest Amount</option>
               </select>
             </div>
-          </div>
-
-          {/* Search Input Bar */}
-          <div className="relative w-full pt-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-[calc(50%-2px)] w-4 h-4 text-stone-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by order ID, status, or item name..."
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-[calc(50%-2px)] text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            )}
           </div>
         </div>
 
@@ -1038,12 +1033,12 @@ const CustomerOrdersPage = () => {
         <section>
           {loadingOrders ? (
             <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mx-auto mb-3" />
               <p className="text-stone-500 font-bold">Loading your orders...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs space-y-3">
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100">
                 <Package className="w-8 h-8" />
               </div>
               <div>
@@ -1053,7 +1048,7 @@ const CustomerOrdersPage = () => {
               {!searchTerm && statusFilter === 'all' && (
                 <button
                   onClick={() => navigate('/')}
-                  className="mt-2 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-lg shadow-emerald-600/20 cursor-pointer transition active:scale-95"
+                  className="mt-2 px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-md cursor-pointer transition active:scale-95"
                 >
                   Start Shopping
                 </button>
@@ -1065,165 +1060,127 @@ const CustomerOrdersPage = () => {
                 const orderId = getOrderId(order);
                 const status = getOrderStatus(order);
                 const items = Array.isArray(order?.order_items) ? order.order_items : [];
-                const subtotal = getOrderItemsSubtotal(order);
                 const total = getOrderTotal(order);
-                const expanded = Boolean(expandedOrders[orderId]);
                 const isDelivered = normalizeOrderStatus(status) === 'DELIVERED';
                 const isCancelled = normalizeOrderStatus(status) === 'CANCELLED';
                 const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
 
+                // Display delivery duration or status message matching screenshot style
+                const deliveredAtTime = order?.delivered_at || order?.updated_at;
+                const durationStr = calculateDeliveryDuration(order?.created_at, deliveredAtTime);
+                const arrivalHeader = isDelivered 
+                  ? (durationStr ? `Arrived in ${durationStr}` : 'Delivered Successfully') 
+                  : isCancelled 
+                  ? 'Order Cancelled' 
+                  : formatStatus(status);
+
                 return (
-                  <motion.div
+                  <div
                     key={orderId}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-3xl border border-stone-200/90 shadow-xs hover:shadow-md transition duration-300 overflow-hidden"
+                    className="bg-white rounded-3xl border border-stone-200/80 shadow-xs hover:shadow-md transition duration-300 overflow-hidden p-4 space-y-4"
                   >
-                    <div className="p-4 sm:p-5">
-                      <div className="flex items-start sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
-                            isDelivered ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                            isCancelled ? 'bg-rose-50 text-rose-600 border border-rose-100' :
-                            'bg-amber-50 text-amber-600 border border-amber-100'
-                          }`}>
-                            <Package className="w-6 h-6" />
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-black text-stone-900 text-sm">
-                                {getDisplayOrderId(order)}
-                              </span>
-                              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider ${
-                                isDelivered ? 'bg-emerald-100 text-emerald-800' : 
-                                isCancelled ? 'bg-rose-100 text-rose-800' : 
-                                'bg-amber-100 text-amber-800 animate-pulse'
-                              }`}>
-                                {formatStatus(status)}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-stone-400 mt-1 flex items-center gap-1 font-medium">
-                              <Clock size={12} /> {formatDateTime(order?.created_at)}
-                            </p>
-                          </div>
+                    {/* Top Row: Green Check Badge, Title, Subtitle, 3-dots Menu */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                          isDelivered ? 'bg-emerald-50 text-emerald-500 border border-emerald-100' :
+                          isCancelled ? 'bg-rose-50 text-rose-500 border border-rose-100' :
+                          'bg-amber-50 text-amber-500 border border-amber-100'
+                        }`}>
+                          {isCancelled ? <X size={20} /> : <Check size={20} className="stroke-[3]" />}
                         </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="font-black text-emerald-700 text-base">{formatCurrency(total)}</span>
-                          <span className="text-[11px] text-stone-400 block font-bold">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                        <div>
+                          <h3 className="font-black text-slate-900 text-sm tracking-tight">
+                            {arrivalHeader}
+                          </h3>
+                          <p className="text-[11px] text-stone-400 font-bold mt-0.5">
+                            {formatCurrency(total)} • {formatDateTime(order?.created_at)}
+                          </p>
                         </div>
                       </div>
 
-                      {/* ── OTP BANNER ── */}
-                      {!isDelivered && !isCancelled && (
-                        <div className="mt-4 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between shadow-xs">
-                          <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                            <ShieldCheck size={14} className="text-emerald-600" /> Delivery Verification OTP:
-                          </span>
-                          <span className="font-mono font-black text-sm text-emerald-700 tracking-widest bg-white px-3 py-1 rounded-xl border border-emerald-200 shadow-2xs">
-                            {order?.otp || '----'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-stone-100 gap-2 flex-wrap">
-                        <button
-                          onClick={() => toggleOrder(orderId)}
-                          className="text-xs text-stone-600 hover:text-emerald-700 inline-flex items-center gap-1.5 font-bold cursor-pointer bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-xl transition"
-                        >
-                          <span>{expanded ? 'Hide Items' : 'View Ordered Items'}</span>
-                          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {isPending && (
-                            <button
-                              onClick={() => handleCancelOrder(order)}
-                              disabled={cancellingOrderId === orderId}
-                              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-black text-rose-700 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5 transition"
-                            >
-                              {cancellingOrderId === orderId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                              <span>Cancel Order</span>
-                            </button>
-                          )}
-
+                      <div className="flex items-center gap-1">
+                        {isPending && (
                           <button
-                            onClick={() => setSelectedOrder(order)}
-                            className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-black cursor-pointer shadow-sm transition"
+                            onClick={() => handleCancelOrder(order)}
+                            disabled={cancellingOrderId === orderId}
+                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-[10px] font-black text-rose-600 disabled:opacity-50 cursor-pointer transition"
+                            title="Cancel Order"
                           >
-                            Track & Details
+                            Cancel
                           </button>
-
-                          {isDelivered && (
-                            <button
-                              onClick={() => handleReorder(order)}
-                              disabled={reorderingOrderId === orderId}
-                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 cursor-pointer shadow-md shadow-emerald-600/20 transition active:scale-95"
-                            >
-                              {reorderingOrderId === orderId ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              )}
-                              <span>Reorder</span>
-                            </button>
-                          )}
-                        </div>
+                        )}
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          className="p-1 text-stone-400 hover:text-stone-700 cursor-pointer rounded-full hover:bg-stone-100 transition"
+                          title="Options"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
                       </div>
                     </div>
 
-                    <AnimatePresence>
-                      {expanded && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="border-t border-stone-100 bg-stone-50/70 p-4 space-y-2.5"
-                        >
-                          {items.map((item, index) => {
-                            const product = item?.products;
-                            const variant = findOrderItemVariant(item, product);
-                            const image =
-                              product?.image_url ||
-                              product?.image ||
-                              product?.images?.[0] ||
-                              product?.gallery?.[0] ||
-                              '';
+                    {/* Products Horizontal Scroll / Grid matching screenshot style */}
+                    <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+                      {items.map((item, index) => {
+                        const product = item?.products;
+                        const image =
+                          product?.image_url ||
+                          product?.image ||
+                          product?.images?.[0] ||
+                          product?.gallery?.[0] ||
+                          '';
 
-                            return (
-                              <div
-                                key={item?.id || index}
-                                className="bg-white rounded-2xl border border-stone-200/80 p-3 flex items-center gap-3.5 shadow-2xs"
-                              >
-                                <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
-                                  {image ? (
-                                    <img src={image} alt="" className="w-full h-full object-contain" />
-                                  ) : (
-                                    <Package className="w-5 h-5 text-stone-300" />
-                                  )}
-                                </div>
+                        if (index >= 4 && items.length > 5) return null; // Show up to 4 items and +X badge if many
 
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-stone-900 text-xs truncate">
-                                    {product?.name || 'Product'}
-                                  </p>
-                                  {variant && (
-                                    <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
-                                  )}
-                                  <p className="text-[10px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
-                                </div>
+                        return (
+                          <div
+                            key={item?.id || index}
+                            className="w-16 h-16 bg-stone-50 rounded-2xl border border-stone-100 flex items-center justify-center p-2 shrink-0 relative"
+                            title={product?.name || 'Product'}
+                          >
+                            {image ? (
+                              <img src={image} alt="" className="w-full h-full object-contain" />
+                            ) : (
+                              <Package className="w-6 h-6 text-stone-300" />
+                            )}
+                            {item.quantity > 1 && (
+                              <span className="absolute bottom-1 right-1 bg-stone-900 text-white font-black text-[9px] px-1 rounded-md">
+                                x{item.quantity}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
 
-                                <div className="text-right shrink-0">
-                                  <p className="font-black text-stone-900 text-xs">{formatCurrency(item?.price)}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </motion.div>
+                      {items.length > 5 && (
+                        <div className="w-16 h-16 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center text-stone-600 font-black text-xs shrink-0">
+                          +{items.length - 4}
+                        </div>
                       )}
-                    </AnimatePresence>
-                  </motion.div>
+                    </div>
+
+                    {/* Bottom Split Buttons: Reorder | View Details matching screenshot */}
+                    <div className="grid grid-cols-2 divide-x divide-stone-100 border-t border-stone-100 pt-3 text-center">
+                      <button
+                        onClick={() => handleReorder(order)}
+                        disabled={reorderingOrderId === orderId}
+                        className="text-emerald-500 hover:text-emerald-600 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                      >
+                        {reorderingOrderId === orderId ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : null}
+                        <span>Reorder</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="text-emerald-500 hover:text-emerald-600 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                      >
+                        <span>View Details</span>
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -1253,7 +1210,7 @@ const CustomerOrdersPage = () => {
             className="flex flex-col items-center p-1.5 cursor-pointer group"
             title="Orders"
           >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
               <Package size={18} />
             </div>
           </button>
@@ -1308,7 +1265,7 @@ const CustomerOrdersPage = () => {
                             <div
                               className={`w-8 h-8 rounded-full flex items-center justify-center border shrink-0 transition-all ${
                                 step.completed || step.active
-                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30'
                                   : 'bg-white border-stone-300 text-stone-400'
                               }`}
                             >
@@ -1318,7 +1275,7 @@ const CustomerOrdersPage = () => {
                             {index < allSteps.length - 1 && (
                               <div
                                 className={`h-1 flex-1 mx-1.5 rounded-full ${
-                                  step.completed ? 'bg-emerald-600' : 'bg-stone-200'
+                                  step.completed ? 'bg-emerald-500' : 'bg-stone-200'
                                 }`}
                               />
                             )}
@@ -1326,7 +1283,7 @@ const CustomerOrdersPage = () => {
 
                           <p
                             className={`text-[11px] mt-2 font-bold truncate ${
-                              step.active ? 'text-emerald-700 font-black' : 'text-stone-500'
+                              step.active ? 'text-emerald-600 font-black' : 'text-stone-500'
                             }`}
                           >
                             {step.label}
@@ -1342,9 +1299,9 @@ const CustomerOrdersPage = () => {
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
                   <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                    <ShieldCheck size={16} className="text-emerald-600" /> Delivery Verification OTP:
+                    <ShieldCheck size={16} className="text-emerald-500" /> Delivery Verification OTP:
                   </span>
-                  <span className="font-mono font-black text-lg text-emerald-700 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
+                  <span className="font-mono font-black text-lg text-emerald-600 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
                     {selectedOrder?.otp || '----'}
                   </span>
                 </div>
@@ -1352,7 +1309,7 @@ const CustomerOrdersPage = () => {
 
               {/* FULFILLMENT DURATION */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
                   <span className="font-black flex items-center gap-2 text-xs">
                     <CheckCircle2 size={18} /> Successfully delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
                   </span>
@@ -1391,7 +1348,7 @@ const CustomerOrdersPage = () => {
                             {product?.name || 'Product'}
                           </p>
                           {variant && (
-                            <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
+                            <p className="text-[11px] text-emerald-600 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
                           )}
                           <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
                         </div>
@@ -1409,7 +1366,7 @@ const CustomerOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
                   <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Delivery Address
+                    <MapPin className="w-3.5 h-3.5 text-emerald-500" /> Delivery Address
                   </h4>
                   <p className="text-stone-700 font-medium leading-relaxed text-xs">
                     {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
@@ -1418,10 +1375,10 @@ const CustomerOrdersPage = () => {
 
                 <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
                   <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment Info
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-500" /> Payment Info
                   </h4>
                   <p className="font-black text-stone-900 text-xs">Cash on Delivery (COD)</p>
-                  <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-600' : 'text-amber-700'}`}>
                     Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid / Completed' : 'Pending Payment'}
                   </p>
                 </div>
@@ -1448,7 +1405,7 @@ const CustomerOrdersPage = () => {
 
                 <div className="flex justify-between pt-3 border-t border-stone-200 font-black text-sm">
                   <span className="text-stone-900">Total Amount</span>
-                  <span className="text-emerald-700 text-base">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                  <span className="text-emerald-600 text-base">{formatCurrency(getOrderTotal(selectedOrder))}</span>
                 </div>
               </div>
 
@@ -1460,7 +1417,7 @@ const CustomerOrdersPage = () => {
                       onClick={() => setInvoiceOrder(selectedOrder)}
                       className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 font-black text-stone-800 cursor-pointer transition text-xs shadow-2xs"
                     >
-                      <FileText className="w-4 h-4 text-emerald-600" /> Download Invoice
+                      <FileText className="w-4 h-4 text-emerald-500" /> Download Invoice
                     </button>
 
                     <button
@@ -1473,7 +1430,7 @@ const CustomerOrdersPage = () => {
                     <button
                       onClick={() => handleReorder(selectedOrder)}
                       disabled={reorderingOrderId === getOrderId(selectedOrder)}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-600/20 active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-500/20 active:scale-95"
                     >
                       {reorderingOrderId === getOrderId(selectedOrder) ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1582,7 +1539,7 @@ const CustomerOrdersPage = () => {
                 <button
                   onClick={handleSubmitAllProductRatings}
                   disabled={savingRating}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 transition text-xs"
                 >
                   {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Submit All Reviews

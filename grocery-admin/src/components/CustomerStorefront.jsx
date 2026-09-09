@@ -795,17 +795,17 @@ export default function CustomerStorefront() {
     e.preventDefault();
     if (!session) return;
 
-    const fullFormattedAddress = `${newAddressForm.house_no}, ${newAddressForm.ward_no_name}, ${newAddressForm.city}, ${newAddressForm.district}, ${newAddressForm.state} - ${newAddressForm.pincode}`;
+    const fullFormattedAddress = `${newAddressForm.house_no}, ${newAddressForm.ward_no_name}, ${newAddressForm.city || 'Harraiya'}, ${newAddressForm.district || 'Basti'}, ${newAddressForm.state || 'Uttar Pradesh'} - ${newAddressForm.pincode || '272155'}`;
 
     const { error } = await supabase.from('customer_addresses').insert([{
       user_id: session.user.id,
-      title: newAddressForm.title,
+      title: newAddressForm.title || 'Home',
       house_no: newAddressForm.house_no,
       ward_no_name: newAddressForm.ward_no_name,
-      city: newAddressForm.city,
-      district: newAddressForm.district,
-      state: newAddressForm.state,
-      pincode: newAddressForm.pincode,
+      city: newAddressForm.city || 'Harraiya',
+      district: newAddressForm.district || 'Basti',
+      state: newAddressForm.state || 'Uttar Pradesh',
+      pincode: newAddressForm.pincode || '272155',
       phone: newAddressForm.phone,
       latitude: newAddressForm.latitude,
       longitude: newAddressForm.longitude,
@@ -1088,7 +1088,7 @@ export default function CustomerStorefront() {
     if (sortBy === 'rating_desc') {
       const ratingA = Number(a.avgRating || a.rating || 0);
       const ratingB = Number(b.avgRating || b.rating || 0);
-      return ratingB - ratingA;
+      return ratingB - ratingB;
     }
     return 0;
   });
@@ -1317,7 +1317,7 @@ export default function CustomerStorefront() {
                      
                     <div className="space-y-1.5">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Profile Avatar</label>
-                      <p className="text-[10px] text-slate-400">Choose a preset avatar or paste a custom image URL below:</p>
+                      <p className="text-[10px] text-stone-400">Choose a preset avatar or paste a custom image URL below:</p>
                       <div className="flex gap-2 py-1 overflow-x-auto">
                         {[
                           'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
@@ -1577,26 +1577,10 @@ export default function CustomerStorefront() {
                   <div className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => handleToggleAddAddressBox(!showAddAddressBox)} className="text-purple-600 font-black hover:underline cursor-pointer">
-                        {showAddAddressBox ? 'Cancel' : '+ Add Address'}
+                      <button onClick={() => setShowAddAddressBox(true)} className="text-purple-600 font-black hover:underline cursor-pointer">
+                        + Add Address
                       </button>
                     </div>
-
-                    {showAddAddressBox && (
-                      <form onSubmit={handleAddAddress} className="bg-purple-50/30 p-3.5 rounded-2xl border border-purple-200 space-y-2.5">
-                        <input type="text" placeholder="Title (Home/Work)" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.title} onChange={e => setNewAddressForm({...newAddressForm, title: e.target.value})} />
-                         
-                        <div className="p-2.5 bg-purple-50 text-purple-800 rounded-xl font-bold flex items-center gap-1.5 border border-purple-200 text-[11px]">
-                          <Navigation size={13} className="shrink-0" />
-                          <span>{newAddressForm.latitude ? 'GPS Location automatically detected!' : 'Detecting GPS location...'}</span>
-                        </div>
-
-                        <input type="text" placeholder="House No." required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.house_no} onChange={e => setNewAddressForm({...newAddressForm, house_no: e.target.value})} />
-                        <input type="text" placeholder="Ward / Colony Name" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.ward_no_name} onChange={e => setNewAddressForm({...newAddressForm, ward_no_name: e.target.value})} />
-                        <input type="tel" placeholder="Phone Number" required className="w-full border border-purple-200 p-2.5 rounded-xl bg-white outline-none" value={newAddressForm.phone} onChange={e => setNewAddressForm({...newAddressForm, phone: e.target.value})} />
-                        <button type="submit" className="w-full bg-purple-600 text-white py-2.5 rounded-xl font-black cursor-pointer">Save Address</button>
-                      </form>
-                    )}
 
                     {savedAddresses.map(addr => (
                       <div key={addr.id} className="p-3.5 bg-purple-50/20 rounded-2xl border border-purple-200 flex justify-between items-start gap-2">
@@ -1951,30 +1935,31 @@ export default function CustomerStorefront() {
 
     {orderSuccess && (
       <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-purple-100 space-y-4">
-          <div className="w-20 h-20 bg-purple-50 text-purple-600 rounded-3xl flex items-center justify-center mx-auto border border-purple-200">
-            <CheckCircle size={40} />
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-stone-100 space-y-4">
+          <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+            <CheckCircle size={40} className="stroke-[2.5]" />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-900">Order Placed!</h2>
-            <p className="text-slate-500 text-xs mt-1">Your quick delivery order <span className="font-mono font-bold text-slate-900">#{orderSuccess}</span> is being packed.</p>
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Order Place Successfully</h2>
+            <p className="text-stone-400 text-xs font-medium">You have successfully made order</p>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             <button
               onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-xl shadow-purple-600/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/20 cursor-pointer"
             >
-              Track Order Status <ArrowRight size={16} />
+              View Order Status
             </button>
             <button
-              onClick={() => { setOrderSuccess(null); }}
-              className="w-full py-2.5 rounded-2xl text-xs font-bold text-stone-500 hover:text-stone-800 hover:bg-stone-50 transition cursor-pointer"
+              onClick={() => { setOrderSuccess(null); setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="w-full py-3 rounded-2xl font-extrabold text-xs text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
             >
               Continue Shopping
             </button>
           </div>
         </div>
       </div>
+      
     )}
 
     {/* 2. Product Grid Component */}
@@ -2088,7 +2073,7 @@ export default function CustomerStorefront() {
                     className="w-full h-full object-contain" 
                   />
                   {isModalOutOfStock && (
-                    <div className="absolute inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-20">
+                    <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20">
                       <span className="bg-white text-stone-950 text-xs font-black px-4 py-1.5 rounded-full uppercase">Sold Out</span>
                     </div>
                   )}
