@@ -1,6 +1,6 @@
 // src/components/store/ProductGrid.jsx
 import { useState } from 'react';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User, ArrowLeft, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct }) {
@@ -33,12 +33,9 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
   const price = Number(activeVariant ? activeVariant.price : product.price || 0);
   const mrp = Number(activeVariant?.mrp || product.mrp || 0);
   const hasMrp = mrp > price;
-  const discountPct = hasMrp ? Math.round(((mrp - price) / mrp) * 100) : 0;
   const stock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
   const isWishlisted = wishlistIds?.includes(product.id);
-  
-  const productRating = product.avgRating != null ? Number(product.avgRating) : product.rating != null ? Number(product.rating) : null;
 
   const variantIdentifier = activeVariant ? (activeVariant.id || activeVariant.unit_label || activeVariant.label || 'default') : 'default';
   const cartItemId = `${product.id}-${variantIdentifier}`;
@@ -59,103 +56,79 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.15 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.2 }}
       onClick={() => onSelectProduct(product)}
-      className="bg-white rounded-2xl border border-emerald-100 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer relative group overflow-hidden w-full"
+      className="bg-white rounded-[2rem] border border-stone-200/80 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full p-4 justify-between"
     >
       <button
         onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
-        className={`absolute top-2 right-2 z-20 p-1.5 rounded-xl transition-all duration-150 backdrop-blur-md
-          ${isWishlisted ? 'bg-rose-50 text-rose-500 scale-105 shadow-xs' : 'bg-white/90 text-stone-400 hover:text-rose-500'}`}
+        className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all duration-150 backdrop-blur-md
+          ${isWishlisted ? 'text-rose-500 scale-105' : 'text-stone-400 hover:text-rose-500'}`}
         title="Wishlist"
       >
-        <Heart size={13} className={isWishlisted ? 'fill-rose-500' : ''} />
+        <Heart size={18} className={isWishlisted ? 'fill-rose-500' : ''} />
       </button>
 
-      {discountPct > 0 && (
-        <div className="absolute top-0 left-0 z-20">
-          <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-[9px] px-2.5 py-1 rounded-br-xl uppercase tracking-tight shadow-sm flex flex-col items-center leading-none">
-            <span>{discountPct}%</span>
-            <span>OFF</span>
-          </span>
-        </div>
-      )}
-
-      <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-emerald-50/40 to-teal-50/40 overflow-hidden flex items-center justify-center p-2.5">
+      <div className="relative w-full aspect-square bg-white rounded-2xl overflow-hidden flex items-center justify-center p-3 mb-3">
         <img 
           src={displayImage} 
           alt={product.name} 
           onError={(e) => { e.target.onerror = null; e.target.src = fallbackDummyImages[0]; }}
           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 ease-out" 
         />
-        <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded-lg text-[9px] font-bold text-emerald-800 border border-emerald-100 shadow-2xs">
-          <Clock size={9} className="text-emerald-600" />
-          <span>13M</span>
-        </div>
         {isOutOfStock && (
           <div className="absolute inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-20">
-            <span className="bg-white text-stone-950 text-[9px] font-black px-3 py-1 rounded-lg uppercase">Sold Out</span>
+            <span className="bg-white text-stone-950 text-[10px] font-black px-3 py-1 rounded-full uppercase">Sold Out</span>
           </div>
         )}
       </div>
 
-      <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between gap-2 bg-white">
-        <div className="space-y-1">
-          {productRating != null && !isNaN(productRating) && (
-            <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-md w-fit border border-amber-200/60 shadow-2xs">
-              <Star size={10} className="text-amber-500 fill-amber-500" />
-              <span className="font-black text-[9px] text-amber-900">{productRating.toFixed(1)}</span>
-            </div>
-          )}
+      <div className="space-y-1 mb-3">
+        <h4 className="font-black text-slate-900 text-xs sm:text-sm tracking-tight line-clamp-1">{product.name}</h4>
+        
+        {hasVariants ? (
+          <div onClick={e => e.stopPropagation()} className="pt-1">
+            <select
+              value={currentVariantKey || ''}
+              onChange={handleVariantChange}
+              className="w-full bg-[#F4F5F7] border border-stone-200 text-stone-700 text-[10px] font-bold rounded-xl px-2.5 py-1.5 outline-none cursor-pointer"
+            >
+              {variants.map((v, idx) => {
+                const vKey = v.id || v.label || v.unit_label || idx;
+                const vLabel = v.unit_label || v.label || `Opt ${idx + 1}`;
+                return <option key={vKey} value={vKey}>{vLabel} • ₹{v.price}</option>;
+              })}
+            </select>
+          </div>
+        ) : (
+          <p className="text-[11px] text-stone-400 font-bold">{product.unit || '500 g'}</p>
+        )}
+      </div>
 
-          <p className="font-bold text-slate-900 text-[11px] sm:text-xs line-clamp-2 leading-tight group-hover:text-emerald-700 transition-colors">{product.name}</p>
+      <div className="flex items-center justify-between pt-2" onClick={e => e.stopPropagation()}>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-black text-sm sm:text-base text-slate-900">${price.toFixed(0)}</span>
+          {hasMrp && <span className="text-[10px] text-stone-400 line-through font-bold">${mrp.toFixed(0)}</span>}
+        </div>
 
-          {hasVariants ? (
-            <div onClick={e => e.stopPropagation()} className="pt-0.5">
-              <select
-                value={currentVariantKey || ''}
-                onChange={handleVariantChange}
-                className="w-full bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-200/80 text-emerald-950 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer"
-              >
-                {variants.map((v, idx) => {
-                  const vKey = v.id || v.label || v.unit_label || idx;
-                  const vLabel = v.unit_label || v.label || `Opt ${idx + 1}`;
-                  return <option key={vKey} value={vKey}>{vLabel} • ₹{v.price}</option>;
-                })}
-              </select>
+        {!isOutOfStock && (
+          qtyInCart > 0 ? (
+            <div className="flex items-center bg-emerald-500 text-white rounded-2xl overflow-hidden h-9 shadow-md">
+              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-3 h-full hover:bg-emerald-600 font-bold text-sm flex items-center justify-center cursor-pointer"><Minus size={14} /></button>
+              <span className="px-2 font-black text-xs">{qtyInCart}</span>
+              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-3 h-full hover:bg-emerald-600 font-bold text-sm flex items-center justify-center cursor-pointer"><Plus size={14} /></button>
             </div>
           ) : (
-            <p className="text-[10px] text-stone-400 font-bold">{product.unit || '1 unit'}</p>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between pt-2 border-t border-stone-100 mt-auto" onClick={e => e.stopPropagation()}>
-          <div className="flex items-baseline gap-1">
-            <span className="font-black text-xs sm:text-sm text-slate-900">₹{price.toFixed(0)}</span>
-            {hasMrp && <span className="text-[9px] sm:text-[10px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>}
-          </div>
-
-          {!isOutOfStock && (
-            qtyInCart > 0 ? (
-              <div className="flex items-center bg-emerald-600 text-white rounded-lg overflow-hidden h-7 sm:h-8 shadow-xs">
-                <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-2 h-full hover:bg-emerald-700 font-bold text-[10px] sm:text-xs flex items-center justify-center cursor-pointer">-</button>
-                <span className="px-1.5 sm:px-2 font-black text-[10px] sm:text-xs">{qtyInCart}</span>
-                <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-2 h-full hover:bg-emerald-700 font-bold text-[10px] sm:text-xs flex items-center justify-center cursor-pointer">+</button>
-              </div>
-            ) : (
-              <motion.button
-                onClick={handleAdd}
-                animate={addedFlash ? { scale: [1, 0.9, 1.1, 1] } : {}}
-                transition={{ duration: 0.2 }}
-                className={`h-7 sm:h-8 px-3 sm:px-4 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wide cursor-pointer transition border shadow-2xs
-                  ${addedFlash ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border-emerald-200'}`}
-              >
-                {addedFlash ? '✓' : 'ADD'}
-              </motion.button>
-            )
-          )}
-        </div>
+            <motion.button
+              onClick={handleAdd}
+              whileTap={{ scale: 0.95 }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-md transition cursor-pointer"
+            >
+              Add
+            </motion.button>
+          )
+        )}
       </div>
     </motion.div>
   );
@@ -165,7 +138,7 @@ export default function ProductGrid({
   banners, currentSlide, activeFlashSale, timeLeft, formatTime,
   categories, activeCategory, setActiveCategory, loading,
   products, searchQuery = '', wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants,
-  cart = [], addToCart, updateQuantity, onSelectProduct
+  cart = [], addToCart, updateQuantity, onSelectProduct, onNavigate, onOpenCart
 }) {
   const fallbackImages = [
     'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
@@ -233,246 +206,80 @@ export default function ProductGrid({
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
 
   return (
-    <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 mt-2 font-sans pb-24 md:pb-12 text-slate-900 overflow-y-auto text-xs">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 font-sans pb-36 text-slate-900">
       
-      {/* ── TOP CATEGORIES STRIP (FIXED HORIZONTAL SCROLL ON MOBILE) ── */}
-      {!isAnyCategorySelected && (
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="font-black text-xs sm:text-sm text-stone-950 tracking-tight uppercase">Explore Categories</h3>
-          </div>
-          <div className="flex overflow-x-auto gap-2.5 pb-2 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <motion.button
-              whileHover={{ y: -2 }}
-              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-              className={`inline-flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 transition-all
-                ${activeCategory === 'All' ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-600/20' : 'border-emerald-100 bg-white hover:border-emerald-400'}`}
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 shrink-0 ${activeCategory === 'All' ? 'bg-white/20 text-white' : 'bg-emerald-600 text-white'}`}>
-                <Sparkles size={15} />
-              </div>
-              <span className={`text-[10px] font-black truncate w-full text-center ${activeCategory === 'All' ? 'text-white' : 'text-stone-900'}`}>All</span>
-            </motion.button>
-
-            {parentCategories.map((cat, index) => {
-              const isSelected = activeCategory === cat.id;
-              const img = cat.image_url || fallbackImages[index % fallbackImages.length];
-              return (
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                  className={`inline-flex flex-col items-center p-2 rounded-2xl border cursor-pointer shrink-0 w-20 transition-all
-                    ${isSelected ? 'border-emerald-600 bg-gradient-to-b from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-600/20' : 'border-emerald-100 bg-white hover:border-emerald-400'}`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-stone-100 overflow-hidden mb-1 border border-stone-200 shrink-0 shadow-2xs">
-                    <img src={img} alt={cat.name} className="w-full h-full object-cover rounded-full" />
-                  </div>
-                  <span className={`text-[10px] font-black truncate w-full text-center ${isSelected ? 'text-white' : 'text-stone-900'}`}>{cat.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── FULL HD CLEAR BANNER WITH FROSTED BLURRED TITLE AT BOTTOM ── */}
-      {!isAnyCategorySelected && (
-        <div className="relative rounded-3xl overflow-hidden shadow-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 mb-6 w-full max-h-[420px] border border-emerald-500/20 flex items-center justify-center">
-          {banners && banners.length > 0 ? (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentSlide}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4 }}
-                className="w-full relative flex items-center justify-center"
-              >
-                <img 
-                  src={banners[currentSlide]?.image_url} 
-                  alt="Banner" 
-                  className="w-full h-auto max-h-[420px] object-contain filter brightness-105 contrast-110 mx-auto" 
-                />
-                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 bg-stone-950/40 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/10 shadow-2xl">
-                  <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-md">
-                    ⚡ 13 Mins Delivery
-                  </span>
-                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">{banners[currentSlide]?.title || 'Fresh groceries instantly'}</h2>
-                  <p className="text-[10px] sm:text-[11px] text-emerald-100 font-medium">{banners[currentSlide]?.subtitle || 'Delivered straight to your doorstep.'}</p>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          ) : (
-            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8 bg-stone-950/40 backdrop-blur-md flex flex-col items-start space-y-1 border-t border-white/10 shadow-2xl w-full">
-              <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-md">
-                ⚡ Lightning Delivery
-              </span>
-              <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">Fresh groceries at your doorstep</h2>
-              <p className="text-[10px] sm:text-[11px] text-emerald-100">Order dairy, vegetables, fruits, and daily essentials instantly.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── STOREFRONT VIEW WITH 15% SUBCATEGORY SIDEBAR & 85% PRODUCT LISTING ── */}
+      {/* ── STOREFRONT VIEW: WHEN A CATEGORY IS SELECTED ── */}
       {isAnyCategorySelected ? (
-        <div className="grid grid-cols-1 md:grid-cols-[15%_85%] gap-4 items-start">
+        <div className="space-y-4">
           
-          {/* DESKTOP 15% VERTICAL SUB-SIDEBAR */}
-          {!query && currentSubcategories.length > 0 && (
-            <div className="hidden md:flex flex-col w-full bg-white rounded-2xl border border-emerald-100 p-1.5 space-y-1 shadow-2xs sticky top-16 max-h-[calc(100vh-100px)] overflow-y-auto">
+          <div className="flex items-center justify-between py-2 border-b border-stone-100 mb-4">
+            <button 
+              onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); }}
+              className="p-2 rounded-full hover:bg-stone-100 text-slate-800 transition cursor-pointer"
+            >
+              <ArrowLeft size={20} className="stroke-[2.5]" />
+            </button>
+            <h2 className="font-black text-slate-900 text-base sm:text-lg tracking-tight">
+              {activeCategoryObj?.name || 'Category'}
+            </h2>
+            <button 
+              onClick={() => {}} 
+              className="p-2 rounded-full hover:bg-stone-100 text-slate-800 transition cursor-pointer"
+            >
+              <Search size={20} className="stroke-[2.5]" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-[85px_1fr] sm:grid-cols-[110px_1fr] gap-4 items-start">
+            
+            <div className="flex flex-col space-y-3 sticky top-20 max-h-[calc(100vh-120px)] overflow-y-auto pr-1">
               <button
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                className={`w-full flex flex-col items-center p-2.5 rounded-xl text-center transition cursor-pointer border ${
+                className={`flex flex-col items-center p-2.5 rounded-2xl text-center transition cursor-pointer border ${
                   activeSubcategoryId === 'All' 
-                    ? 'bg-emerald-50 border-emerald-600 text-emerald-950 font-black shadow-2xs ring-1 ring-emerald-500/20' 
+                    ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950 font-black shadow-xs' 
                     : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
                 }`}
               >
-                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs shrink-0">
-                  <Sparkles size={14} />
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-1.5 shadow-xs shrink-0">
+                  <Sparkles size={18} />
                 </div>
                 <span className="text-[10px] leading-tight truncate w-full">All Items</span>
               </button>
 
-              <div className="space-y-1">
-                {currentSubcategories.map((sub, index) => {
-                  const isSubSelected = activeSubcategoryId === sub.id;
-                  const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
-                  return (
-                    <button
-                      key={sub.id}
-                      onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                      className={`w-full flex flex-col items-center p-2.5 rounded-xl text-center transition cursor-pointer border ${
-                        isSubSelected 
-                          ? 'bg-emerald-50 border-emerald-600 text-emerald-950 font-black shadow-2xs ring-1 ring-emerald-500/20' 
-                          : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-stone-100 overflow-hidden mb-1 border border-stone-200/80 flex items-center justify-center shadow-2xs shrink-0">
-                        {sub.image_url ? <img src={subImg} alt="" className="w-full h-full object-cover rounded-full" /> : <Package size={14} className="text-stone-400" />}
-                      </div>
-                      <span className="text-[10px] leading-tight truncate w-full">{sub.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 85% PRODUCTS AREA */}
-          <div className="flex-1 w-full space-y-3 min-w-0">
-            
-            {/* MOBILE HORIZONTAL SUBCATEGORY SCROLL STRIP */}
-            {!query && currentSubcategories.length > 0 && (
-              <div className="block md:hidden bg-white p-3 rounded-2xl border border-emerald-100 shadow-2xs mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-black text-[11px] text-stone-900 uppercase tracking-wider">Subcategories</h3>
-                  <span className="text-[10px] text-emerald-700 font-bold">{currentSubcategories.length} available</span>
-                </div>
-                <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  <div
-                    onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                    className={`inline-flex flex-col items-center bg-stone-50 rounded-xl p-2 border cursor-pointer shrink-0 w-20 transition ${
-                      activeSubcategoryId === 'All' ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200'
+              {parentCategories.concat(currentSubcategories).map((sub, index) => {
+                const isSubSelected = activeSubcategoryId === sub.id || activeCategory === sub.id;
+                const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
+                return (
+                  <button
+                    key={sub.id || index}
+                    onClick={() => { setActiveCategory(sub.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                    className={`flex flex-col items-center p-2.5 rounded-2xl text-center transition cursor-pointer relative border ${
+                      isSubSelected 
+                        ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950 font-black shadow-xs' 
+                        : 'bg-white border-transparent text-stone-600 hover:bg-stone-50 font-bold'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
-                      <Sparkles size={15} />
+                    {isSubSelected && (
+                      <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-emerald-500 rounded-l-full" />
+                    )}
+                    <div className="w-12 h-12 rounded-2xl bg-stone-100 overflow-hidden mb-1.5 border border-stone-200/60 flex items-center justify-center shadow-2xs shrink-0 p-1">
+                      <img src={subImg} alt={sub.name} className="w-full h-full object-contain" />
                     </div>
-                    <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">All</span>
-                  </div>
-
-                  {currentSubcategories.map((sub, index) => {
-                    const isSubSelected = activeSubcategoryId === sub.id;
-                    const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
-                    return (
-                      <div
-                        key={sub.id}
-                        onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className={`inline-flex flex-col items-center bg-stone-50 rounded-xl p-2 border cursor-pointer shrink-0 w-20 transition ${
-                          isSubSelected ? 'border-emerald-600 bg-emerald-50/80 ring-1 ring-emerald-500' : 'border-stone-200 hover:border-emerald-300'
-                        }`}
-                      >
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-100 mb-1 shadow-2xs border border-stone-200">
-                          <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
-                        </div>
-                        <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white px-3.5 py-2.5 rounded-2xl border border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
-              <div>
-                <h2 className="font-black text-stone-900 text-xs sm:text-sm tracking-tight">
-                  {query 
-                    ? `Search: "${searchQuery}"` 
-                    : activeSubcategoryId !== 'All' && activeSubcategoryObj 
-                      ? activeSubcategoryObj.name 
-                      : activeCategoryObj?.name || 'All Products'}
-                </h2>
-                <p className="text-[9px] text-stone-400 font-medium">Delivering in 13 minutes to your location</p>
-              </div>
-
-              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none relative">
-                
-                {/* SORT DROPDOWN CONTAINER */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 rounded-xl text-[11px] font-bold border border-emerald-200 shrink-0 cursor-pointer shadow-2xs transition"
-                  >
-                    <ArrowUpDown size={11} className="text-emerald-700" /> 
-                    {sortBy === 'price_asc' ? 'Price: Low to High' : sortBy === 'price_desc' ? 'Price: High to Low' : sortBy === 'rating_desc' ? 'Ratings' : 'Sort by'}
+                    <span className="text-[10px] leading-tight line-clamp-2 w-full">{sub.name}</span>
                   </button>
-
-                  {sortDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-emerald-100 z-50 py-1 text-[11px]">
-                      <button
-                        onClick={() => { setSortBy('price_asc'); setSortDropdownOpen(false); setCurrentPage(1); }}
-                        className={`w-full text-left px-3.5 py-2 font-bold transition hover:bg-emerald-50 ${sortBy === 'price_asc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
-                      >
-                        Price: Low to High
-                      </button>
-                      <button
-                        onClick={() => { setSortBy('price_desc'); setSortDropdownOpen(false); setCurrentPage(1); }}
-                        className={`w-full text-left px-3.5 py-2 font-bold transition hover:bg-emerald-50 ${sortBy === 'price_desc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
-                      >
-                        Price: High to Low
-                      </button>
-                      <button
-                        onClick={() => { setSortBy('rating_desc'); setSortDropdownOpen(false); setCurrentPage(1); }}
-                        className={`w-full text-left px-3.5 py-2 font-bold transition hover:bg-emerald-50 ${sortBy === 'rating_desc' ? 'text-emerald-700 bg-emerald-50/60 font-black' : 'text-stone-700'}`}
-                      >
-                        Top Rated
-                      </button>
-                      {sortBy && (
-                        <button
-                          onClick={() => { setSortBy(''); setSortDropdownOpen(false); setCurrentPage(1); }}
-                          className="w-full text-left px-3.5 py-1.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50 border-t border-stone-100 mt-1"
-                        >
-                          Clear Sort
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-              </div>
+                );
+              })}
             </div>
 
-            {sourceProducts.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 border border-emerald-100 text-center shadow-2xs">
-                <Package size={36} className="text-stone-300 mx-auto mb-2" />
-                <p className="text-[11px] font-black text-stone-700">No active products found in this selection.</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+            <div className="flex-1 w-full space-y-4 min-w-0">
+              {sourceProducts.length === 0 ? (
+                <div className="bg-white rounded-3xl p-16 border border-stone-200 text-center shadow-sm">
+                  <Package size={48} className="text-stone-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-stone-700">No active products found in this selection.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {currentProducts.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -488,120 +295,174 @@ export default function ProductGrid({
                     />
                   ))}
                 </div>
+              )}
+            </div>
 
-                {totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-1.5 pt-3">
-                    <button
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className="p-1.5 bg-white rounded-xl border border-stone-200 disabled:opacity-40 shadow-2xs cursor-pointer"
-                    >
-                      <ChevronLeft size={13} />
-                    </button>
-                    
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
-                      <button
-                        key={num}
-                        onClick={() => setCurrentPage(num)}
-                        className={`w-7 h-7 rounded-xl font-black text-[11px] cursor-pointer shadow-2xs ${
-                          currentPage === num ? 'bg-emerald-600 text-white' : 'bg-white text-stone-600 border border-stone-200'
-                        }`}
-                      >
-                        {num}
-                      </button>
-                    ))}
+          </div>
+        </div>
+      ) : (
+        /* HOMEPAGE SECTIONS */
+        <div className="space-y-10">
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-black text-base sm:text-lg text-slate-900 tracking-tight">Shop By Category</h3>
+              <button 
+                onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }} 
+                className="text-xs font-bold text-emerald-500 hover:text-emerald-600 cursor-pointer transition"
+              >
+                See All
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-3 sm:gap-4">
+              <motion.button
+                whileHover={{ y: -2 }}
+                onClick={() => { setActiveCategory('All'); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                className="flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shadow-xs border-stone-100 bg-[#F4F5F7] hover:border-emerald-300 text-slate-800"
+              >
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-2 shrink-0 bg-white text-emerald-600 shadow-xs">
+                  <Sparkles size={20} />
+                </div>
+                <span className="text-[10px] sm:text-[11px] font-bold truncate w-full text-center">All</span>
+              </motion.button>
 
-                    <button
-                      disabled={currentPage === totalPages}
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className="p-1.5 bg-white rounded-xl border border-stone-200 disabled:opacity-40 shadow-2xs cursor-pointer"
-                    >
-                      <ChevronRight size={13} />
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+              {parentCategories.slice(0, 7).map((cat, index) => {
+                const img = cat.image_url || fallbackImages[index % fallbackImages.length];
+                return (
+                  <motion.button
+                    whileHover={{ y: -2 }}
+                    key={cat.id}
+                    onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
+                    className="flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shadow-xs border-stone-100 bg-[#F4F5F7] hover:border-emerald-300 text-slate-800"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-white overflow-hidden mb-2 border border-stone-200/50 shrink-0 shadow-xs flex items-center justify-center p-1">
+                      <img src={img} alt={cat.name} className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-[10px] sm:text-[11px] font-bold truncate w-full text-center">{cat.name}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="relative rounded-[2.5rem] overflow-hidden shadow-sm w-full bg-[#EAF8EE] border border-emerald-100 flex items-center justify-between p-6 sm:p-10">
+            <div className="space-y-3 max-w-xs sm:max-w-md relative z-10">
+              <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">World Food Festival, Bring the world to your Kitchen!</h2>
+              <button 
+                onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-xs shadow-md transition cursor-pointer"
+              >
+                Shop Now
+              </button>
+            </div>
+            <div className="absolute right-4 bottom-0 top-0 flex items-center opacity-90 sm:opacity-100 pointer-events-none">
+              <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80" alt="Festival" className="h-full object-contain max-h-48 rounded-3xl" />
+            </div>
+          </div>
+
+          {/* Best Deal Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">Best Deal</h3>
+              <button 
+                onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }} 
+                className="text-xs font-bold text-emerald-500 hover:text-emerald-600 cursor-pointer transition"
+              >
+                See All
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {activeProducts.slice(0, 4).map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  wishlistIds={wishlistIds}
+                  toggleWishlist={toggleWishlist}
+                  selectedVariants={selectedVariants}
+                  setSelectedVariants={setSelectedVariants}
+                  cart={cart}
+                  addToCart={addToCart}
+                  updateQuantity={updateQuantity}
+                  onSelectProduct={onSelectProduct}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Best Selling Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">Best Selling</h3>
+              <button 
+                onClick={() => { setActiveCategory(parentCategories[1]?.id || parentCategories[0]?.id || 'All'); }} 
+                className="text-xs font-bold text-emerald-500 hover:text-emerald-600 cursor-pointer transition"
+              >
+                See All
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+              {activeProducts.slice(4, 8).map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  wishlistIds={wishlistIds}
+                  toggleWishlist={toggleWishlist}
+                  selectedVariants={selectedVariants}
+                  setSelectedVariants={setSelectedVariants}
+                  cart={cart}
+                  addToCart={addToCart}
+                  updateQuantity={updateQuantity}
+                  onSelectProduct={onSelectProduct}
+                />
+              ))}
+            </div>
           </div>
 
         </div>
-      ) : (
-        /* HOMEPAGE POPULATION: SHOWING CATEGORIES WITH HORIZONTAL SUBCATEGORY SCROLL */
-        <div className="space-y-4">
-          {parentCategories.map(parent => {
-            const subcats = getSubcategories(parent.id);
-            if (subcats.length === 0) return null;
-
-            return (
-              <div key={parent.id} className="bg-white rounded-2xl border border-emerald-100 shadow-2xs p-3.5 sm:p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-                  <h3 className="text-xs sm:text-sm font-black text-stone-900 tracking-tight uppercase">{parent.name}</h3>
-                  <button onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} className="text-[10px] font-black text-emerald-700 hover:text-emerald-800 cursor-pointer uppercase flex items-center gap-0.5 bg-emerald-50 px-2 py-1 rounded-xl">
-                    <span>see all</span> <ChevronRight size={11} />
-                  </button>
-                </div>
-
-                {/* MOBILE HORIZONTAL SUBCATEGORY SCROLL STRIP */}
-                <div className="block md:hidden bg-emerald-50/30 p-2 rounded-xl border border-emerald-100 mb-2">
-                  <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-none whitespace-nowrap touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    <div
-                      onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                      className="inline-flex flex-col items-center bg-white rounded-xl p-2 border border-stone-200 cursor-pointer shrink-0 w-20 transition hover:border-emerald-400"
-                    >
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
-                        <Sparkles size={14} />
-                      </div>
-                      <span className="text-[9px] font-black text-stone-900 text-center truncate w-full">View All</span>
-                    </div>
-
-                    {subcats.map((sub, index) => {
-                      const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
-                      return (
-                        <div
-                          key={sub.id}
-                          onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                          className="inline-flex flex-col items-center bg-white rounded-xl p-2 border border-stone-200 cursor-pointer shrink-0 w-20 transition hover:border-emerald-400"
-                        >
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-100 mb-1 shadow-2xs border border-stone-200">
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
-                          </div>
-                          <span className="text-[9px] font-bold text-stone-800 text-center truncate w-full">{sub.name}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* DESKTOP SUBCATEGORIES SCROLL STRIP */}
-                <div className="hidden md:flex overflow-x-auto pb-1 gap-2.5 scrollbar-none snap-x whitespace-nowrap">
-                  {subcats.map((sub, index) => {
-                    const subImg = sub.image_url || fallbackImages[index % fallbackImages.length];
-                    return (
-                      <motion.div
-                        whileHover={{ y: -1 }}
-                        key={sub.id}
-                        onClick={() => { setActiveCategory(parent.id); setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
-                        className="inline-flex flex-col items-center text-center cursor-pointer group space-y-1 shrink-0 w-16 snap-start"
-                      >
-                        <div className="w-12 h-12 rounded-full bg-stone-50 border border-stone-200 overflow-hidden shadow-2xs group-hover:border-emerald-400 transition-all shrink-0 p-0.5 flex items-center justify-center">
-                          {sub.image_url ? (
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            <Package size={16} className="text-emerald-600" />
-                          )}
-                        </div>
-                        <span className="font-bold text-[9px] text-stone-800 group-hover:text-emerald-700 leading-tight line-clamp-1 w-full px-0.5">
-                          {sub.name}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
       )}
+
+      {/* Fixed Bottom Navigation Bar matching reference screenshot */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200/80 py-2.5 px-6 z-50 shadow-lg max-w-lg mx-auto sm:max-w-none sm:rounded-t-3xl">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          <button 
+            onClick={() => { setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-1 text-emerald-500 cursor-pointer"
+          >
+            <div className="relative p-1">
+              <Home size={22} className="stroke-[2.5]" />
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-emerald-500 rounded-full" />
+            </div>
+            <span className="text-[10px] font-black">Shop</span>
+          </button>
+
+          <button 
+            onClick={() => { if(onNavigate) onNavigate('wishlist'); else setActiveCategory(parentCategories[0]?.id || 'All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition"
+          >
+            <Heart size={22} className="stroke-[2]" />
+            <span className="text-[10px] font-bold">Favourite</span>
+          </button>
+
+          <button 
+            onClick={() => { if(onOpenCart) onOpenCart(); }}
+            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition"
+          >
+            <ShoppingBag size={22} className="stroke-[2]" />
+            <span className="text-[10px] font-bold">Cart</span>
+          </button>
+
+          <button 
+            onClick={() => { if(onNavigate) onNavigate('profile'); }}
+            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition"
+          >
+            <User size={22} className="stroke-[2]" />
+            <span className="text-[10px] font-bold">Account</span>
+          </button>
+        </div>
+      </div>
 
     </main>
   );
