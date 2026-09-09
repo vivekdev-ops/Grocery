@@ -33,9 +33,10 @@ export default function CustomerStorefront() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Pagination State
+  // Pagination & Sorting State
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 12;
+  const [sortBy, setSortBy] = useState('');
 
   // Store & Sale Data
   const [storeLocation, setStoreLocation] = useState({ latitude: 26.7900, longitude: 82.6000 });
@@ -1073,10 +1074,29 @@ export default function CustomerStorefront() {
     return matchesCategory && matchesSearch;
   });
 
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    if (sortBy === 'price_asc') {
+      const priceA = Number(a.variants?.[0]?.price ?? a.price ?? 0);
+      const priceB = Number(b.variants?.[0]?.price ?? b.price ?? 0);
+      return priceA - priceB;
+    }
+    if (sortBy === 'price_desc') {
+      const priceA = Number(a.variants?.[0]?.price ?? a.price ?? 0);
+      const priceB = Number(b.variants?.[0]?.price ?? b.price ?? 0);
+      return priceB - priceA;
+    }
+    if (sortBy === 'rating_desc') {
+      const ratingA = Number(a.avgRating || a.rating || 0);
+      const ratingB = Number(b.avgRating || b.rating || 0);
+      return ratingB - ratingA;
+    }
+    return 0;
+  });
+
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+  const currentProducts = sortedProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
 
   // Full-screen loading splash screen until categories, subcategories, and products are fully loaded
   if (checkingStatus || loading) {
@@ -1982,6 +2002,8 @@ export default function CustomerStorefront() {
       cart={cart}
       addToCart={addToCart}
       updateQuantity={updateQuantity}
+      sortBy={sortBy}
+      setSortBy={setSortBy}
       onNavigate={navigate}
       onOpenCart={() => setIsCartOpen(true)}
       onSelectProduct={async (product) => {
@@ -2024,6 +2046,9 @@ export default function CustomerStorefront() {
           (selectedProductDetails.category && (p.category === selectedProductDetails.category || p.category_id === selectedProductDetails.category))
         )
       ).slice(0, 4);
+
+      const ratingNum = selectedProductDetails.avgRating ? Number(selectedProductDetails.avgRating) : 4.0;
+      const reviewCountNum = selectedProductDetails.reviewCount || productReviews.length || 1;
 
       return (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 font-sans p-0 sm:p-4">
@@ -2093,21 +2118,23 @@ export default function CustomerStorefront() {
 
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-0.5 text-emerald-500">
-                    <Star size={14} className="fill-emerald-500" />
-                    <Star size={14} className="fill-emerald-500" />
-                    <Star size={14} className="fill-emerald-500" />
-                    <Star size={14} className="fill-emerald-500" />
-                    <Star size={14} className="text-stone-300" />
+                    {[1, 2, 3, 4, 5].map((starIdx) => (
+                      <Star 
+                        key={starIdx} 
+                        size={14} 
+                        className={starIdx <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} 
+                      />
+                    ))}
                   </div>
                   <span className="font-extrabold text-slate-800 text-xs">
-                    {selectedProductDetails.avgRating || '4.0'} ({selectedProductDetails.reviewCount || 146} Reviews)
+                    {ratingNum.toFixed(1)} ({reviewCountNum} Reviews)
                   </span>
                 </div>
 
                 <div className="flex items-baseline gap-3">
-                  <span className="text-2xl font-black text-slate-900">${modalPrice.toFixed(0)}</span>
+                  <span className="text-2xl font-black text-slate-900">₹{modalPrice.toFixed(0)}</span>
                   {hasModalMrp && (
-                    <span className="text-stone-400 line-through font-bold text-sm">${modalMrp.toFixed(0)}</span>
+                    <span className="text-stone-400 line-through font-bold text-sm">₹{modalMrp.toFixed(0)}</span>
                   )}
                   {discountPct > 0 && (
                     <span className="bg-emerald-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
@@ -2115,75 +2142,96 @@ export default function CustomerStorefront() {
                     </span>
                   )}
                 </div>
+
+                {hasVariants && (
+                  <div className="pt-2">
+                    <label className="block text-[10px] font-black uppercase text-stone-400 mb-1">Select Size / Unit</label>
+                    <div className="flex flex-wrap gap-2">
+                      {variants.map((v, idx) => {
+                        const vKey = v.id || v.label || v.unit_label || idx;
+                        const vLabel = v.unit_label || v.label || `Option ${idx + 1}`;
+                        const isVarSelected = (currentVariantKey === v.id || currentVariantKey === v.label || currentVariantKey === v.unit_label);
+                        return (
+                          <button
+                            key={vKey}
+                            type="button"
+                            onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer ${
+                              isVarSelected 
+                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' 
+                                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                            }`}
+                          >
+                            {vLabel} • ₹{v.price}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Description */}
+              {/* Description (Exact as configured by Admin) */}
               <div className="space-y-1 text-xs text-stone-600 leading-relaxed font-medium">
                 <p>
                   {isDescriptionExpanded 
-                    ? (selectedProductDetails.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Orci, sem feugiat ut nullam nisl orci, volutpat, felis. Nunc elit, et mattis commodo condimentum tellus et.")
-                    : "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Orci, sem feugiat ut nullam nisl orci, volutpat, felis. Nunc elit, et mattis commodo condimentum tellus et."}
-                  <button 
-                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
-                    className="text-emerald-500 font-extrabold ml-1 hover:underline cursor-pointer"
-                  >
-                    {isDescriptionExpanded ? 'Read Less' : 'Read More'}
-                  </button>
+                    ? (selectedProductDetails.description || "No description provided by admin.")
+                    : ((selectedProductDetails.description || "No description provided by admin.").slice(0, 140) + ((selectedProductDetails.description || "").length > 140 ? '...' : ''))}
+                  {(selectedProductDetails.description || "").length > 140 && (
+                    <button 
+                      onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
+                      className="text-emerald-500 font-extrabold ml-1 hover:underline cursor-pointer"
+                    >
+                      {isDescriptionExpanded ? 'Read Less' : 'Read More'}
+                    </button>
+                  )}
                 </p>
               </div>
 
-              {/* Reviews & Ratings Section */}
+              {/* Reviews & Ratings Section (Fetched dynamically) */}
               <div className="space-y-4 pt-4 border-t border-stone-100">
                 <h3 className="font-black text-base text-slate-900 tracking-tight">Reviews & Ratings</h3>
                 
                 <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-3xl">
-                  <span className="text-3xl font-black text-slate-900">4.2</span>
+                  <span className="text-3xl font-black text-slate-900">{ratingNum.toFixed(1)}</span>
                   <div className="space-y-1">
                     <div className="flex items-center gap-1 text-emerald-500">
-                      <Star size={14} className="fill-emerald-500" />
-                      <Star size={14} className="fill-emerald-500" />
-                      <Star size={14} className="fill-emerald-500" />
-                      <Star size={14} className="fill-emerald-500" />
-                      <Star size={14} className="text-stone-300" />
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} size={14} className={s <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} />
+                      ))}
                     </div>
-                    <p className="text-[10px] text-stone-400 font-bold">120 Reviews</p>
+                    <p className="text-[10px] text-stone-400 font-bold">{reviewCountNum} Reviews</p>
                   </div>
                 </div>
 
-                {/* Sample Review Card */}
-                <div className="space-y-3 p-4 bg-white rounded-3xl border border-stone-100 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-full bg-stone-200 overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80" alt="User" className="w-full h-full object-cover" />
+                {productReviews.length === 0 ? (
+                  <p className="text-xs text-stone-400 italic">No reviews yet for this product.</p>
+                ) : (
+                  productReviews.map(rev => (
+                    <div key={rev.id} className="space-y-3 p-4 bg-white rounded-3xl border border-stone-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-full bg-stone-200 overflow-hidden flex items-center justify-center font-bold text-stone-600 text-xs">
+                            {rev.user_email?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-xs text-slate-900">{rev.user_email?.split('@')[0] || 'Customer'}</h4>
+                            <p className="text-[10px] text-stone-400">{new Date(rev.created_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 text-emerald-500">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} size={12} className={s <= rev.rating ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} />
+                          ))}
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-extrabold text-xs text-slate-900">Johnson Smith</h4>
-                        <p className="text-[10px] text-stone-400">April 19, 2023</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 text-emerald-500">
-                      <Star size={12} className="fill-emerald-500" />
-                      <Star size={12} className="fill-emerald-500" />
-                      <Star size={12} className="fill-emerald-500" />
-                      <Star size={12} className="fill-emerald-500" />
-                      <Star size={12} className="fill-emerald-500" />
-                    </div>
-                  </div>
 
-                  <p className="text-xs text-stone-700 font-medium leading-relaxed">
-                    Recently I have purchased this product and it's fragrance is very nice, I loved it.
-                  </p>
-
-                  <div className="flex gap-2">
-                    <div className="w-16 h-16 rounded-2xl bg-stone-100 overflow-hidden border border-stone-200">
-                      <img src={modalImages[0] || ''} alt="" className="w-full h-full object-cover" />
+                      <p className="text-xs text-stone-700 font-medium leading-relaxed">
+                        {rev.review_text}
+                      </p>
                     </div>
-                    <div className="w-16 h-16 rounded-2xl bg-stone-100 overflow-hidden border border-stone-200">
-                      <img src={modalImages[0] || ''} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
 
               {/* Similar Products Shelf */}
@@ -2193,12 +2241,18 @@ export default function CustomerStorefront() {
                   <div className="grid grid-cols-2 gap-3">
                     {similarProducts.map(p => {
                       const pImgs = p.images || p.gallery || [p.image_url].filter(Boolean);
+                      const pVariants = p.variants || p.product_variants || [];
+                      const hasPVar = pVariants.length > 0;
+                      const pVar = pVariants[0] || null;
+                      const pPrice = Number(pVar ? pVar.price : p.price || 0);
+
                       return (
                         <div 
                           key={p.id}
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedProductDetails(p);
                             setActiveGalleryImage(pImgs[0] || '');
+                            await fetchProductReviews(p.id);
                           }}
                           className="bg-stone-50/70 p-3.5 rounded-3xl border border-stone-100 cursor-pointer space-y-2 group"
                         >
@@ -2207,12 +2261,12 @@ export default function CustomerStorefront() {
                             <Heart size={14} className="absolute top-2.5 right-2.5 text-stone-400" />
                           </div>
                           <h4 className="font-extrabold text-xs text-slate-900 line-clamp-1">{p.name}</h4>
-                          <p className="text-[10px] text-stone-400 font-bold">5 L</p>
+                          <p className="text-[10px] text-stone-400 font-bold">{p.unit || '1 unit'}</p>
                           <div className="flex items-center justify-between pt-1">
-                            <span className="font-black text-sm text-slate-900">${Number(p.price).toFixed(0)}</span>
+                            <span className="font-black text-sm text-slate-900">₹{pPrice.toFixed(0)}</span>
                             <button 
-                              onClick={(e) => { e.stopPropagation(); addToCart(p); }}
-                              className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); addToCart(p, pVar); }}
+                              className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
                             >
                               Add
                             </button>
@@ -2265,7 +2319,7 @@ export default function CustomerStorefront() {
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-500/25 transition cursor-pointer"
               >
                 <span>Add to Cart</span>
-                <span className="border-l border-emerald-400 pl-4">${(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
+                <span className="border-l border-emerald-400 pl-4">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
               </button>
             </div>
           </motion.div>
