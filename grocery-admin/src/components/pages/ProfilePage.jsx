@@ -1,44 +1,67 @@
 // src/components/pages/ProfilePage.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { User, Phone, Mail, Save, UserCircle, Upload, Sparkles } from 'lucide-react';
-import StoreHeader from '../store/StoreHeader';
+import { 
+  User, 
+  Package, 
+  ShieldCheck, 
+  FileText, 
+  LogOut, 
+  ChevronRight, 
+  Edit3, 
+  Home, 
+  Heart, 
+  ShoppingBag,
+  ArrowLeft,
+  Camera
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Footer from '../Footer';
-import { motion } from 'framer-motion';
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const [session, setSession] = useState(null);
-  const [customerProfile, setCustomerProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ full_name: '', phone: '', avatar_url: '' });
+  const [activeTab, setActiveTab] = useState('menu'); // 'menu' | 'edit'
+
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        navigate('/login');
+      }
     });
-  }, []);
+  }, [navigate]);
 
   const fetchProfile = async (userId) => {
     try {
-      const { data } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('customer_profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
+      if (error) {
+        console.error('Error fetching profile:', error.message);
+      }
+
       if (data) {
-        setCustomerProfile(data);
-        setForm({
-          full_name: data.full_name || '',
-          phone: data.phone || '',
-          avatar_url: data.avatar_url || ''
-        });
+        setFullName(data.full_name || '');
+        setPhone(data.phone || '');
+        setAddress(data.address || '');
+        setAvatarUrl(data.avatar_url || '');
       }
     } catch (err) {
-      console.error('Error fetching profile:', err.message);
+      console.error('Unexpected error fetching profile:', err.message);
     } finally {
       setLoading(false);
     }
@@ -50,13 +73,12 @@ export default function ProfilePage() {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64String = reader.result;
-      setForm(prev => ({ ...prev, avatar_url: base64String }));
+      setAvatarUrl(reader.result);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSave = async (e) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!session?.user) return;
     setSaving(true);
@@ -64,10 +86,11 @@ export default function ProfilePage() {
     try {
       const updates = {
         user_id: session.user.id,
-        full_name: form.full_name.trim(),
-        phone: form.phone.trim(),
-        avatar_url: form.avatar_url.trim(),
-        updated_at: new Date()
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        avatar_url: avatarUrl.trim(),
+        updated_at: new Date(),
       };
 
       const { error } = await supabase
@@ -75,130 +98,279 @@ export default function ProfilePage() {
         .upsert(updates, { onConflict: 'user_id' });
 
       if (error) throw error;
-      setCustomerProfile(updates);
+      
       alert('Profile updated successfully!');
+      setActiveTab('menu');
     } catch (err) {
-      alert('Failed to update profile: ' + err.message);
+      console.error('Profile update failed:', err);
+      alert('Error updating profile: ' + (err.message || err));
     } finally {
       setSaving(false);
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen text-stone-500 font-bold text-xs">Loading profile...</div>;
+  }
+
+  const displayName = fullName || session?.user?.user_metadata?.full_name || 'Smith Mate';
+  const displayEmail = session?.user?.email || 'smithmate@example.com';
+  const activeAvatar = avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-50 via-stone-50/50 to-white font-sans text-stone-900 flex flex-col selection:bg-emerald-500 selection:text-white text-xs">
-      <StoreHeader session={session} customerProfile={customerProfile} showSearch={false} />
-
-      <main className="flex-1 max-w-xl mx-auto px-3 sm:px-4 py-6 w-full space-y-6">
-        
-        {/* =================================================
-            PAGE HEADER BANNER
-        ================================================= */}
-        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute right-[-20px] bottom-[-20px] opacity-10 pointer-events-none">
-            <User size={180} />
+    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-28 select-none flex flex-col">
+      
+      {activeTab === 'edit' ? (
+        <>
+          {/* Top Header for Edit Mode */}
+          <div className="px-4 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-30">
+            <button 
+              type="button"
+              onClick={() => setActiveTab('menu')}
+              className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition cursor-pointer"
+            >
+              <ArrowLeft size={18} className="stroke-[2.5]" />
+            </button>
+            <h1 className="font-black text-slate-900 text-base tracking-tight">Edit Profile</h1>
+            <div className="w-9" />
           </div>
-          <div className="relative z-10 space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] tracking-wider uppercase">
-              <Sparkles size={12} /> Account Management
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">My Profile</h1>
-            <p className="text-emerald-100/90 text-xs sm:text-sm max-w-md font-medium">
-              Manage your personal information, contact phone, and account profile picture.
-            </p>
-          </div>
-        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl border border-stone-200/90 p-6 sm:p-8 shadow-xs"
-        >
-          <form onSubmit={handleSave} className="space-y-5 text-xs">
-            
-            {/* Avatar Section */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 pb-6 border-b border-stone-100 text-center sm:text-left">
-              <div className="w-20 h-20 rounded-full bg-stone-100 overflow-hidden border-2 border-emerald-100 shrink-0 shadow-inner flex items-center justify-center">
-                {form.avatar_url ? (
-                  <img src={form.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <UserCircle className="w-full h-full text-stone-400" />
-                )}
-              </div>
-              <div className="space-y-2 flex-1 w-full">
-                <label className="block font-black text-stone-700 uppercase tracking-wider text-[10px]">Profile Picture</label>
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <input 
-                    type="url" 
-                    placeholder="https://example.com/avatar.jpg"
-                    value={form.avatar_url}
-                    onChange={e => setForm({ ...form, avatar_url: e.target.value })}
-                    className="w-full border border-stone-200 rounded-xl p-3 bg-stone-50 outline-none focus:border-emerald-500 font-medium truncate"
-                  />
-                  <label className="w-full sm:w-auto bg-stone-900 hover:bg-stone-800 text-white px-4 py-3 rounded-xl font-bold cursor-pointer transition shrink-0 inline-flex items-center justify-center gap-1.5 shadow-xs">
-                    <Upload size={14} /> Browse Device
+          <main className="flex-1 max-w-md mx-auto px-4 py-6 w-full space-y-6">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              
+              {/* Avatar Section */}
+              <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-stone-100 overflow-hidden border-2 border-emerald-500 shadow-sm flex items-center justify-center">
+                    <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <label className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition">
+                    <Camera size={14} />
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
               </div>
-            </div>
 
-            {/* Full Name */}
-            <div className="space-y-1.5">
-              <label className="block font-black text-stone-700 uppercase tracking-wider text-[10px]">Full Name</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
+              {/* Name Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Name</label>
                 <input 
                   type="text" 
                   required
-                  value={form.full_name}
-                  onChange={e => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full pl-11 pr-4 py-3 border border-stone-200 rounded-2xl bg-stone-50 outline-none focus:border-emerald-500 focus:bg-white font-bold text-stone-900 transition"
-                  placeholder="Enter your full name"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="Smith Mate"
                 />
               </div>
-            </div>
 
-            {/* Phone Number */}
-            <div className="space-y-1.5">
-              <label className="block font-black text-stone-700 uppercase tracking-wider text-[10px]">Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
-                <input 
-                  type="tel" 
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                  className="w-full pl-11 pr-4 py-3 border border-stone-200 rounded-2xl bg-stone-50 outline-none focus:border-emerald-500 focus:bg-white font-bold text-stone-900 transition"
-                  placeholder="9876543210"
-                />
-              </div>
-            </div>
-
-            {/* Email Address (Locked) */}
-            <div className="space-y-1.5">
-              <label className="block font-black text-stone-700 uppercase tracking-wider text-[10px]">Email Address (Locked)</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
+              {/* Email Address Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Email Address</label>
                 <input 
                   type="email" 
                   disabled
-                  value={session?.user?.email || ''}
-                  className="w-full pl-11 pr-4 py-3 border border-stone-200 rounded-2xl bg-stone-100 text-stone-500 cursor-not-allowed font-medium"
+                  value={displayEmail}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-stone-50/50 text-stone-500 font-bold text-sm cursor-not-allowed shadow-2xs"
                 />
               </div>
+
+              {/* Mobile Number Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="(205) 555-0100"
+                />
+              </div>
+
+              {/* Enter Address Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
+                <input 
+                  type="text" 
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="8502 Preston Rd. Inglewood, USA"
+                />
+              </div>
+
+              {/* Update Button */}
+              <div className="pt-6">
+                <button 
+                  type="submit" 
+                  disabled={saving}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer uppercase tracking-wider text-xs active:scale-95 flex items-center justify-center"
+                >
+                  {saving ? 'Updating...' : 'Update'}
+                </button>
+              </div>
+
+            </form>
+          </main>
+        </>
+      ) : (
+        <>
+          {/* Top Green Banner */}
+          <div className="bg-emerald-500 text-white rounded-b-[2.5rem] p-6 pt-10 shadow-lg space-y-6">
+            <h1 className="text-center font-black text-lg tracking-tight">My Profile</h1>
+
+            <div className="flex items-center gap-4 pb-2">
+              <div className="relative">
+                <img 
+                  src={activeAvatar} 
+                  alt="Profile" 
+                  className="w-16 h-16 rounded-full object-cover border-2 border-white/80 shadow-md bg-white"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('edit')}
+                  className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center border-2 border-white shadow-xs cursor-pointer"
+                >
+                  <Edit3 size={12} />
+                </button>
+              </div>
+
+              <div className="min-w-0">
+                <h2 className="font-black text-base truncate tracking-tight">{displayName}</h2>
+                <p className="text-xs text-emerald-100 font-medium truncate mt-0.5">{displayEmail}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Menu Options List */}
+          <main className="max-w-md mx-auto px-4 mt-6 space-y-4">
+            <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden divide-y divide-stone-100 text-xs">
+              
+              <button 
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <User size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Edit Profile</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/account/orders')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <Package size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">My Orders</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/privacy-policy')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Privacy Policy</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/terms')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <FileText size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Terms & Conditions</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
             </div>
 
-            <button 
-              type="submit" 
-              disabled={saving}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-emerald-600/25 transition cursor-pointer uppercase tracking-wider flex items-center justify-center gap-2 mt-2 active:scale-95"
-            >
-              <Save size={16} /> {saving ? 'Saving Changes...' : 'Save Profile Changes'}
-            </button>
-          </form>
-        </motion.div>
-      </main>
+            {/* Logout Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut size={16} /> Logout
+              </button>
+            </div>
+          </main>
+        </>
+      )}
+
+      {/* Bottom Navigation Bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
+        <div className="flex items-center justify-around px-2 py-2 max-w-md mx-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Home"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <Home size={20} />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Wishlist"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <Heart size={20} />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Cart"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <ShoppingBag size={20} />
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('menu')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Profile"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 text-emerald-500 shadow-xs">
+              <User size={20} />
+            </div>
+          </button>
+        </div>
+      </div>
 
       <Footer />
     </div>

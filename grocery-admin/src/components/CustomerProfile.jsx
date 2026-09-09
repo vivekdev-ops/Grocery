@@ -1,17 +1,19 @@
 // src/components/CustomerProfile.jsx
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { User, Mail, Heart, Save, ArrowLeft, Camera } from 'lucide-react';
+import { User, Lock, CreditCard, Package, ShieldCheck, FileText, LogOut, ChevronRight, Edit3, Home, Heart, ShoppingBag, ArrowLeft, Camera } from 'lucide-react';
+import Footer from './Footer';
 
 export default function CustomerProfile() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const [activeTab, setActiveTab] = useState('menu'); // 'menu' | 'edit'
+
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [interests, setInterests] = useState('');
+  const [address, setAddress] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
   const navigate = useNavigate();
@@ -36,152 +38,357 @@ export default function CustomerProfile() {
         .eq('user_id', userId)
         .maybeSingle();
 
+      if (error) {
+        console.error('Error fetching profile:', error.message);
+      }
+
       if (data) {
         setFullName(data.full_name || '');
         setPhone(data.phone || '');
-        setInterests(data.interests || '');
+        setAddress(data.address || '');
         setAvatarUrl(data.avatar_url || '');
       }
     } catch (err) {
-      console.error('Error fetching profile:', err.message);
+      console.error('Unexpected error fetching profile:', err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    if (!session) return;
+    if (!session?.user) return;
     setSaving(true);
 
-    const updates = {
-      user_id: session.user.id,
-      full_name: fullName,
-      phone: phone,
-      interests: interests,
-      avatar_url: avatarUrl,
-      updated_at: new Date(),
-    };
+    try {
+      const updates = {
+        user_id: session.user.id,
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        avatar_url: avatarUrl.trim(),
+        updated_at: new Date(),
+      };
 
-    // Upsert profile data
-    const { error } = await supabase
-      .from('customer_profiles')
-      .upsert(updates, { onConflict: 'user_id' });
+      const { error } = await supabase
+        .from('customer_profiles')
+        .upsert(updates, { onConflict: 'user_id' });
 
-    if (error) {
-      alert('Error updating profile: ' + error.message);
-    } else {
+      if (error) throw error;
+      
       alert('Profile updated successfully!');
+      setActiveTab('menu');
+    } catch (err) {
+      console.error('Profile update failed:', err);
+      alert('Error updating profile: ' + (err.message || err));
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-gray-500 font-medium">Loading profile...</div>;
+    return <div className="flex items-center justify-center min-h-screen text-stone-500 font-bold text-xs">Loading profile...</div>;
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
-      <div className="max-w-xl mx-auto space-y-6">
-        
-        {/* Navigation Header */}
-        <div className="flex items-center justify-between">
-          <Link to="/" className="text-gray-600 font-bold flex items-center gap-1.5 hover:text-green-700 transition text-sm">
-            <ArrowLeft size={16} /> Back to Storefront
-          </Link>
-          <h1 className="text-lg font-black text-gray-900">Account Settings</h1>
-        </div>
+  const displayName = fullName || session?.user?.user_metadata?.full_name || 'Smith Mate';
+  const displayEmail = session?.user?.email || 'smithmate@example.com';
+  const activeAvatar = avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
 
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-200 space-y-6">
-          
-          {/* Avatar / Picture Section */}
-          <div className="flex flex-col items-center text-center space-y-3">
-            <div className="relative w-24 h-24 bg-green-50 text-green-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-green-200 shadow-inner">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User size={40} />
-              )}
-            </div>
-            <div className="w-full">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Profile Picture URL</label>
-              <input 
-                type="url" 
-                placeholder="https://example.com/avatar.jpg"
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-green-600 outline-none"
-                value={avatarUrl}
-                onChange={e => setAvatarUrl(e.target.value)}
-              />
+  return (
+    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-28 select-none flex flex-col">
+      
+      {activeTab === 'edit' ? (
+        <>
+          {/* Top Header for Edit Mode */}
+          <div className="px-4 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-30">
+            <button 
+              type="button"
+              onClick={() => setActiveTab('menu')}
+              className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition cursor-pointer"
+            >
+              <ArrowLeft size={18} className="stroke-[2.5]" />
+            </button>
+            <h1 className="font-black text-slate-900 text-base tracking-tight">Edit Profile</h1>
+            <div className="w-9" />
+          </div>
+
+          <main className="flex-1 max-w-md mx-auto px-4 py-6 w-full space-y-6">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              
+              {/* Avatar Section */}
+              <div className="flex flex-col items-center justify-center pt-2 pb-2">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-stone-100 overflow-hidden border-2 border-emerald-500 shadow-sm flex items-center justify-center">
+                    <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                  <label className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition">
+                    <Camera size={14} />
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Name Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Name</label>
+                <input 
+                  type="text" 
+                  required
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="Smith Mate"
+                />
+              </div>
+
+              {/* Email Address Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Email Address</label>
+                <input 
+                  type="email" 
+                  disabled
+                  value={displayEmail}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-stone-50/50 text-stone-500 font-bold text-sm cursor-not-allowed shadow-2xs"
+                />
+              </div>
+
+              {/* Mobile Number Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
+                <input 
+                  type="tel" 
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="(205) 555-0100"
+                />
+              </div>
+
+              {/* Enter Address Field */}
+              <div className="space-y-1">
+                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
+                <input 
+                  type="text" 
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                  placeholder="8502 Preston Rd. Inglewood, USA"
+                />
+              </div>
+
+              {/* Update Button */}
+              <div className="pt-6">
+                <button 
+                  type="submit" 
+                  disabled={saving}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer uppercase tracking-wider text-xs active:scale-95 flex items-center justify-center"
+                >
+                  {saving ? 'Updating...' : 'Update'}
+                </button>
+              </div>
+
+            </form>
+          </main>
+        </>
+      ) : (
+        <>
+          {/* Top Green Banner */}
+          <div className="bg-emerald-500 text-white rounded-b-[2.5rem] p-6 pt-10 shadow-lg space-y-6">
+            <h1 className="text-center font-black text-lg tracking-tight">My Profile</h1>
+
+            <div className="flex items-center gap-4 pb-2">
+              <div className="relative">
+                <img 
+                  src={activeAvatar} 
+                  alt="Profile" 
+                  className="w-16 h-16 rounded-full object-cover border-2 border-white/80 shadow-md bg-white"
+                />
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('edit')}
+                  className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center border-2 border-white shadow-xs cursor-pointer"
+                >
+                  <Edit3 size={12} />
+                </button>
+              </div>
+
+              <div className="min-w-0">
+                <h2 className="font-black text-base truncate tracking-tight">{displayName}</h2>
+                <p className="text-xs text-emerald-100 font-medium truncate mt-0.5">{displayEmail}</p>
+              </div>
             </div>
           </div>
 
-          {/* Edit Form */}
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Full Name</label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="Vivek Kumar"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-green-600 outline-none transition"
-                  value={fullName} 
-                  onChange={e => setFullName(e.target.value)} 
-                />
-              </div>
+          {/* Menu Options List */}
+          <main className="max-w-md mx-auto px-4 mt-6 space-y-4">
+            <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden divide-y divide-stone-100 text-xs">
+              
+              <button 
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <User size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Edit Profile</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <Lock size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Change Password</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <CreditCard size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Payment Method</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/account/orders')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <Package size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">My Orders</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Privacy Policy</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                    <FileText size={18} />
+                  </div>
+                  <span className="font-extrabold text-slate-900">Terms & Conditions</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400" />
+              </button>
+
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Email Address (Read-only)</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="email" 
-                  disabled 
-                  className="w-full pl-10 pr-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-medium text-gray-500 cursor-not-allowed"
-                  value={session?.user?.email || ''} 
-                />
-              </div>
+            {/* Logout Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut size={16} /> Logout
+              </button>
             </div>
+          </main>
+        </>
+      )}
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Phone Number</label>
-              <input 
-                type="text" 
-                placeholder="+91 98765 43210"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-green-600 outline-none transition"
-                value={phone} 
-                onChange={e => setPhone(e.target.value)} 
-              />
+      {/* Bottom Navigation Bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
+        <div className="flex items-center justify-around px-2 py-2 max-w-md mx-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Home"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <Home size={20} />
             </div>
+          </button>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Interests & Preferences (e.g. Organic, Snacks, Dairy)</label>
-              <div className="relative">
-                <Heart className="absolute left-3.5 top-3 text-gray-400" size={16} />
-                <textarea 
-                  rows="3"
-                  placeholder="Enter your favorite categories or preferences..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-green-600 outline-none transition resize-none"
-                  value={interests} 
-                  onChange={e => setInterests(e.target.value)} 
-                />
-              </div>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Wishlist"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <Heart size={20} />
             </div>
+          </button>
 
-            <button 
-              type="submit" 
-              disabled={saving}
-              className="w-full bg-[#0c831f] hover:bg-[#0b6f1a] text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 cursor-pointer mt-4"
-            >
-              <Save size={16} />
-              {saving ? 'Saving Changes...' : 'Save Profile Details'}
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Cart"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
+              <ShoppingBag size={20} />
+            </div>
+          </button>
 
+          <button
+            type="button"
+            onClick={() => setActiveTab('menu')}
+            className="flex flex-col items-center p-2 cursor-pointer group"
+            title="Profile"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 text-emerald-500 shadow-xs">
+              <User size={20} />
+            </div>
+          </button>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

@@ -2,11 +2,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { Lock, Mail, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, KeyRound, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
@@ -54,28 +55,41 @@ export default function Login() {
       
       if (role === 'delivery' || role === 'delivery_partner' || role === 'rider' || role === 'delivery boy') {
         navigate('/delivery');
+        return;
       } else if (role === 'admin' || role === 'manager' || role === 'staff') {
         navigate('/admin');
-      } else {
-        navigate('/admin');
+        return;
       }
+    }
+
+    // 4. Check Customer Profiles or default to customer role -> Redirect to home page (/)
+    const { data: customer } = await supabase
+      .from('customer_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (customer || data.user.user_metadata?.role === 'customer' || !staff && !shopkeeper) {
+      navigate('/');
       return;
     }
 
-    // 4. Default fallback for standard customers
     navigate('/');
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4 font-sans text-xs">
-      <div className="bg-white rounded-3xl shadow-xl max-w-sm w-full p-8 border border-stone-200/80 space-y-5">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans text-xs selection:bg-emerald-500 selection:text-white select-none">
+      <div className="max-w-sm w-full p-6 space-y-6">
         
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md shadow-emerald-600/20 font-black text-lg">
-            KD
+        {/* Logo and Header */}
+        <div className="text-center space-y-3 pt-4">
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/30 text-white font-black text-2xl tracking-tighter">
+            R
           </div>
-          <h1 className="font-black text-stone-900 text-base">KD Store Sign In</h1>
-          <p className="text-stone-400 text-[11px]">Sign in to access your account or portal</p>
+          <div className="space-y-1">
+            <h1 className="font-black text-stone-900 text-xl tracking-tight">Welcome Back</h1>
+            <p className="text-stone-400 text-xs font-medium">Log in to your account using email or phone</p>
+          </div>
         </div>
 
         {errorMsg && (
@@ -85,58 +99,65 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-3.5">
+        {/* Form Inputs */}
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block font-bold text-stone-600 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" size={14} />
-              <input 
-                type="email" 
-                required 
-                placeholder="name@example.com"
-                className="w-full bg-stone-50 border border-stone-200 pl-10 pr-3 py-2.5 rounded-xl font-bold outline-none focus:border-emerald-500"
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-              />
-            </div>
+            <input 
+              type="text" 
+              required 
+              placeholder="Phone Number or Email"
+              className="w-full bg-white border-2 border-stone-200/80 px-4 py-3.5 rounded-2xl font-extrabold text-stone-900 outline-none focus:border-emerald-500 transition text-sm shadow-2xs placeholder:text-stone-400 placeholder:font-medium"
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+            />
           </div>
 
-          <div>
-            <label className="block font-bold text-stone-600 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" size={14} />
-              <input 
-                type="password" 
-                required 
-                placeholder="••••••••"
-                className="w-full bg-stone-50 border border-stone-200 pl-10 pr-3 py-2.5 rounded-xl font-bold outline-none focus:border-emerald-500"
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-              />
-            </div>
+          <div className="relative">
+            <input 
+              type={showPassword ? "text" : "password"} 
+              required 
+              placeholder="Password"
+              className="w-full bg-white border-2 border-stone-200/80 pl-4 pr-12 py-3.5 rounded-2xl font-extrabold text-stone-900 outline-none focus:border-emerald-500 transition text-sm shadow-2xs placeholder:text-stone-400 placeholder:font-medium"
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition cursor-pointer"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          <div className="text-right">
+            <Link 
+              to="/forgot-password" 
+              className="text-emerald-500 hover:text-emerald-600 font-extrabold text-xs transition cursor-pointer"
+            >
+              Forgot Password ?
+            </Link>
           </div>
 
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow-md shadow-emerald-600/20 cursor-pointer transition flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer uppercase tracking-wider text-xs active:scale-95 flex items-center justify-center mt-2 disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign In'} <ArrowRight size={14} />
+            {loading ? 'Logging in...' : 'Login'}
           </button>
-
-          <Link 
-            to="/forgot-password" 
-            className="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs cursor-pointer block text-center"
-          >
-            <KeyRound size={14} className="text-stone-500" />
-            Forgot Password?
-          </Link>
         </form>
 
-        <div className="text-center pt-2 border-t border-stone-100">
-          <Link to="/" className="text-emerald-600 font-bold hover:underline cursor-pointer">
-            ← Return to Customer Storefront
-          </Link>
+        {/* Register prompt & Storefront Link */}
+        <div className="text-center space-y-3 pt-2">
+          <p className="text-stone-500 font-medium text-xs">
+            Didn't have an account? <Link to="/signup" className="text-emerald-500 font-extrabold hover:underline">Register</Link>
+          </p>
+          <div className="border-t border-stone-100 pt-3">
+            <Link to="/" className="text-stone-400 hover:text-stone-600 font-bold transition text-[11px] inline-block">
+              ← Return to Customer Storefront
+            </Link>
+          </div>
         </div>
 
       </div>
