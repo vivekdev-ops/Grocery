@@ -132,8 +132,8 @@ export default function StoreHeader({
       <div className="relative overflow-hidden bg-gradient-to-r from-emerald-900 via-teal-800 to-emerald-900 text-emerald-100 py-1.5 shadow-inner">
         <div className="flex animate-ticker whitespace-nowrap">
           {[...Array(4)].map((_, i) => (
-            <span key={i} className="flex items-center gap-2 px-6 text-[10px] font-black uppercase tracking-widest shrink-0">
-              <Zap size={12} className="text-amber-400 fill-amber-400 animate-pulse" />
+            <span key={i} className="flex items-center gap-1.5 px-4 text-[9px] font-black uppercase tracking-widest shrink-0">
+              <Zap size={11} className="text-amber-400 fill-amber-400 animate-pulse" />
               ⚡ Lightning Fast Delivery in 13 Minutes
               <span className="w-1 h-1 rounded-full bg-emerald-400 inline-block mx-2" />
               Free Delivery on Orders Above ₹500
@@ -144,21 +144,21 @@ export default function StoreHeader({
 
       {/* ── MAIN HEADER ── */}
       <header className={`bg-white/95 backdrop-blur-xl sticky top-0 z-40 border-b border-emerald-100/80 font-sans transition-all duration-300 ${scrolled ? 'shadow-md shadow-emerald-950/5' : ''}`}>
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
 
           {/* Left: Logo & Mobile Menu Toggle */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => { setActiveCategory('All'); navigate('/'); }}
-              className="flex items-center gap-2 group cursor-pointer"
+              className="flex items-center gap-1.5 group cursor-pointer"
             >
-              <div className="w-10 h-10 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-lg shadow-emerald-600/30 group-hover:scale-105 transition-all">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm text-white shadow-md shadow-emerald-600/30 group-hover:scale-105 transition-all">
                 KD
               </div>
               <div className="hidden sm:block leading-tight">
-                <p className="text-xs font-black text-slate-900 tracking-tight">KD Store</p>
-                <span className="inline-flex items-center gap-1 text-[9px] text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> Fastest Store
+                <p className="text-[11px] font-black text-slate-900 tracking-tight">KD Store</p>
+                <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> Fast Store
                 </span>
               </div>
             </button>
@@ -168,11 +168,11 @@ export default function StoreHeader({
           <div className="relative hidden lg:block" ref={categoryMenuRef}>
             <button
               onClick={() => setIsCategoryMenuOpen(prev => !prev)}
-              className="flex items-center gap-2 h-11 px-4 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-2xl transition-all cursor-pointer font-black text-xs text-emerald-900 shadow-2xs group"
+              className="flex items-center gap-1.5 h-10 px-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-xl transition-all cursor-pointer font-black text-[11px] text-emerald-900 shadow-2xs group"
             >
-              <FolderTree size={16} className="text-emerald-700 group-hover:rotate-12 transition-transform" />
-              <span className="truncate max-w-[130px]">{currentCategoryLabel}</span>
-              <ChevronDown size={14} className={`text-emerald-700 transition-transform duration-200 ${isCategoryMenuOpen ? 'rotate-180' : ''}`} />
+              <FolderTree size={14} className="text-emerald-700 group-hover:rotate-12 transition-transform" />
+              <span className="truncate max-w-[120px]">{currentCategoryLabel}</span>
+              <ChevronDown size={12} className={`text-emerald-700 transition-transform duration-200 ${isCategoryMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Categories Popup Menu */}
@@ -183,22 +183,22 @@ export default function StoreHeader({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute left-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-emerald-100 py-3 z-50 overflow-hidden text-xs max-h-[75vh] overflow-y-auto"
+                  className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-emerald-100 py-2.5 z-50 overflow-hidden text-[11px] max-h-[70vh] overflow-y-auto"
                 >
-                  <div className="px-5 py-2.5 border-b border-emerald-100 bg-emerald-50/50 flex items-center justify-between">
-                    <span className="font-black text-slate-900 uppercase tracking-wider text-[10px]">Explore Store Categories</span>
-                    <span className="text-[10px] bg-emerald-200/60 text-emerald-900 px-2 py-0.5 rounded-full font-bold">{activeCategories.length}</span>
+                  <div className="px-4 py-2 border-b border-emerald-100 bg-emerald-50/50 flex items-center justify-between">
+                    <span className="font-black text-slate-900 uppercase tracking-wider text-[9px]">Explore Categories</span>
+                    <span className="text-[9px] bg-emerald-200/60 text-emerald-900 px-1.5 py-0.5 rounded-full font-bold">{activeCategories.length}</span>
                   </div>
                   
-                  <div className="py-1 px-1.5 space-y-0.5">
+                  <div className="py-1 px-1 space-y-0.5">
                     <button
                       onClick={() => { setActiveCategory('All'); setIsCategoryMenuOpen(false); }}
-                      className={`w-full text-left px-4 py-3 rounded-2xl font-bold flex items-center justify-between transition cursor-pointer ${
+                      className={`w-full text-left px-3 py-2 rounded-xl font-bold flex items-center justify-between transition cursor-pointer ${
                         activeCategory === 'All' ? 'bg-emerald-600 text-white font-black shadow-sm' : 'text-slate-700 hover:bg-emerald-50/50'
                       }`}
                     >
-                      <span className="flex items-center gap-2.5">
-                        <Sparkles size={15} className={activeCategory === 'All' ? 'text-white' : 'text-emerald-600'} /> All Categories
+                      <span className="flex items-center gap-2">
+                        <Sparkles size={13} className={activeCategory === 'All' ? 'text-white' : 'text-emerald-600'} /> All Categories
                       </span>
                     </button>
 
@@ -209,12 +209,12 @@ export default function StoreHeader({
                         <button
                           key={cat.id}
                           onClick={() => { setActiveCategory(cat.id); setIsCategoryMenuOpen(false); }}
-                          className={`w-full text-left px-3 py-2.5 rounded-2xl font-bold flex items-center justify-between transition cursor-pointer ${
+                          className={`w-full text-left px-2.5 py-2 rounded-xl font-bold flex items-center justify-between transition cursor-pointer ${
                             isSelected ? 'bg-emerald-600 text-white font-black shadow-sm' : 'text-slate-800 hover:bg-emerald-50/50'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-stone-100 overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-full bg-stone-100 overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
                               <img src={img} alt="" className="w-full h-full object-cover" />
                             </div>
                             <span className="truncate">{cat.name}</span>
@@ -231,70 +231,70 @@ export default function StoreHeader({
           {/* Location Picker */}
           <button
             onClick={fetchCurrentLocation}
-            className="hidden xl:flex items-center gap-2 bg-stone-50 hover:bg-emerald-50/60 border border-stone-200/80 hover:border-emerald-300 px-3.5 py-2 rounded-2xl cursor-pointer transition-all group shrink-0 shadow-2xs"
+            className="hidden xl:flex items-center gap-1.5 bg-stone-50 hover:bg-emerald-50/60 border border-stone-200/80 hover:border-emerald-300 px-3 py-1.5 rounded-xl cursor-pointer transition-all group shrink-0 shadow-2xs"
             title="Click to refresh location"
           >
-            <MapPin size={16} className="text-emerald-600 shrink-0 group-hover:bounce" />
+            <MapPin size={14} className="text-emerald-600 shrink-0 group-hover:bounce" />
             <div className="text-left leading-tight">
-              <p className="text-[8px] font-black text-stone-400 uppercase tracking-widest">Deliver to</p>
-              <p className="text-[11px] font-black text-slate-800 flex items-center gap-1 mt-0.5">
-                <span className="truncate max-w-[120px]">{locationName}</span>
-                {isFetchingLocation ? <Loader2 size={10} className="animate-spin text-emerald-600" /> : <ChevronDown size={10} className="text-stone-400" />}
+              <p className="text-[7px] font-black text-stone-400 uppercase tracking-widest">Deliver to</p>
+              <p className="text-[10px] font-black text-slate-800 flex items-center gap-1 mt-0.5">
+                <span className="truncate max-w-[110px]">{locationName}</span>
+                {isFetchingLocation ? <Loader2 size={9} className="animate-spin text-emerald-600" /> : <ChevronDown size={9} className="text-stone-400" />}
               </p>
             </div>
           </button>
 
           {/* ── SEARCH BAR ── */}
-          <div className="flex-1 max-w-xl mx-1 sm:mx-4">
+          <div className="flex-1 max-w-lg mx-1.5 sm:mx-3">
             <div className="relative group">
               <Search
-                size={17}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition-colors pointer-events-none"
+                size={15}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition-colors pointer-events-none"
               />
               <input
                 type="text"
-                placeholder='Search "Fresh Milk", "Tomatoes", "Snacks"…'
-                className="w-full pl-11 pr-12 py-2.5 sm:py-3 bg-stone-100/80 hover:bg-stone-100 focus:bg-white rounded-2xl text-xs sm:text-sm font-bold text-slate-900 outline-none border border-stone-200/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-inner"
+                placeholder='Search "Fresh Milk", "Tomatoes"…'
+                className="w-full pl-10 pr-10 py-2 sm:py-2.5 bg-stone-100/80 hover:bg-stone-100 focus:bg-white rounded-xl text-[11px] sm:text-xs font-bold text-slate-900 outline-none border border-stone-200/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all shadow-inner"
                 value={searchQuery}
                 onChange={e => setSearchQuery && setSearchQuery(e.target.value)}
               />
               <button
                 type="button"
                 onClick={startVoiceSearch}
-                className={`absolute inset-y-1.5 right-1.5 px-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`absolute inset-y-1.5 right-1 px-2 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                   isListening
                     ? 'bg-rose-500 text-white animate-pulse shadow-md'
                     : 'text-stone-400 hover:text-emerald-600 hover:bg-emerald-50'
                 }`}
                 title={isListening ? 'Listening…' : 'Voice search'}
               >
-                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                {isListening ? <MicOff size={14} /> : <Mic size={14} />}
               </button>
             </div>
           </div>
 
           {/* Right Actions: Account, Cart & Mobile Menu */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Account Menu / Login */}
             {session ? (
               <div className="relative hidden sm:block" ref={accountMenuRef}>
                 <button
                   onClick={handleProfileClick}
-                  className="flex items-center gap-2 h-11 px-3 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl transition-all cursor-pointer btn-press group shadow-2xs"
+                  className="flex items-center gap-1.5 h-10 px-2.5 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-xl transition-all cursor-pointer btn-press group shadow-2xs"
                 >
-                  <div className="w-7 h-7 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                  <div className="w-6 h-6 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
                     {avatarUrl ? (
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : customerProfile?.full_name?.[0] || displayName?.[0]?.toUpperCase() ? (
-                      <span className="font-black text-[10px] text-emerald-700">
+                      <span className="font-black text-[9px] text-emerald-700">
                         {customerProfile?.full_name?.[0] || displayName?.[0]?.toUpperCase()}
                       </span>
                     ) : (
-                      <UserCircle size={16} className="text-stone-600" />
+                      <UserCircle size={14} className="text-stone-600" />
                     )}
                   </div>
-                  <span className="text-xs font-black text-slate-800 truncate max-w-[90px]">{displayName || 'Account'}</span>
-                  <ChevronDown size={13} className={`text-stone-500 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
+                  <span className="text-[11px] font-black text-slate-800 truncate max-w-[80px]">{displayName || 'Account'}</span>
+                  <ChevronDown size={12} className={`text-stone-500 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 <AnimatePresence>
@@ -303,34 +303,34 @@ export default function StoreHeader({
                       initial={{ opacity: 0, y: 10, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                      className="absolute right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-stone-100 py-3 z-50 overflow-hidden font-sans text-xs"
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-stone-100 py-2.5 z-50 overflow-hidden font-sans text-[11px]"
                     >
-                      <div className="px-5 py-3 border-b border-stone-100 bg-stone-50/50 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                      <div className="px-4 py-2.5 border-b border-stone-100 bg-stone-50/50 flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
                           {avatarUrl ? (
                             <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                           ) : (
-                            <UserCircle size={20} className="text-stone-500" />
+                            <UserCircle size={16} className="text-stone-500" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-black text-slate-900 text-sm truncate">{customerProfile?.full_name || 'My Account'}</p>
-                          <p className="text-stone-500 text-[11px] mt-0.5 truncate font-medium">{userPhone}</p>
+                          <p className="font-black text-slate-900 text-xs truncate">{customerProfile?.full_name || 'My Account'}</p>
+                          <p className="text-stone-500 text-[10px] mt-0.5 truncate font-medium">{userPhone}</p>
                         </div>
                       </div>
 
                       <div className="py-1">
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <User size={15} className="text-stone-400" /> Profile
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <User size={14} className="text-stone-400" /> Profile
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Package size={15} className="text-stone-400" /> Orders
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <Package size={14} className="text-stone-400" /> Orders
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/address'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <MapPin size={15} className="text-stone-400" /> Address Book
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/address'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <MapPin size={14} className="text-stone-400" /> Address Book
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Heart size={15} className="text-stone-400" /> Wishlist
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <Heart size={14} className="text-stone-400" /> Wishlist
                         </button>
                         <button onClick={() => { 
                           setIsAccountMenuOpen(false); 
@@ -340,23 +340,23 @@ export default function StoreHeader({
                             navigator.clipboard.writeText(window.location.origin);
                             alert('App link copied to clipboard!');
                           }
-                        }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Share2 size={15} className="text-stone-400" /> Share the app
+                        }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <Share2 size={14} className="text-stone-400" /> Share the app
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/terms'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <FileText size={15} className="text-stone-400" /> Term and condition
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/terms'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <FileText size={14} className="text-stone-400" /> Terms & Conditions
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Shield size={15} className="text-stone-400" /> Privacy Policy
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/privacy'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <Shield size={14} className="text-stone-400" /> Privacy Policy
                         </button>
-                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/about'); }} className="w-full text-left px-5 py-2.5 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-3 transition cursor-pointer">
-                          <Info size={15} className="text-stone-400" /> About Us
+                        <button onClick={() => { setIsAccountMenuOpen(false); navigate('/about'); }} className="w-full text-left px-4 py-2 text-slate-700 hover:bg-emerald-50/50 font-medium flex items-center gap-2.5 transition cursor-pointer">
+                          <Info size={14} className="text-stone-400" /> About Us
                         </button>
                       </div>
 
                       <div className="border-t border-stone-100 pt-1 mt-1">
-                        <button onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }} className="w-full text-left px-5 py-2.5 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-3 transition cursor-pointer">
-                          <LogOut size={15} /> Logout
+                        <button onClick={() => { setIsAccountMenuOpen(false); handleLogout(); }} className="w-full text-left px-4 py-2 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-2.5 transition cursor-pointer">
+                          <LogOut size={14} /> Logout
                         </button>
                       </div>
                     </motion.div>
@@ -366,23 +366,23 @@ export default function StoreHeader({
             ) : (
               <Link
                 to="/login"
-                className="hidden sm:inline-flex items-center gap-1.5 h-11 px-5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-600/25 transition-all btn-press"
+                className="hidden sm:inline-flex items-center gap-1 h-10 px-4 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-[11px] font-black shadow-md shadow-emerald-600/25 transition-all btn-press"
               >
                 Login
               </Link>
             )}
 
             {/* Notification Bell */}
-            {session && <NotificationBell session={session} size={18} />}
+            {session && <NotificationBell session={session} size={16} />}
 
             {/* Cart Button */}
             <motion.button
               onClick={onOpenCart}
               animate={cartBounce ? { scale: [1, 1.18, 0.95, 1] } : {}}
               transition={{ duration: 0.35, type: 'spring', stiffness: 400, damping: 15 }}
-              className="relative h-11 px-4 sm:px-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer btn-press font-black text-xs"
+              className="relative h-10 px-3 sm:px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer btn-press font-black text-[11px]"
             >
-              <ShoppingCart size={18} />
+              <ShoppingCart size={16} />
               <span className="hidden md:inline">Cart</span>
               <AnimatePresence>
                 {totalItemsCount > 0 && (
@@ -391,7 +391,7 @@ export default function StoreHeader({
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
-                    className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center border-2 border-white shadow-md"
+                    className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-black min-w-[18px] h-[18px] px-0.5 rounded-full flex items-center justify-center border-2 border-white shadow-md"
                   >
                     {totalItemsCount}
                   </motion.span>
@@ -402,9 +402,9 @@ export default function StoreHeader({
             {/* Mobile Menu Toggle Button */}
             <button
               onClick={() => setIsMobileMenuOpen(prev => !prev)}
-              className="lg:hidden p-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition cursor-pointer"
+              className="lg:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition cursor-pointer"
             >
-              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
         </div>
@@ -416,25 +416,25 @@ export default function StoreHeader({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-white border-t border-stone-200 overflow-hidden px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto"
+              className="lg:hidden bg-white border-t border-stone-200 overflow-hidden px-3 py-3 space-y-3 max-h-[75vh] overflow-y-auto text-[11px]"
             >
               {/* Categories Section in Mobile */}
               <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Store Categories</p>
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <p className="text-[9px] font-black uppercase text-stone-400 tracking-wider">Store Categories</p>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
                   <button
                     onClick={() => { setActiveCategory('All'); setIsMobileMenuOpen(false); }}
-                    className={`p-2.5 rounded-xl font-bold text-xs border text-left flex items-center gap-2 ${
+                    className={`p-2 rounded-lg font-bold text-[11px] border text-left flex items-center gap-1.5 truncate ${
                       !activeCategory || activeCategory === 'All' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-stone-50 border-stone-200 text-stone-800'
                     }`}
                   >
-                    <Sparkles size={14} /> All Categories
+                    <Sparkles size={13} /> All Categories
                   </button>
                   {parentCategories.map(cat => (
                     <button
                       key={cat.id}
                       onClick={() => { setActiveCategory(cat.id); setIsMobileMenuOpen(false); }}
-                      className={`p-2.5 rounded-xl font-bold text-xs border text-left truncate ${
+                      className={`p-2 rounded-lg font-bold text-[11px] border text-left truncate ${
                         activeCategory === cat.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-stone-50 border-stone-200 text-stone-800'
                       }`}
                     >
@@ -446,76 +446,81 @@ export default function StoreHeader({
 
               {/* Account Navigation Links in Mobile */}
               {session ? (
-                <div className="pt-3 border-t border-stone-100 space-y-1">
-                  <p className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-2">My Account</p>
+                <div className="pt-2.5 border-t border-stone-100 space-y-1">
+                  <p className="text-[9px] font-black uppercase text-stone-400 tracking-wider mb-1.5">My Account & Pages</p>
                   
-                  <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-2xl mb-3 border border-stone-100">
-                    <div className="w-9 h-9 rounded-full bg-stone-200 overflow-hidden flex items-center justify-center shrink-0">
+                  <div className="flex items-center gap-2.5 p-2.5 bg-stone-50 rounded-xl mb-2 border border-stone-100">
+                    <div className="w-8 h-8 rounded-full bg-stone-200 overflow-hidden flex items-center justify-center shrink-0">
                       {avatarUrl ? (
                         <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
-                        <UserCircle size={20} className="text-stone-500" />
+                        <UserCircle size={16} className="text-stone-500" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-black text-stone-900 text-xs truncate">{customerProfile?.full_name || 'My Account'}</p>
-                      <p className="text-stone-500 text-[10px] truncate">{userPhone}</p>
+                      <p className="font-black text-stone-900 text-[11px] truncate">{customerProfile?.full_name || 'My Account'}</p>
+                      <p className="text-stone-500 text-[9px] truncate">{userPhone}</p>
                     </div>
                   </div>
 
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/profile'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <User size={16} className="text-stone-400" /> Profile
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/orders'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <Package size={16} className="text-stone-400" /> Orders
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/address'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <MapPin size={16} className="text-stone-400" /> Address Book
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/wishlist'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <Heart size={16} className="text-stone-400" /> Wishlist
-                  </button>
-                  <button onClick={() => { 
-                    setIsMobileMenuOpen(false); 
-                    if (navigator.share) {
-                      navigator.share({ title: 'KD Store', url: window.location.origin }).catch(() => {});
-                    } else {
-                      navigator.clipboard.writeText(window.location.origin);
-                      alert('App link copied to clipboard!');
-                    }
-                  }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <Share2 size={16} className="text-stone-400" /> Share the app
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <FileText size={16} className="text-stone-400" /> Term and condition
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <Shield size={16} className="text-stone-400" /> Privacy Policy
-                  </button>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="w-full text-left py-2.5 px-3 rounded-xl font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-3 transition">
-                    <Info size={16} className="text-stone-400" /> About Us
-                  </button>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/profile'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <User size={14} className="text-stone-400" /> Profile
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/orders'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <Package size={14} className="text-stone-400" /> Orders
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/address'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <MapPin size={14} className="text-stone-400" /> Address Book
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/account/wishlist'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <Heart size={14} className="text-stone-400" /> Wishlist
+                    </button>
+                  </div>
 
-                  <div className="pt-2">
-                    <button onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }} className="w-full text-left py-3 px-3 rounded-xl font-black text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition">
-                      <LogOut size={16} /> Logout
+                  <div className="pt-1 border-t border-stone-100 grid grid-cols-2 gap-1 pt-2">
+                    <button onClick={() => { 
+                      setIsMobileMenuOpen(false); 
+                      if (navigator.share) {
+                        navigator.share({ title: 'KD Store', url: window.location.origin }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(window.location.origin);
+                        alert('App link copied to clipboard!');
+                      }
+                    }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <Share2 size={14} className="text-stone-400" /> Share App
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <Info size={14} className="text-stone-400" /> About Us
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <FileText size={14} className="text-stone-400" /> Terms
+                    </button>
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="text-left py-2 px-2.5 rounded-lg font-bold text-stone-700 hover:bg-emerald-50 flex items-center gap-2 transition">
+                      <Shield size={14} className="text-stone-400" /> Privacy
+                    </button>
+                  </div>
+
+                  <div className="pt-1.5">
+                    <button onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }} className="w-full text-left py-2.5 px-2.5 rounded-lg font-black text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition">
+                      <LogOut size={14} /> Logout
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="pt-3 border-t border-stone-100 space-y-2">
-                  <div className="space-y-1 mb-3">
-                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
-                      <FileText size={15} /> Term and condition
+                <div className="pt-2.5 border-t border-stone-100 space-y-2">
+                  <div className="grid grid-cols-2 gap-1 mb-2">
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="text-left py-2 px-2.5 rounded-lg font-medium text-stone-700 hover:bg-stone-50 flex items-center gap-2">
+                      <Info size={14} /> About Us
                     </button>
-                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
-                      <Shield size={15} /> Privacy Policy
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/terms'); }} className="text-left py-2 px-2.5 rounded-lg font-medium text-stone-700 hover:bg-stone-50 flex items-center gap-2">
+                      <FileText size={14} /> Terms
                     </button>
-                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/about'); }} className="w-full text-left py-2 px-3 rounded-xl font-medium text-stone-600 hover:bg-stone-50 flex items-center gap-3">
-                      <Info size={15} /> About Us
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/privacy'); }} className="text-left py-2 px-2.5 rounded-lg font-medium text-stone-700 hover:bg-stone-50 flex items-center gap-2">
+                      <Shield size={14} /> Privacy Policy
                     </button>
                   </div>
-                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-center font-black rounded-2xl shadow-md">
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-center font-black rounded-xl shadow-md text-xs">
                     Login / Sign Up
                   </Link>
                 </div>
