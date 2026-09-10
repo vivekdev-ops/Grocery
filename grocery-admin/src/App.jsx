@@ -44,6 +44,7 @@ import CustomerOrdersPage from './components/CustomerOrdersPage';
 import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
+import PortalBottomNav from './components/PortalBottomNav';
 
 
 /* ─────────────────────────────────────────────
@@ -324,7 +325,6 @@ function AdminLayout() {
       categories: <CategoryManager />, orders: <Orders />, staff: <Staff />,
       customers: <CustomerManagement />, shopkeeperDetails: <ShopkeeperDetailsAdmin />,
       deliveryFees: <DeliveryFeeManager />, storeLocation: <StoreLocationManager />,
-      /*storeStatus: <StoreStatusManager />, about_us: <AdminAboutUs />,*/
       coupons: <CouponManager />, banners: <BannerManager />, flashSales: <FlashSaleManager />,
       testimonials: <TestimonialManager />, feedback: <AdminFeedbacks />,
     };
@@ -536,26 +536,29 @@ function AdminLayout() {
 function AnimatedRoutes() {
   const location = useLocation();
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/"                element={<PageWrap><CustomerStorefront /></PageWrap>} />
-        <Route path="/track"           element={<PageWrap><OrderTracker /></PageWrap>} />
-        <Route path="/login"           element={<PageWrap><Login /></PageWrap>} />
-        <Route path="/select"          element={<PageWrap><HomeSelector /></PageWrap>} />
-        <Route path="/admin"           element={<AdminRouteGuard />} />
-        <Route path="/shopkeeper"      element={<ShopkeeperRouteGuard />} />
-        <Route path="/delivery"        element={<DeliveryPortal />} />
-        <Route path="/privacy-policy"  element={<PageWrap><PrivacyPolicy /></PageWrap>} />
-        <Route path="/terms"           element={<PageWrap><TermsOfService /></PageWrap>} />
-        <Route path="/forgot-password" element={<PageWrap><ForgotPassword /></PageWrap>} />
-        <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
-        <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />
-        <Route path="/account/orders" element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
-        <Route path="/account/profile" element={<ProfilePage />} />
-        <Route path="/account/wishlist" element={<WishlistPage />} />
-        <Route path="/account/address" element={<AddressBookPage />} />
-      </Routes>
-    </AnimatePresence>
+    <div className="pb-16"> {/* Ensures bottom content doesn't get hidden behind bottom nav */}
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/"                element={<PageWrap><CustomerStorefront /></PageWrap>} />
+          <Route path="/track"           element={<PageWrap><OrderTracker /></PageWrap>} />
+          <Route path="/login"           element={<PageWrap><Login /></PageWrap>} />
+          <Route path="/select"          element={<PageWrap><HomeSelector /></PageWrap>} />
+          <Route path="/admin"           element={<AdminRouteGuard />} />
+          <Route path="/shopkeeper"      element={<ShopkeeperRouteGuard />} />
+          <Route path="/delivery"        element={<DeliveryPortal />} />
+          <Route path="/privacy-policy"  element={<PageWrap><PrivacyPolicy /></PageWrap>} />
+          <Route path="/terms"           element={<PageWrap><TermsOfService /></PageWrap>} />
+          <Route path="/forgot-password" element={<PageWrap><ForgotPassword /></PageWrap>} />
+          <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
+          <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />
+          <Route path="/account/orders"  element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
+          <Route path="/account/profile" element={<ProfilePage />} />
+          <Route path="/account/wishlist" element={<WishlistPage />} />
+          <Route path="/account/address" element={<AddressBookPage />} />
+        </Routes>
+      </AnimatePresence>
+      <PortalBottomNav />
+    </div>
   );
 }
 
