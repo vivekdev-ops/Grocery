@@ -1,6 +1,6 @@
 // src/components/PortalBottomNav.jsx
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Heart, User, ClipboardList } from 'lucide-react';
+import { Home, ShoppingBag, User, ClipboardList } from 'lucide-react';
 
 export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, onOpenCart }) {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
   const navItems = [
     { label: 'Home', path: '/', icon: Home },
     { label: 'Orders', path: '/account/orders', icon: ClipboardList },
-    { label: 'Wishlist', path: '/account/wishlist', icon: Heart },
+    { label: 'Cart', action: onOpenCart, icon: ShoppingBag, badge: totalItemsCount },
     { label: 'Profile', path: '/account/profile', icon: User },
   ];
 
@@ -50,17 +50,30 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
       <div className="max-w-xl mx-auto px-4 py-1.5 flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentPath === item.path;
+          const isActive = item.path ? currentPath === item.path : false;
 
           return (
             <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer ${
+              key={item.label}
+              onClick={() => {
+                if (item.action) {
+                  item.action();
+                } else if (item.path) {
+                  navigate(item.path);
+                }
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
                 isActive ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
               }`}
             >
-              <Icon size={18} className={isActive ? 'text-emerald-600 scale-110' : ''} />
+              <div className="relative">
+                <Icon size={18} className={isActive ? 'text-emerald-600 scale-110' : ''} />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
               <span className="text-[9.5px] tracking-tight mt-0.5">{item.label}</span>
             </button>
           );

@@ -9,7 +9,7 @@ import {
   Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen, ZoomIn, ZoomOut, Plus, Minus, ArrowLeft
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
-import Footer from './Footer';
+// import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
@@ -2413,7 +2413,6 @@ export default function CustomerStorefront() {
       {/* Feedback Modal */}
       <CustomerFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
-      <Footer />
     </div>
   );
 }
