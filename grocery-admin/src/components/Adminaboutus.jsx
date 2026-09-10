@@ -104,7 +104,7 @@ export default function AdminAboutUs() {
   }
 
   return (
-    <form onSubmit={handleSaveAboutUs} className="bg-white p-8 rounded-3xl border border-stone-200/80 shadow-2xs space-y-6 text-xs max-w-4xl">
+    <form onSubmit={handleSaveAboutUs} className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-2xs space-y-6 text-xs max-w-4xl w-full mx-auto">
       <div className="flex items-center gap-2.5 border-b border-stone-100 pb-4">
         <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">
           <FileText size={18} />
