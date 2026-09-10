@@ -44,9 +44,8 @@ import CustomerOrdersPage from './components/CustomerOrdersPage';
 import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
-// Add these missing component imports at the top of your src/App.jsx file:
-import AdminAboutUs from './components/AdminAboutUs';
 import AboutPage from './components/pages/AboutPage';
+
 
 /* ─────────────────────────────────────────────
    GROUP ICON COLOURS  (sidebar section accents)
@@ -209,7 +208,7 @@ function AdminLayout() {
 
       const userId = currentSession.user.id;
 
-      // 1. Check if user is a Shopkeeper (Block access) - USING .maybeSingle() TO PREVENT 406 ERROR
+      // 1. Check if user is a Shopkeeper (Block access)
       const { data: shopkeeperCheck } = await supabase
         .from('shopkeeper_profiles')
         .select('id')
@@ -274,7 +273,7 @@ function AdminLayout() {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <Login />;
-/*Comment*/
+
   const menuGroups = [
     {
       title: 'Overview',
