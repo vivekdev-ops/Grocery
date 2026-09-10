@@ -4,7 +4,7 @@ import { supabase } from '../../supabaseClient';
 import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct, boughtProductIds }) {
+function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct, boughtProductIds }) {
   const [addedFlash, setAddedFlash] = useState(false);
 
   const fallbackDummyImages = [
@@ -36,9 +36,10 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
   const hasMrp = mrp > price;
   const stock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
-  const isWishlisted = wishlistIds?.includes(product.id);
+  
+  const safeWishlistIds = Array.isArray(wishlistIds) ? wishlistIds : [];
+  const isWishlisted = safeWishlistIds.includes(product.id);
 
-  // Check if the logged-in user has bought this product earlier
   const isBoughtBefore = boughtProductIds?.has(product.id) || boughtProductIds?.has(product.name?.toLowerCase());
 
   const variantIdentifier = activeVariant ? (activeVariant.id || activeVariant.unit_label || activeVariant.label || 'default') : 'default';
@@ -74,18 +75,17 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
         <Heart size={16} className={isWishlisted ? 'fill-rose-500' : ''} />
       </button>
 
-      {/* Full square image layout with Top Badge */}
-      <div className="relative w-full aspect-square bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center mb-3">
+      <div className="relative w-full aspect-square bg-transparent rounded-2xl overflow-hidden flex items-center justify-center mb-3">
         {isBoughtBefore && (
-  <div className="absolute top-2.5 left-2.5 z-20 bg-sky-50 text-sky-800 border border-sky-200/80 shadow-xs px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 backdrop-blur-md">
-    Bought Earlier
-  </div>
-)}
+          <div className="absolute top-2.5 left-2.5 z-20 bg-sky-50 text-sky-800 border border-sky-200/80 shadow-xs px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 backdrop-blur-md">
+            Bought Earlier
+          </div>
+        )}
         <img 
           src={displayImage} 
           alt={product.name} 
           onError={(e) => { e.target.onerror = null; e.target.src = fallbackDummyImages[0]; }}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out" 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out border-0 bg-transparent" 
         />
         {isOutOfStock && (
           <div className="absolute inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-20">
@@ -102,7 +102,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
             <select
               value={currentVariantKey || ''}
               onChange={handleVariantChange}
-              className="w-full bg-[#F4F5F7] border border-stone-200 text-stone-700 text-[10px] font-bold rounded-xl px-2.5 py-2 outline-none cursor-pointer"
+              className="w-full bg-transparent border border-stone-200 text-stone-700 text-[10px] font-bold rounded-xl px-2.5 py-2 outline-none cursor-pointer"
             >
               {variants.map((v, idx) => {
                 const vKey = v.id || v.label || v.unit_label || idx;
@@ -147,7 +147,7 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
 export default function ProductGrid({
   banners, currentSlide, activeFlashSale, timeLeft, formatTime,
   categories, activeCategory, setActiveCategory, loading,
-  products, searchQuery = '', wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants,
+  products, searchQuery = '', wishlistIds = [], toggleWishlist, selectedVariants, setSelectedVariants,
   cart = [], addToCart, updateQuantity, onSelectProduct, onNavigate, onOpenCart, session
 }) {
   const fallbackImages = [
@@ -167,13 +167,11 @@ export default function ProductGrid({
   const [boughtProductIds, setBoughtProductIds] = useState(new Set());
   const productsPerPage = 12;
 
-  // Fetch past orders to determine which products were bought earlier by this user
-useEffect(() => {
+  useEffect(() => {
     const fetchUserPurchaseHistory = async () => {
       if (!session?.user?.id) return;
       
       try {
-        // Query order_items joined with orders where customer_id matches the logged-in user
         const { data: purchasedItems, error } = await supabase
           .from('order_items')
           .select(`
@@ -231,7 +229,7 @@ useEffect(() => {
   return (
     <main className="w-full min-h-screen max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-10 mt-2 font-sans pb-36 text-slate-900">
       
-      {/* ── STOREFRONT VIEW: WHEN A CATEGORY IS SELECTED ── */}
+      {/* ── STOREFRONT VIEW: WHEN A CATEGORY IS SELECTED OR SEARCHING ── */}
       {isAnyCategorySelected ? (
         <div className="space-y-4">
 
@@ -242,8 +240,8 @@ useEffect(() => {
               
               {activeCategoryObj && (
                 <div className="bg-white p-3 rounded-2xl border border-emerald-500 shadow-sm flex flex-col items-center text-center mb-1">
-                  <div className="w-12 h-12 rounded-xl bg-stone-100 overflow-hidden border border-stone-200 mb-1.5 flex items-center justify-center p-0.5">
-                    <img src={activeCategoryObj.image_url || fallbackImages[0]} alt={activeCategoryObj.name} className="w-full h-full object-cover rounded-lg" />
+                  <div className="w-12 h-12 rounded-xl bg-transparent overflow-hidden mb-1.5 flex items-center justify-center p-0.5">
+                    <img src={activeCategoryObj.image_url || fallbackImages[0]} alt={activeCategoryObj.name} className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
                   </div>
                   <span className="text-[11px] font-black text-slate-900 line-clamp-1">{activeCategoryObj.name}</span>
                 </div>
@@ -283,8 +281,8 @@ useEffect(() => {
                     {isSubSelected && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-500 rounded-r-full" />
                     )}
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-stone-100 overflow-hidden border border-stone-200/60 flex items-center justify-center shrink-0 p-0.5">
-                      <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-lg" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-transparent overflow-hidden flex items-center justify-center shrink-0 p-0.5">
+                      <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
                     </div>
                     <span className="text-[11px] sm:text-xs leading-tight line-clamp-2 w-full">{sub.name}</span>
                   </button>
@@ -325,60 +323,55 @@ useEffect(() => {
       ) : (
         /* HOMEPAGE SECTIONS */
         <div className="space-y-12 w-full">
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">Shop By Category</h3>
-              </div>
-              <button 
-                onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }} 
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer transition flex items-center gap-1"
-              >
-                See All <ChevronRight size={14} />
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4">
-              {parentCategories.map((cat, index) => {
-                const img = cat.image_url || fallbackImages[index % fallbackImages.length];
-                return (
-                  <motion.button
-                    whileHover={{ y: -2 }}
-                    key={cat.id}
-                    onClick={() => { setActiveCategory(cat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }}
-                    className="flex flex-col items-center p-3 rounded-2xl border cursor-pointer transition-all shadow-xs border-stone-100 bg-[#F4F5F7] hover:border-emerald-300 text-slate-800 group"
-                  >
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white overflow-hidden mb-2 border border-stone-200/50 shrink-0 shadow-xs flex items-center justify-center p-0.5 group-hover:scale-105 transition">
-                      <img src={img} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-bold truncate w-full text-center">{cat.name}</span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="relative rounded-[2.5rem] overflow-hidden shadow-sm w-full bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white border border-emerald-800 flex items-center justify-between p-6 sm:p-12">
-            <div className="absolute right-[-20px] bottom-[-20px] opacity-10 pointer-events-none">
-              <Sparkles size={200} />
-            </div>
-            <div className="space-y-4 max-w-xs sm:max-w-xl relative z-10">
-              <span className="bg-emerald-500/20 text-emerald-300 font-black text-[10px] px-3 py-1 rounded-full border border-emerald-500/30 uppercase tracking-widest inline-flex items-center gap-1.5">
-                <Zap size={13} /> Special Festival Offer
-              </span>
-              <h2 className="text-xl sm:text-4xl font-black tracking-tight leading-tight">World Food Festival, Bring the world to your Kitchen!</h2>
-              <button 
-                onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg transition cursor-pointer flex items-center gap-2"
-              >
-                Shop Now <ChevronRight size={15} />
-              </button>
-            </div>
-            <div className="absolute right-4 bottom-0 top-0 flex items-center opacity-90 sm:opacity-100 pointer-events-none">
-              <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80" alt="Festival" className="h-full object-cover max-h-56 rounded-3xl" />
-            </div>
+          {/* Categories with Subcategories Section (2 rows on mobile, 1 row on web, horizontal scroll) */}
+          <div className="space-y-8">
+            {parentCategories.map((parentCat, pIdx) => {
+              const subcats = getSubcategories(parentCat.id);
+              if (subcats.length === 0) return null;
+
+              return (
+                <div key={parentCat.id} className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                      <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">
+                        {parentCat.name}
+                      </h3>
+                    </div>
+                    <button 
+                      onClick={() => { setActiveCategory(parentCat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} 
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer transition flex items-center gap-1"
+                    >
+                      See All <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col auto-cols-[85px] sm:auto-cols-[100px] gap-3 sm:gap-4 overflow-x-auto scrollbar-none pb-2">
+                    {subcats.map((sub, sIdx) => {
+                      const subImg = sub.image_url || fallbackImages[(pIdx + sIdx) % fallbackImages.length];
+                      return (
+                        <motion.button
+                          whileHover={{ y: -2 }}
+                          key={sub.id}
+                          onClick={() => { 
+                            setActiveCategory(parentCat.id); 
+                            setActiveSubcategoryId(sub.id); 
+                            setCurrentPage(1); 
+                          }}
+                          className="flex flex-col items-center p-2.5 rounded-2xl cursor-pointer transition-all bg-transparent text-slate-800 group"
+                        >
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-transparent overflow-hidden mb-1.5 shrink-0 flex items-center justify-center p-0.5 group-hover:scale-105 transition">
+                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-xl border-0 bg-transparent" />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold truncate w-full text-center leading-tight line-clamp-1">{sub.name}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Best Deal Section */}
@@ -492,7 +485,7 @@ useEffect(() => {
 
           <button 
             onClick={() => { if(onNavigate) onNavigate('profile'); }}
-            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition group"
+            className="flex flex-col items-center group cursor-pointer transition text-stone-400 hover:text-stone-700"
           >
             <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100">
               <User size={20} className="stroke-[2]" />
