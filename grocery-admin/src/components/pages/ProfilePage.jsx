@@ -13,7 +13,10 @@ import {
   Heart, 
   ShoppingBag,
   ArrowLeft,
-  Camera
+  Camera,
+  MapPin,
+  Info,
+  Share2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Footer from '../Footer';
@@ -109,6 +112,19 @@ export default function ProfilePage() {
     }
   };
 
+  const handleShareApp = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'KD Store',
+        text: 'Check out this amazing grocery and quick commerce store!',
+        url: window.location.origin,
+      }).catch((err) => console.log('Error sharing:', err));
+    } else {
+      navigator.clipboard.writeText(window.location.origin);
+      alert('App link copied to clipboard!');
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
@@ -123,12 +139,12 @@ export default function ProfilePage() {
   const activeAvatar = avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-28 select-none flex flex-col">
+    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-28 select-none flex flex-col w-full">
       
       {activeTab === 'edit' ? (
         <>
           {/* Top Header for Edit Mode */}
-          <div className="px-4 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-30">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-30 shadow-xs">
             <button 
               type="button"
               onClick={() => setActiveTab('menu')}
@@ -136,187 +152,235 @@ export default function ProfilePage() {
             >
               <ArrowLeft size={18} className="stroke-[2.5]" />
             </button>
-            <h1 className="font-black text-slate-900 text-base tracking-tight">Edit Profile</h1>
+            <h1 className="font-black text-slate-900 text-base md:text-lg tracking-tight">Edit Profile</h1>
             <div className="w-9" />
           </div>
 
-          <main className="flex-1 max-w-md mx-auto px-4 py-6 w-full space-y-6">
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
-              
-              {/* Avatar Section */}
-              <div className="flex flex-col items-center justify-center pt-2 pb-2">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-stone-100 overflow-hidden border-2 border-emerald-500 shadow-sm flex items-center justify-center">
-                    <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover" />
+          <main className="flex-1 max-w-2xl mx-auto px-4 md:px-8 py-8 w-full space-y-6">
+            <div className="bg-white rounded-3xl p-6 md:p-10 shadow-sm border border-stone-200/80">
+              <form onSubmit={handleUpdateProfile} className="space-y-6">
+                
+                {/* Avatar Section */}
+                <div className="flex flex-col items-center justify-center pt-2 pb-4">
+                  <div className="relative">
+                    <div className="w-28 h-28 rounded-full bg-stone-100 overflow-hidden border-4 border-emerald-500 shadow-md flex items-center justify-center">
+                      <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition">
+                      <Camera size={16} />
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
                   </div>
-                  <label className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition">
-                    <Camera size={14} />
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
                 </div>
-              </div>
 
-              {/* Name Field */}
-              <div className="space-y-1">
-                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
-                  placeholder="Smith Mate"
-                />
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Name Field */}
+                  <div className="space-y-1">
+                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      placeholder="Smith Mate"
+                    />
+                  </div>
 
-              {/* Email Address Field */}
-              <div className="space-y-1">
-                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Email Address</label>
-                <input 
-                  type="email" 
-                  disabled
-                  value={displayEmail}
-                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-stone-50/50 text-stone-500 font-bold text-sm cursor-not-allowed shadow-2xs"
-                />
-              </div>
+                  {/* Email Address Field */}
+                  <div className="space-y-1">
+                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Email Address</label>
+                    <input 
+                      type="email" 
+                      disabled
+                      value={displayEmail}
+                      className="w-full px-4 py-3.5 border-2 border-stone-200 rounded-2xl bg-stone-50/70 text-stone-500 font-bold text-sm cursor-not-allowed shadow-2xs"
+                    />
+                  </div>
 
-              {/* Mobile Number Field */}
-              <div className="space-y-1">
-                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
-                <input 
-                  type="tel" 
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
-                  placeholder="(205) 555-0100"
-                />
-              </div>
+                  {/* Mobile Number Field */}
+                  <div className="space-y-1">
+                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
+                    <input 
+                      type="tel" 
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      placeholder="(205) 555-0100"
+                    />
+                  </div>
 
-              {/* Enter Address Field */}
-              <div className="space-y-1">
-                <label className="block font-black text-emerald-500 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
-                <input 
-                  type="text" 
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
-                  placeholder="8502 Preston Rd. Inglewood, USA"
-                />
-              </div>
+                  {/* Enter Address Field */}
+                  <div className="space-y-1">
+                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
+                    <input 
+                      type="text" 
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      className="w-full px-4 py-3.5 border-2 border-emerald-400 rounded-2xl bg-white outline-none focus:border-emerald-500 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      placeholder="8502 Preston Rd. Inglewood, USA"
+                    />
+                  </div>
+                </div>
 
-              {/* Update Button */}
-              <div className="pt-6">
-                <button 
-                  type="submit" 
-                  disabled={saving}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer uppercase tracking-wider text-xs active:scale-95 flex items-center justify-center"
-                >
-                  {saving ? 'Updating...' : 'Update'}
-                </button>
-              </div>
+                {/* Update Button */}
+                <div className="pt-4">
+                  <button 
+                    type="submit" 
+                    disabled={saving}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/25 transition cursor-pointer uppercase tracking-wider text-xs active:scale-95 flex items-center justify-center"
+                  >
+                    {saving ? 'Updating...' : 'Update Profile'}
+                  </button>
+                </div>
 
-            </form>
+              </form>
+            </div>
           </main>
         </>
       ) : (
         <>
-          {/* Top Green Banner */}
-          <div className="bg-emerald-500 text-white rounded-b-[2.5rem] p-6 pt-10 shadow-lg space-y-6">
-            <h1 className="text-center font-black text-lg tracking-tight">My Profile</h1>
+          {/* Top Green Banner / Header */}
+          <div className="bg-emerald-500 text-white rounded-b-[2.5rem] px-6 py-10 md:py-14 shadow-lg space-y-6 w-full">
+            <div className="max-w-3xl mx-auto w-full">
+              <h1 className="text-center font-black text-xl md:text-2xl tracking-tight mb-6">My Profile</h1>
 
-            <div className="flex items-center gap-4 pb-2">
-              <div className="relative">
-                <img 
-                  src={activeAvatar} 
-                  alt="Profile" 
-                  className="w-16 h-16 rounded-full object-cover border-2 border-white/80 shadow-md bg-white"
-                />
-                <button 
-                  type="button"
-                  onClick={() => setActiveTab('edit')}
-                  className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center border-2 border-white shadow-xs cursor-pointer"
-                >
-                  <Edit3 size={12} />
-                </button>
-              </div>
+              <div className="flex flex-col md:flex-row items-center gap-6 pb-2 text-center md:text-left">
+                <div className="relative">
+                  <img 
+                    src={activeAvatar} 
+                    alt="Profile" 
+                    className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-4 border-white/90 shadow-lg bg-white"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab('edit')}
+                    className="absolute bottom-0 right-0 w-7 h-7 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                </div>
 
-              <div className="min-w-0">
-                <h2 className="font-black text-base truncate tracking-tight">{displayName}</h2>
-                <p className="text-xs text-emerald-100 font-medium truncate mt-0.5">{displayEmail}</p>
+                <div className="min-w-0 space-y-1">
+                  <h2 className="font-black text-lg md:text-xl truncate tracking-tight">{displayName}</h2>
+                  <p className="text-xs md:text-sm text-emerald-100 font-medium truncate">{displayEmail}</p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Menu Options List */}
-          <main className="max-w-md mx-auto px-4 mt-6 space-y-4">
-            <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden divide-y divide-stone-100 text-xs">
+          <main className="flex-1 max-w-3xl mx-auto px-4 md:px-8 mt-8 w-full space-y-6">
+            <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden divide-y divide-stone-100 text-xs md:text-sm">
               
               <button 
                 type="button"
                 onClick={() => setActiveTab('edit')}
-                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                    <User size={18} />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <User size={20} />
                   </div>
-                  <span className="font-extrabold text-slate-900">Edit Profile</span>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">Edit Profile</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400" />
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/account/address')}
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <MapPin size={20} />
+                  </div>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">My Address</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/account/orders')}
-                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                    <Package size={18} />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <Package size={20} />
                   </div>
-                  <span className="font-extrabold text-slate-900">My Orders</span>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">My Orders</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400" />
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => navigate('/about')}
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <Info size={20} />
+                  </div>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">About Us</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={handleShareApp}
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <Share2 size={20} />
+                  </div>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">Share App</span>
+                </div>
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/privacy-policy')}
-                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                    <ShieldCheck size={18} />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <ShieldCheck size={20} />
                   </div>
-                  <span className="font-extrabold text-slate-900">Privacy Policy</span>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">Privacy Policy</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400" />
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/terms')}
-                className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                    <FileText size={18} />
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <FileText size={20} />
                   </div>
-                  <span className="font-extrabold text-slate-900">Terms & Conditions</span>
+                  <span className="font-extrabold text-slate-900 text-sm md:text-base">Terms & Conditions</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400" />
+                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
             </div>
 
             {/* Logout Button */}
-            <div className="pt-2">
+            <div className="pt-2 pb-8">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <LogOut size={16} /> Logout
+                <LogOut size={18} /> Logout
               </button>
             </div>
           </main>
@@ -325,7 +389,7 @@ export default function ProfilePage() {
 
       {/* Bottom Navigation Bar */}
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
-        <div className="flex items-center justify-around px-2 py-2 max-w-md mx-auto">
+        <div className="flex items-center justify-around px-2 py-2 max-w-lg mx-auto">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -339,7 +403,7 @@ export default function ProfilePage() {
 
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/wishlist')}
             className="flex flex-col items-center p-2 cursor-pointer group"
             title="Wishlist"
           >
