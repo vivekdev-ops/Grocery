@@ -59,77 +59,77 @@ export default function AboutPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 flex flex-col">
+    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 flex flex-col w-full selection:bg-emerald-500 selection:text-white">
       <StoreHeader session={session} customerProfile={customerProfile} showSearch={false} />
       
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-12 space-y-10 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12 space-y-10 md:space-y-12 w-full">
         {loading ? (
-          <div className="py-20 text-center flex items-center justify-center gap-2">
-            <Loader2 className="animate-spin text-emerald-600" size={20} />
-            <span className="text-stone-500 font-bold">Loading About Us...</span>
+          <div className="py-28 text-center flex items-center justify-center gap-2">
+            <Loader2 className="animate-spin text-emerald-600" size={22} />
+            <span className="text-stone-500 font-bold text-sm">Loading About Us...</span>
           </div>
         ) : (
-          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 rounded-3xl p-8 md:p-12 text-white shadow-xl space-y-4 text-center relative overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 rounded-[2.5rem] p-8 md:p-16 text-white shadow-xl space-y-5 text-center relative overflow-hidden w-full">
             <div className="absolute right-[-30px] bottom-[-30px] opacity-10 pointer-events-none">
-              <Sparkles size={220} />
+              <Sparkles size={240} />
             </div>
-            <span className="bg-emerald-500/20 text-emerald-300 font-black text-[10px] px-3.5 py-1.5 rounded-full border border-emerald-500/30 uppercase tracking-widest">
+            <span className="bg-emerald-500/20 text-emerald-300 font-black text-[10px] md:text-xs px-4 py-1.5 rounded-full border border-emerald-500/30 uppercase tracking-widest">
               {pageData?.title || 'About KD Store'}
             </span>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight">Delivering Freshness in Minutes</h1>
-            <p className="text-emerald-100 text-xs md:text-sm max-w-xl mx-auto leading-relaxed whitespace-pre-line">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">Delivering Freshness in Minutes</h1>
+            <p className="text-emerald-100 text-xs md:text-sm max-w-2xl mx-auto leading-relaxed whitespace-pre-line">
               {descriptionText}
             </p>
           </div>
         )}
 
         {/* Core Values */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-2 text-center">
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
-              <Zap size={22} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:gap-6 w-full">
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-xs space-y-3 text-center flex flex-col items-center justify-center">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
+              <Zap size={24} />
             </div>
-            <h3 className="font-black text-stone-900 text-sm">13-Min Delivery</h3>
-            <p className="text-stone-500 text-[11px]">Lightning-fast inventory dispatch right to your doorstep.</p>
+            <h3 className="font-black text-stone-900 text-sm md:text-base">13-Min Delivery</h3>
+            <p className="text-stone-500 text-[11px] md:text-xs leading-relaxed">Lightning-fast inventory dispatch right to your doorstep.</p>
           </div>
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-2 text-center">
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
-              <ShieldCheck size={22} />
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-xs space-y-3 text-center flex flex-col items-center justify-center">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
+              <ShieldCheck size={24} />
             </div>
-            <h3 className="font-black text-stone-900 text-sm">Quality Assured</h3>
-            <p className="text-stone-500 text-[11px]">Rigorous hygiene and freshness checks for all essentials.</p>
+            <h3 className="font-black text-stone-900 text-sm md:text-base">Quality Assured</h3>
+            <p className="text-stone-500 text-[11px] md:text-xs leading-relaxed">Rigorous hygiene and freshness checks for all essentials.</p>
           </div>
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-2 text-center">
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border border-emerald-200">
-              <HeartHandshake size={22} />
+          <div className="bg-white p-6 md:p-8 rounded-3xl border border-stone-200/80 shadow-xs space-y-3 text-center flex flex-col items-center justify-center">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-2xs">
+              <HeartHandshake size={24} />
             </div>
-            <h3 className="font-black text-stone-900 text-sm">Local Support</h3>
-            <p className="text-stone-500 text-[11px]">Empowering local shopkeepers with advanced tools.</p>
+            <h3 className="font-black text-stone-900 text-sm md:text-base">Local Support</h3>
+            <p className="text-stone-500 text-[11px] md:text-xs leading-relaxed">Empowering local shopkeepers with advanced tools.</p>
           </div>
         </div>
 
         {/* Team Section */}
-        <div className="space-y-6 pt-4">
-          <div className="text-center space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+        <div className="space-y-6 pt-4 w-full">
+          <div className="text-center space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200">
               Our Leadership
             </span>
-            <h2 className="text-2xl font-black text-stone-900 mt-2">Meet the Team</h2>
+            <h2 className="text-2xl md:text-3xl font-black text-stone-900 mt-2">Meet the Team</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
             {teamMembers.map((member, index) => (
-              <div key={index} className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-2xs text-center space-y-4 flex flex-col justify-between">
+              <div key={index} className="bg-white rounded-3xl border border-stone-200/80 p-6 md:p-8 shadow-xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
-                  <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-emerald-100 bg-stone-100">
+                  <div className="w-28 h-28 mx-auto rounded-full overflow-hidden border-4 border-emerald-100 bg-stone-100 shadow-md">
                     <img src={member.image} alt={member.name} className="w-full h-full object-cover" />
                   </div>
-                  <div>
-                    <h3 className="font-black text-stone-900 text-sm">{member.name}</h3>
-                    <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{member.designation}</p>
+                  <div className="space-y-0.5">
+                    <h3 className="font-black text-stone-900 text-base md:text-lg">{member.name}</h3>
+                    <p className="text-xs text-emerald-700 font-extrabold">{member.designation}</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-stone-500 font-medium bg-stone-50 p-3 rounded-2xl border border-stone-100">
+                <p className="text-xs text-stone-600 font-medium bg-stone-50 p-4 rounded-2xl border border-stone-100/80 leading-relaxed">
                   {member.bio}
                 </p>
               </div>
