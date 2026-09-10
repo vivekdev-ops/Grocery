@@ -1,4 +1,8 @@
 {
+  "buildCommand": "cd grocery-admin && npm run build",
+  "outputDirectory": "grocery-admin/dist",
+  "installCommand": "cd grocery-admin && npm install",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
