@@ -1,8 +1,9 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
-import { Search, ShoppingBag, Heart, User, MapPin, ChevronDown, Check } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
+import NotificationBell from '../NotificationBell';
 
 export default function StoreHeader({
   session, customerProfile, showSearch = true,
@@ -78,10 +79,10 @@ export default function StoreHeader({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs">
+    <header className="sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-xl backdrop-blur-md">
       
       {/* Marquee Banner */}
-      <div className="bg-emerald-600 text-white overflow-hidden py-1.5 px-4 text-xs font-black tracking-wider uppercase">
+      <div className="bg-emerald-800/80 text-emerald-100 overflow-hidden py-1.5 px-4 text-xs font-black tracking-wider uppercase border-b border-emerald-500/30">
         <div className="whitespace-nowrap animate-marquee flex items-center justify-around">
           <span>⚡ Quick and Free Delivery in Harraiya</span>
           <span className="hidden sm:inline">⚡ Quick and Free Delivery in Harraiya</span>
@@ -89,7 +90,7 @@ export default function StoreHeader({
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-3 space-y-3">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-3.5 space-y-3">
         
         {/* Top Main Row */}
         <div className="flex items-center justify-between gap-4">
@@ -100,27 +101,27 @@ export default function StoreHeader({
               onClick={() => navigate('/')}
               className="flex items-center gap-2 cursor-pointer group shrink-0"
             >
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-black shadow-md group-hover:scale-105 transition">
+              <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md text-white flex items-center justify-center font-black shadow-inner border border-white/20 group-hover:scale-105 transition">
                 KD
               </div>
             </button>
             
             <div className="min-w-0 relative">
-              <h1 className="font-black text-slate-900 text-xs sm:text-sm tracking-tight truncate">KD Store Quick Commerce</h1>
+              <h1 className="font-black text-white text-xs sm:text-sm tracking-tight truncate drop-shadow-sm">KD Store Quick Commerce</h1>
               
               {/* Address Dropdown Toggle */}
               <button
                 onClick={() => session?.user && savedAddresses.length > 0 && setIsAddressDropdownOpen(!isAddressDropdownOpen)}
-                className="text-[11px] text-stone-600 font-bold truncate flex items-center gap-1 mt-0.5 hover:text-emerald-600 transition cursor-pointer text-left"
+                className="text-[11px] text-emerald-100 font-bold truncate flex items-center gap-1 mt-0.5 hover:text-white transition cursor-pointer text-left opacity-90"
               >
-                <MapPin size={12} className="text-emerald-600 shrink-0" />
+                <MapPin size={12} className="text-emerald-300 shrink-0" />
                 <span className="truncate">{addressDisplay}</span>
-                {session?.user && savedAddresses.length > 0 && <ChevronDown size={12} className="shrink-0 text-stone-400" />}
+                {session?.user && savedAddresses.length > 0 && <ChevronDown size={12} className="shrink-0 text-emerald-200" />}
               </button>
 
               {/* Popup Saved Addresses Dropdown for Logged-In Users */}
               {isAddressDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-stone-200/90 py-2 z-50 space-y-1">
+                <div className="absolute top-full left-0 mt-2 w-72 bg-white text-stone-900 rounded-2xl shadow-xl border border-stone-200/90 py-2 z-50 space-y-1">
                   <div className="px-3 py-1.5 border-b border-stone-100 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Select Delivery Address</span>
                     <button 
@@ -147,36 +148,9 @@ export default function StoreHeader({
             </div>
           </div>
 
-          {/* Right Action Icons (Wishlist, Cart, Profile) */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              onClick={() => navigate('/wishlist')}
-              className="p-2.5 rounded-2xl bg-stone-50 hover:bg-stone-100 text-stone-700 transition cursor-pointer relative"
-              title="Wishlist"
-            >
-              <Heart size={18} />
-            </button>
-
-            <button
-              onClick={onOpenCart}
-              className="p-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white transition cursor-pointer relative flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
-              title="Cart"
-            >
-              <ShoppingBag size={18} />
-              {totalItemsCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] w-5 h-5 rounded-full font-black flex items-center justify-center shadow-sm">
-                  {totalItemsCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={onOpenProfile}
-              className="p-2.5 rounded-2xl bg-stone-50 hover:bg-stone-100 text-stone-700 transition cursor-pointer"
-              title="Account"
-            >
-              <User size={18} />
-            </button>
+          {/* Right Action Icons (Wishlist, Cart, Profile removed as requested) */}
+          <div className="flex items-center gap-3 shrink-0">
+            <NotificationBell session={session} size={18} className="text-white hover:bg-white/20 p-2.5 rounded-xl transition" />
           </div>
         </div>
 
