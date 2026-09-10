@@ -1151,17 +1151,19 @@ export default function CustomerStorefront() {
        
       {/* 1. Header Component */}
       <StoreHeader 
-        session={session} 
-        customerProfile={customerProfile}
-        searchQuery={searchQuery} 
-        setSearchQuery={setSearchQuery} 
-        totalItemsCount={totalItemsCount} 
-        onOpenProfile={() => setIsProfileOpen(true)} 
-        onOpenCart={() => setIsCartOpen(true)}
-        categories={categories}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-      />
+  session={session} 
+  customerProfile={customerProfile}
+  searchQuery={searchQuery} 
+  setSearchQuery={setSearchQuery} 
+  totalItemsCount={totalItemsCount} 
+  onOpenProfile={() => setIsProfileOpen(true)} 
+  onOpenCart={() => setIsCartOpen(true)}
+  categories={categories}
+  activeCategory={activeCategory}
+  setActiveCategory={setActiveCategory}
+  sortBy={sortBy}
+  setSortBy={setSortBy}
+/>
 
       {personalizedDeals.length > 0 && activeCategory === 'All' && !searchQuery && (
         <div className="max-w-7xl mx-auto px-4 mt-6">
