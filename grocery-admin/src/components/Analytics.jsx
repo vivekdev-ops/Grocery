@@ -66,14 +66,14 @@ export default function Analytics() {
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('customer_profiles').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        // Fixed: Querying products safely without missing relations
         supabase.from('products').select(`
           *,
-          product_variants(price, mrp, stock),
-          variants(price, mrp, stock),
-          shopkeeper_profiles(shop_name, owner_name)
+          product_variants(price, mrp, stock)
         `).order('created_at', { ascending: false }),
         supabase.from('shopkeeper_profiles').select('*'),
-        supabase.from('delivery_boys').select('*')
+        // Fixed: Use 'staff' or 'staff_profiles' instead of non-existent 'delivery_boys'
+        supabase.from('staff_profiles').select('*')
       ]);
 
       const allOrders = ordersData || [];
