@@ -141,7 +141,6 @@ export default function AdminAboutUs() {
         </div>
       </div>
 
-      {/* Team Members Management Section */}
       <div className="space-y-4 pt-4 border-t border-stone-100">
         <div className="flex items-center justify-between">
           <h4 className="font-black text-stone-900 uppercase tracking-wider text-[11px]">Team Members</h4>
