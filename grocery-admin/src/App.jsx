@@ -44,9 +44,9 @@ import CustomerOrdersPage from './components/CustomerOrdersPage';
 import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
-import AboutPage from './components/pages/AboutPage';
+// Add these missing component imports at the top of your src/App.jsx file:
 import AdminAboutUs from './components/AdminAboutUs';
-
+import AboutPage from './components/pages/AboutPage';
 
 /* ─────────────────────────────────────────────
    GROUP ICON COLOURS  (sidebar section accents)
@@ -209,7 +209,7 @@ function AdminLayout() {
 
       const userId = currentSession.user.id;
 
-      // 1. Check if user is a Shopkeeper (Block access)
+      // 1. Check if user is a Shopkeeper (Block access) - USING .maybeSingle() TO PREVENT 406 ERROR
       const { data: shopkeeperCheck } = await supabase
         .from('shopkeeper_profiles')
         .select('id')
@@ -262,7 +262,7 @@ function AdminLayout() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-
+  
   const fetchBadgeCounts = async () => {
     const { data: fbData } = await supabase
       .from('customer_feedbacks').select('status, category').eq('category', 'order_support');
