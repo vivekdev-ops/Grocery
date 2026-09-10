@@ -1,674 +1,577 @@
 // src/components/Analytics.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { LayoutDashboard, ShoppingBag, Users, DollarSign, Package, Filter, Store, Truck, TrendingUp, Award, Sparkles, AlertCircle, CheckCircle2, Eye, X, Mail, Phone, User } from 'lucide-react';
+import { 
+  ShoppingBag, Package, Store, Users, TrendingUp, Clock, CheckCircle2, 
+  Truck, XCircle, ArrowUpRight, Loader2, Eye, ChevronLeft, ChevronRight, AlertTriangle, Calendar 
+} from 'lucide-react';
 
 export default function Analytics() {
-  const [orders, setOrders] = useState([]);
-  const [orderItems, setOrderItems] = useState([]);
-  const [shopkeepers, setShopkeepers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [deliveryBoys, setDeliveryBoys] = useState([]);
-  
   const [stats, setStats] = useState({
-    totalRevenue: 0,
+    totalShops: 0,
+    totalProducts: 0,
     totalOrders: 0,
     totalCustomers: 0,
-    pendingOrders: 0
+    totalDeliveryBoys: 0,
+    pending: 0,
+    confirmed: 0,
+    processing: 0,
+    pickup: 0,
+    onTheWay: 0,
+    delivered: 0,
+    cancelled: 0,
+    totalEarning: 0,
+    alreadyWithdraw: 0,
+    pendingWithdraw: 0,
+    totalCommission: 0,
+    rejectedWithdraw: 0
   });
-  const [filteredOrders, setFilteredOrders] = useState([]);
+
+  const [orders, setOrders] = useState([]);
+  const [recentProducts, setRecentProducts] = useState([]);
+  const [shops, setShops] = useState([]);
+  const [deliveryBoys, setDeliveryBoys] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Detailed Order Modal State
-  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
-  const [detailedOrderItems, setDetailedOrderItems] = useState([]);
+  // Statistics Filter State: 'Daily' | 'Monthly' | 'Yearly' | 'Custom'
+  const [statFilter, setStatFilter] = useState('Daily');
+  const [customDate, setCustomDate] = useState('');
 
-  // Filter States
-  const [filterType, setFilterType] = useState('all'); // 'all', 'date', 'month', 'year'
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedYear, setSelectedYear] = useState('2026');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'delivered', 'pending', 'shipped', 'cancelled'
+  // Pagination for Order Summary
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
+
+  // Selected Order for Details Modal
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [orders, filterType, selectedDate, selectedMonth, selectedYear, statusFilter]);
-
   const fetchDashboardData = async () => {
-    setLoading(true);
     try {
-      const [ordRes, itemRes, shopRes, prodRes, staffRes] = await Promise.all([
+      setLoading(true);
+
+      const [
+        { count: shopsCount },
+        { count: productsCount },
+        { count: customersCount },
+        { data: ordersData },
+        { data: productsData },
+        { data: shopsData },
+        { data: deliveryData }
+      ] = await Promise.all([
+        supabase.from('shopkeeper_profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('products').select('*', { count: 'exact', head: true }),
+        supabase.from('customer_profiles').select('*', { count: 'exact', head: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('order_items').select('*'),
+        supabase.from('products').select(`
+          *,
+          product_variants(price, mrp, stock),
+          variants(price, mrp, stock),
+          shopkeeper_profiles(shop_name, owner_name)
+        `).order('created_at', { ascending: false }),
         supabase.from('shopkeeper_profiles').select('*'),
-        supabase.from('products').select('*'),
-        supabase.from('staff_profiles').select('*')
+        supabase.from('delivery_boys').select('*')
       ]);
 
-      if (ordRes.data) setOrders(ordRes.data);
-      if (itemRes.data) setOrderItems(itemRes.data);
-      if (shopRes.data) setShopkeepers(shopRes.data);
-      if (prodRes.data) setProducts(prodRes.data);
-      if (staffRes.data) setDeliveryBoys(staffRes.data);
+      const allOrders = ordersData || [];
+      const allProducts = productsData || [];
+      const allShops = shopsData || [];
+      const allDelivery = deliveryData || [];
+
+      // Status breakdown
+      const pending = allOrders.filter(o => o.status === 'pending').length;
+      const confirmed = allOrders.filter(o => o.status === 'confirmed' || o.status === 'accepted').length;
+      const processing = allOrders.filter(o => o.status === 'processing').length;
+      const pickup = allOrders.filter(o => o.status === 'ready_for_pickup' || o.status === 'pickup').length;
+      const onTheWay = allOrders.filter(o => o.status === 'out_for_delivery' || o.status === 'on_the_way').length;
+      const delivered = allOrders.filter(o => o.status === 'delivered').length;
+      const cancelled = allOrders.filter(o => o.status === 'cancelled').length;
+
+      const totalEarning = allOrders
+        .filter(o => o.status === 'delivered')
+        .reduce((sum, o) => sum + Number(o.total_amount || o.total || 0), 0);
+
+      setStats({
+        totalShops: allShops.length,
+        totalProducts: allProducts.length,
+        totalOrders: allOrders.length,
+        totalCustomers: customersCount || 0,
+        totalDeliveryBoys: allDelivery.length,
+        pending,
+        confirmed,
+        processing,
+        pickup,
+        onTheWay,
+        delivered,
+        cancelled,
+        totalEarning,
+        alreadyWithdraw: 0,
+        pendingWithdraw: 0,
+        totalCommission: Number((totalEarning * 0.1).toFixed(2)),
+        rejectedWithdraw: 0
+      });
+
+      setOrders(allOrders);
+      setRecentProducts(allProducts.slice(0, 5));
+      setShops(allShops);
+      setDeliveryBoys(allDelivery);
+      setLowStockProducts(allProducts.filter(p => {
+        const variants = p.product_variants || p.variants || [];
+        const stock = variants.length > 0 ? Number(variants[0].stock || 0) : Number(p.stock || 5);
+        return stock < 5;
+      }));
     } catch (err) {
-      console.error('Error loading analytics data:', err);
+      console.error('Error loading analytics:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    let result = [...orders];
-
-    if (filterType === 'date' && selectedDate) {
-      result = result.filter(o => o.created_at.startsWith(selectedDate));
-    } else if (filterType === 'month' && selectedMonth) {
-      result = result.filter(o => o.created_at.startsWith(selectedMonth));
-    } else if (filterType === 'year' && selectedYear) {
-      result = result.filter(o => o.created_at.startsWith(selectedYear));
-    }
-
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'pending') {
-        result = result.filter(o => o.status === 'pending' || o.status === 'processing');
-      } else if (statusFilter === 'shipped') {
-        result = result.filter(o => o.status === 'shipped' || o.status === 'out_for_delivery');
-      } else {
-        result = result.filter(o => o.status === statusFilter);
+  // Filtered orders for Statistics Overview based on 'Daily', 'Monthly', 'Yearly', or 'Custom'
+  const getFilteredOrdersForStats = () => {
+    const now = new Date();
+    return orders.filter(o => {
+      const orderDate = new Date(o.created_at || Date.now());
+      if (statFilter === 'Daily') {
+        return orderDate.toDateString() === now.toDateString();
       }
-    }
-
-    const totalRevenue = result.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.total_amount : 0), 0);
-    const totalOrders = result.length;
-    const pendingOrders = result.filter(o => o.status === 'pending' || o.status === 'processing').length;
-    const uniqueCustomers = new Set(result.map(o => o.customer_email).filter(Boolean)).size;
-
-    setStats({
-      totalRevenue,
-      totalOrders,
-      totalCustomers: uniqueCustomers,
-      pendingOrders
+      if (statFilter === 'Monthly') {
+        return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+      }
+      if (statFilter === 'Yearly') {
+        return orderDate.getFullYear() === now.getFullYear();
+      }
+      if (statFilter === 'Custom' && customDate) {
+        return orderDate.toISOString().split('T')[0] === customDate;
+      }
+      return true;
     });
-
-    setFilteredOrders(result);
   };
 
-  const openOrderDetails = async (order) => {
-    setSelectedOrderDetails(order);
-    const { data, error } = await supabase
-      .from('order_items')
-      .select('*, products(*)')
-      .eq('order_id', order.id);
+  const filteredOrders = getFilteredOrdersForStats();
+  const filteredTotalOrders = filteredOrders.length;
+  const filteredPending = filteredOrders.filter(o => o.status === 'pending').length;
+  const filteredConfirmed = filteredOrders.filter(o => o.status === 'confirmed' || o.status === 'accepted').length;
+  const filteredProcessing = filteredOrders.filter(o => o.status === 'processing').length;
+  const filteredPickup = filteredOrders.filter(o => o.status === 'ready_for_pickup' || o.status === 'pickup').length;
+  const filteredOnTheWay = filteredOrders.filter(o => o.status === 'out_for_delivery' || o.status === 'on_the_way').length;
+  const filteredDelivered = filteredOrders.filter(o => o.status === 'delivered').length;
+  const filteredCancelled = filteredOrders.filter(o => o.status === 'cancelled').length;
 
-    if (!error && data) {
-      setDetailedOrderItems(data);
-    } else {
-      setDetailedOrderItems(order.order_items || []);
-    }
-  };
+  // Pagination Logic for Order Summary
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(orders.length / ordersPerPage) || 1;
 
-  const getAssignedAgent = (order) => {
-    const agentId = order.delivery_agent_id || order.delivery_boy_id || order.staff_id;
-    if (agentId) {
-      const found = deliveryBoys.find(db => String(db.id).trim() === String(agentId).trim());
-      if (found) {
-        return {
-          name: found.name || found.full_name || 'Delivery Staff',
-          email: found.email || 'N/A',
-          phone: found.phone || 'N/A'
-        };
-      }
-    }
-    if (order.delivery_person) {
-      return {
-        name: order.delivery_person,
-        email: 'N/A',
-        phone: 'N/A'
-      };
-    }
-    return null;
-  };
-
-  const shopkeeperMetrics = shopkeepers.map(sk => {
-    const skProducts = products.filter(p => String(p.shopkeeper_id).trim() === String(sk.id).trim());
-    const skProductIds = skProducts.map(p => p.id);
-    
-    const relevantItems = orderItems.filter(item => skProductIds.includes(item.product_id));
-    const revenue = relevantItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const totalSold = relevantItems.reduce((sum, item) => sum + item.quantity, 0);
-
-    return {
-      ...sk,
-      productCount: skProducts.length,
-      revenue,
-      totalSold
-    };
-  }).sort((a, b) => b.revenue - a.revenue);
-
-  const deliveryMetrics = deliveryBoys.map(db => {
-    const assignedOrders = orders.filter(o => 
-      String(o.delivery_agent_id).trim() === String(db.id).trim() ||
-      String(o.delivery_boy_id).trim() === String(db.id).trim() || 
-      String(o.staff_id).trim() === String(db.id).trim()
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] gap-2">
+        <Loader2 className="animate-spin text-emerald-600" size={24} />
+        <span className="text-stone-500 font-bold text-xs">Loading analytics and stats...</span>
+      </div>
     );
-    const deliveredCount = assignedOrders.filter(o => o.status === 'delivered').length;
-    const activeCount = assignedOrders.filter(o => o.status === 'out_for_delivery' || o.status === 'shipped' || o.status === 'processing').length;
-
-    return {
-      ...db,
-      totalAssigned: assignedOrders.length,
-      deliveredCount,
-      activeCount
-    };
-  }).sort((a, b) => b.deliveredCount - a.deliveredCount);
-
-  // Robust product lookup map
-  const productLookup = {};
-  products.forEach(p => {
-    productLookup[p.id] = p;
-  });
-
-  const productSalesMap = {};
-  orders.forEach(order => {
-    if (order.status === 'cancelled') return;
-    const items = orderItems.filter(item => item.order_id === order.id);
-    items.forEach(item => {
-      const prod = productLookup[item.product_id] || {};
-      const prodName = prod.name || item.variant_label || 'Product Item';
-      const prodImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-
-      if (!productSalesMap[prodName]) {
-        productSalesMap[prodName] = { 
-          quantity: 0, 
-          revenue: 0, 
-          image: prodImages[0] || '' 
-        };
-      }
-      productSalesMap[prodName].quantity += Number(item.quantity || 1);
-      productSalesMap[prodName].revenue += Number(item.price || 0) * Number(item.quantity || 1);
-    });
-  });
-
-  const topProducts = Object.entries(productSalesMap)
-    .map(([name, data]) => ({ name, ...data }))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5);
-
-  const statusCounts = {
-    delivered: orders.filter(o => o.status === 'delivered').length,
-    pending: orders.filter(o => o.status === 'pending' || o.status === 'processing').length,
-    shipped: orders.filter(o => o.status === 'shipped' || o.status === 'out_for_delivery').length,
-    cancelled: orders.filter(o => o.status === 'cancelled').length,
-  };
-
-  const generateAIInsights = () => {
-    const insights = [];
-    const totalCount = orders.length;
-    if (totalCount === 0) return [{ type: 'info', text: 'Insufficient order data to run AI diagnostics.' }];
-
-    const cancellationRate = (statusCounts.cancelled / totalCount) * 100;
-    const fulfillmentRate = (statusCounts.delivered / totalCount) * 100;
-
-    if (cancellationRate > 10) {
-      insights.push({
-        type: 'warning',
-        title: 'High Cancellation Alert',
-        text: `Cancellation rate is currently at ${cancellationRate.toFixed(1)}%. Check inventory stock-outs or delivery delays.`
-      });
-    } else {
-      insights.push({
-        type: 'success',
-        title: 'Healthy Order Fulfillment',
-        text: `Order success rate is strong at ${fulfillmentRate.toFixed(1)}% delivered successfully.`
-      });
-    }
-
-    if (stats.pendingOrders > 5) {
-      insights.push({
-        type: 'warning',
-        title: 'Fulfillment Bottleneck',
-        text: `You have ${stats.pendingOrders} pending orders awaiting processing. Assign staff immediately to maintain 10-minute delivery SLAs.`
-      });
-    } else {
-      insights.push({
-        type: 'success',
-        title: 'Operations Flowing Smoothly',
-        text: 'Pending queue is under control. Dark store operators are maintaining optimal dispatch times.'
-      });
-    }
-
-    if (shopkeeperMetrics.length > 0) {
-      const topStore = shopkeeperMetrics[0];
-      insights.push({
-        type: 'info',
-        title: 'Top Performing Store',
-        text: `"${topStore.store_name}" is leading revenue generation with ₹${topStore.revenue.toFixed(2)} total sales.`
-      });
-    }
-
-    return insights;
-  };
-
-  if (loading) return <div className="text-center py-20 text-slate-500 font-medium">Loading dashboard analytics...</div>;
+  }
 
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-6 font-sans text-xs text-stone-800 pb-16">
       
-      {/* Header & Filter Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm">
+      {/* Top Header Banner */}
+      <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <LayoutDashboard size={24} className="text-emerald-700"/> Business Analytics & Insights
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">Real-time performance metrics, status filtering, and AI intelligence overview.</p>
+          <h1 className="text-base font-black text-slate-900 tracking-tight">Welcome Back, Super Admin</h1>
+          <p className="text-[11px] text-stone-400 font-medium">Live business analytics, orders, inventory and delivery overview.</p>
+        </div>
+        <button 
+          onClick={fetchDashboardData}
+          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black px-3.5 py-2 rounded-xl transition cursor-pointer text-[10px] uppercase tracking-wider"
+        >
+          Refresh Data
+        </button>
+      </div>
+
+      {/* Top 5 Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xl font-black text-slate-900">{stats.totalShops}</p>
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Total Shops</p>
+          </div>
+          <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center"><Store size={18} /></div>
         </div>
 
-        {/* Filters Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1 bg-emerald-50/50 p-1.5 rounded-2xl border border-emerald-200">
-            <span className="font-bold text-slate-500 pl-1">Status:</span>
-            <select 
-              className="bg-transparent font-bold text-slate-800 outline-none pr-2 cursor-pointer"
-              value={statusFilter} 
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Statuses</option>
-              <option value="delivered">Delivered</option>
-              <option value="pending">Pending</option>
-              <option value="shipped">Shipped</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xl font-black text-slate-900">{stats.totalDeliveryBoys}</p>
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Delivery Boys</p>
           </div>
+          <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><Truck size={18} /></div>
+        </div>
 
-          <div className="flex items-center gap-1 bg-emerald-50/50 p-1.5 rounded-2xl border border-emerald-200">
-            <Filter size={14} className="text-emerald-700 ml-1" />
-            <select 
-              className="bg-transparent font-bold text-slate-800 outline-none pr-2 cursor-pointer"
-              value={filterType} 
-              onChange={e => setFilterType(e.target.value)}
-            >
-              <option value="all">All Time</option>
-              <option value="date">Filter by Date</option>
-              <option value="month">Filter by Month</option>
-              <option value="year">Filter by Year</option>
-            </select>
+        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xl font-black text-slate-900">{stats.totalProducts}</p>
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Total Products</p>
           </div>
+          <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center"><Package size={18} /></div>
+        </div>
 
-          {filterType === 'date' && (
-            <input 
-              type="date" 
-              className="border border-emerald-200 p-2.5 rounded-2xl bg-white font-medium outline-none focus:border-emerald-600 text-slate-800 shadow-2xs"
-              value={selectedDate} 
-              onChange={e => setSelectedDate(e.target.value)}
-            />
-          )}
+        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xl font-black text-slate-900">{stats.totalOrders}</p>
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Total Orders</p>
+          </div>
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center"><ShoppingBag size={18} /></div>
+        </div>
 
-          {filterType === 'month' && (
-            <input 
-              type="month" 
-              className="border border-emerald-200 p-2.5 rounded-2xl bg-white font-medium outline-none focus:border-emerald-600 text-slate-800 shadow-2xs"
-              value={selectedMonth} 
-              onChange={e => setSelectedMonth(e.target.value)}
-            />
-          )}
-
-          {filterType === 'year' && (
-            <select 
-              className="border border-emerald-200 p-2.5 rounded-2xl bg-white font-bold text-slate-800 outline-none shadow-2xs"
-              value={selectedYear} 
-              onChange={e => setSelectedYear(e.target.value)}
-            >
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
-            </select>
-          )}
+        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <p className="text-xl font-black text-slate-900">{stats.totalCustomers}</p>
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Customers</p>
+          </div>
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><Users size={18} /></div>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Revenue</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">₹{stats.totalRevenue.toFixed(2)}</h3>
+      {/* Order Analytics Status Bar */}
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-3">
+        <h3 className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Order Analytics</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Pending</p><p className="text-lg font-black text-stone-800">{stats.pending}</p></div>
+            <Clock size={16} className="text-amber-500" />
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center border border-emerald-200">
-            <DollarSign size={24} />
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Confirm</p><p className="text-lg font-black text-stone-800">{stats.confirmed}</p></div>
+            <CheckCircle2 size={16} className="text-sky-500" />
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Orders</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">{stats.totalOrders}</h3>
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Processing</p><p className="text-lg font-black text-stone-800">{stats.processing}</p></div>
+            <Package size={16} className="text-indigo-500" />
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center border border-emerald-200">
-            <ShoppingBag size={24} />
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Pickup</p><p className="text-lg font-black text-stone-800">{stats.pickup}</p></div>
+            <Store size={16} className="text-violet-500" />
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Active Customers</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">{stats.totalCustomers}</h3>
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">On The Way</p><p className="text-lg font-black text-stone-800">{stats.onTheWay}</p></div>
+            <Truck size={16} className="text-blue-500" />
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl flex items-center justify-center border border-emerald-200">
-            <Users size={24} />
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Delivered</p><p className="text-lg font-black text-stone-800">{stats.delivered}</p></div>
+            <CheckCircle2 size={16} className="text-emerald-500" />
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Pending Fulfillment</p>
-            <h3 className="text-2xl font-black text-amber-600 mt-1">{stats.pendingOrders}</h3>
-          </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center border border-amber-200">
-            <Package size={24} />
+          <div className="bg-stone-50 p-3 rounded-2xl border flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-stone-400 uppercase">Cancelled</p><p className="text-lg font-black text-stone-800">{stats.cancelled}</p></div>
+            <XCircle size={16} className="text-rose-500" />
           </div>
         </div>
       </div>
 
-      {/* AI Business Insights Intelligence Section */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-950 rounded-3xl p-6 text-white border border-emerald-800 shadow-xl space-y-4">
-        <div className="flex items-center gap-2.5 border-b border-emerald-800/80 pb-3">
-          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-            <Sparkles size={18} />
-          </div>
+      {/* Statistics Graph Section with Daily, Monthly, Yearly, and Custom Date Filters */}
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-black text-sm uppercase tracking-wider text-white">AI-Powered Business Intelligence</h3>
-            <p className="text-[11px] text-emerald-300/80">Automated store health diagnostics and growth recommendations.</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          {generateAIInsights().map((insight, idx) => (
-            <div key={idx} className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-800/60 space-y-1.5 backdrop-blur-md">
-              <div className="flex items-center gap-1.5 font-black uppercase text-[10px] tracking-wider text-emerald-400">
-                {insight.type === 'warning' ? <AlertCircle size={14} className="text-amber-400" /> : <CheckCircle2 size={14} className="text-emerald-400" />}
-                <span>{insight.title}</span>
-              </div>
-              <p className="text-emerald-100/90 leading-relaxed">{insight.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Advanced Analyzers Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Top Selling Products Analyzer */}
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4 lg:col-span-2">
-          <div className="flex items-center gap-2 border-b border-emerald-100 pb-3">
-            <Award className="text-emerald-700" size={20} />
-            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">Top Selling Products</h3>
+            <h3 className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Orders Statistics Overview</h3>
+            <p className="text-[10px] text-stone-400 font-bold">Showing orders volume for: <span className="text-emerald-600 font-black">{statFilter} {statFilter === 'Custom' && customDate ? `(${customDate})` : ''}</span></p>
           </div>
 
-          {topProducts.length === 0 ? (
-            <p className="text-xs text-slate-400 italic text-center py-6">No sales data recorded yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {topProducts.map((prod, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3.5 bg-emerald-50/30 rounded-2xl border border-emerald-100 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="font-black text-emerald-700 bg-emerald-100 w-6 h-6 rounded-full flex items-center justify-center text-[10px]">#{idx + 1}</span>
-                    <img src={prod.image || ''} alt="" className="w-10 h-10 object-cover rounded-xl border border-emerald-200 bg-white" />
-                    <div>
-                      <span className="font-bold text-slate-900 block text-sm">{prod.name}</span>
-                      <span className="text-slate-500 font-medium">Total Quantity Sold: <strong className="text-slate-800">{prod.quantity} units</strong></span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-black text-emerald-700 text-sm block">₹{prod.revenue.toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Revenue Generated</span>
-                  </div>
-                </div>
+          {/* Filter Buttons & Date Picker */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-stone-100 p-1 rounded-2xl">
+              {['Daily', 'Monthly', 'Yearly', 'Custom'].map((filterName) => (
+                <button
+                  key={filterName}
+                  onClick={() => setStatFilter(filterName)}
+                  className={`px-3 py-1.5 rounded-xl font-black text-[10px] transition cursor-pointer ${
+                    statFilter === filterName ? 'bg-emerald-500 text-white shadow-sm' : 'text-stone-600 hover:text-slate-900'
+                  }`}
+                >
+                  {filterName}
+                </button>
               ))}
             </div>
-          )}
-        </div>
 
-        {/* Order Status Breakdown Analyzer */}
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-emerald-100 pb-3">
-            <TrendingUp className="text-emerald-700" size={20} />
-            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">Order Status Breakdown</h3>
-          </div>
-
-          <div className="space-y-3 pt-1 text-xs">
-            <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-              <span className="font-bold text-emerald-900 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>Delivered</span>
-              <span className="font-black text-emerald-800 text-sm">{statusCounts.delivered}</span>
-            </div>
-
-            <div className="flex justify-between items-center p-3 bg-amber-50 rounded-2xl border border-amber-200">
-              <span className="font-bold text-amber-900 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>Pending / Processing</span>
-              <span className="font-black text-amber-800 text-sm">{statusCounts.pending}</span>
-            </div>
-
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border border-blue-200">
-              <span className="font-bold text-blue-900 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>Shipped / Dispatched</span>
-              <span className="font-black text-blue-800 text-sm">{statusCounts.shipped}</span>
-            </div>
-
-            <div className="flex justify-between items-center p-3 bg-rose-50 rounded-2xl border border-rose-200">
-              <span className="font-bold text-rose-900 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>Cancelled</span>
-              <span className="font-black text-rose-800 text-sm">{statusCounts.cancelled}</span>
-            </div>
+            {statFilter === 'Custom' && (
+              <input 
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="bg-stone-50 border border-stone-200 rounded-2xl px-3 py-1.5 text-xs font-bold text-stone-800 outline-none focus:border-emerald-500"
+              />
+            )}
           </div>
         </div>
 
+        <div className="h-52 w-full bg-stone-50 rounded-2xl border border-dashed border-stone-200 flex flex-col items-center justify-center p-4">
+          <div className="w-full flex items-end justify-around h-36 px-4 gap-2">
+            {[
+              { label: 'Pending', count: filteredPending, color: 'bg-amber-400' },
+              { label: 'Confirmed', count: filteredConfirmed, color: 'bg-sky-400' },
+              { label: 'Processing', count: filteredProcessing, color: 'bg-indigo-400' },
+              { label: 'Pickup', count: filteredPickup, color: 'bg-violet-400' },
+              { label: 'On Way', count: filteredOnTheWay, color: 'bg-blue-500' },
+              { label: 'Delivered', count: filteredDelivered, color: 'bg-emerald-500' },
+              { label: 'Cancelled', count: filteredCancelled, color: 'bg-rose-400' }
+            ].map((bar, i) => {
+              const heightPercent = Math.min(Math.max((bar.count / (filteredTotalOrders || 1)) * 100, 15), 100);
+              return (
+                <div key={i} className="flex flex-col items-center gap-1.5 flex-1 h-full justify-end">
+                  <span className="text-[10px] font-black text-stone-600">{bar.count}</span>
+                  <div style={{ height: `${heightPercent}%` }} className={`w-full max-w-[36px] rounded-t-xl ${bar.color} transition-all duration-500 shadow-sm`} />
+                  <span className="text-[9px] font-bold text-stone-400 truncate w-full text-center">{bar.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Shopkeeper & Staff Performance Analytics Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Shopkeeper Performance Breakdown */}
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-emerald-100 pb-3">
-            <Store className="text-emerald-700" size={20} />
-            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">Shopkeeper Store Performance</h3>
-          </div>
-
-          {shopkeeperMetrics.length === 0 ? (
-            <p className="text-xs text-slate-400 italic text-center py-6">No shopkeeper profiles registered.</p>
-          ) : (
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {shopkeeperMetrics.map(sk => (
-                <div key={sk.id} className="flex justify-between items-center p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-900 block text-sm">{sk.store_name}</span>
-                    <span className="text-slate-500">{sk.productCount} products listed | {sk.totalSold} items sold</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-black text-emerald-700 text-sm block">₹{sk.revenue.toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Revenue</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Order Summary Table with Pagination & View Details */}
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Order Summary (Latest Orders)</h3>
+          <span className="text-stone-400 font-bold text-[10px]">Showing {orders.length > 0 ? indexOfFirstOrder + 1 : 0}-{Math.min(indexOfLastOrder, orders.length)} of {orders.length}</span>
         </div>
 
-        {/* Staff / Delivery Personnel Performance Breakdown */}
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-emerald-100 pb-3">
-            <Truck className="text-emerald-700" size={20} />
-            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">Delivery Staff Performance</h3>
-          </div>
-
-          {deliveryMetrics.length === 0 ? (
-            <p className="text-xs text-slate-400 italic text-center py-6">No staff profiles registered.</p>
-          ) : (
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {deliveryMetrics.map(db => (
-                <div key={db.id} className="flex justify-between items-center p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-900 block text-sm">{db.name || db.full_name || db.email || 'Delivery Staff'}</span>
-                    <span className="text-slate-500">Phone: {db.phone || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-right">
-                    <div className="bg-emerald-100/60 px-2.5 py-1 rounded-xl border border-emerald-200">
-                      <span className="font-bold text-emerald-900 block text-xs">{db.deliveredCount}</span>
-                      <span className="text-[9px] text-emerald-700 uppercase font-semibold">Delivered</span>
-                    </div>
-                    <div className="bg-amber-100/60 px-2.5 py-1 rounded-xl border border-amber-200">
-                      <span className="font-bold text-amber-900 block text-xs">{db.activeCount}</span>
-                      <span className="text-[9px] text-amber-700 uppercase font-semibold">Active</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-stone-100 text-stone-400 font-bold uppercase text-[10px]">
+                <th className="py-3 px-4">Order ID</th>
+                <th className="py-3 px-4">Items</th>
+                <th className="py-3 px-4">Total</th>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50 font-medium text-stone-700">
+              {currentOrders.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-6 text-center text-stone-400 font-bold">No orders found in database.</td>
+                </tr>
+              ) : (
+                currentOrders.map((order, idx) => (
+                  <tr key={order.id || idx} className="hover:bg-stone-50/80 transition">
+                    <td className="py-3.5 px-4 font-black text-emerald-600">#{order.id?.slice(0, 8)}</td>
+                    <td className="py-3.5 px-4 font-bold">{order.items?.length || 1} items</td>
+                    <td className="py-3.5 px-4 font-black text-slate-900">₹{Number(order.total_amount || order.total || 0).toFixed(0)}</td>
+                    <td className="py-3.5 px-4 text-stone-400">{new Date(order.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block
+                        ${order.status === 'delivered' ? 'bg-emerald-50 text-emerald-700' : 
+                          order.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}
+                      >
+                        {order.status || 'Pending'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="bg-stone-100 hover:bg-emerald-500 hover:text-white text-stone-700 p-2 rounded-xl transition cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
+                        title="View Details"
+                      >
+                        <Eye size={14} /> Details
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
 
-      </div>
-
-      {/* Filtered Orders Table / Overview (Clickable to View Details) */}
-      <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-bold text-slate-900 text-base">Filtered Orders Overview ({filteredOrders.length})</h3>
-          <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Status: {statusFilter.toUpperCase()} | Click any order for full details</span>
-        </div>
-
-        {filteredOrders.length === 0 ? (
-          <p className="text-center py-12 text-slate-400 text-xs italic">No orders found for the selected filters.</p>
-        ) : (
-          <div className="divide-y divide-emerald-50 max-h-[400px] overflow-y-auto">
-            {filteredOrders.map(order => (
-              <div 
-                key={order.id} 
-                onClick={() => openOrderDetails(order)}
-                className="py-3.5 flex justify-between items-center text-xs hover:bg-emerald-50/40 px-3 rounded-2xl transition cursor-pointer group"
-              >
-                <div>
-                  <span className="font-mono font-bold text-slate-900 group-hover:text-emerald-700 transition">#{order.id.slice(0,8)}</span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{order.customer_email || 'Guest'} • {new Date(order.created_at).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-black text-slate-900 text-sm">₹{order.total_amount.toFixed(2)}</span>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
-                    order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' : 
-                    order.status === 'shipped' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {order.status}
-                  </span>
-                  <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl group-hover:bg-emerald-700 group-hover:text-white transition">
-                    <Eye size={14} />
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-xl font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1"
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <span className="text-stone-500 font-bold">Page {currentPage} of {totalPages}</span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-xl font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1"
+            >
+              Next <ChevronRight size={14} />
+            </button>
           </div>
         )}
       </div>
 
-      {/* DETAILED ORDER INSPECTION MODAL (WITH COMPLETE AGENT NAME, EMAIL & PHONE) */}
-      {selectedOrderDetails && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white text-slate-900 rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
-            
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
-              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                Order #{selectedOrderDetails.id.slice(0, 8)} Full Details
-              </h3>
-              <button onClick={() => setSelectedOrderDetails(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 transition">
-                <X size={16}/>
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center">
-                <span className="text-slate-500 font-bold">Order Status:</span>
-                <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
-                  selectedOrderDetails.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                  selectedOrderDetails.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {selectedOrderDetails.status}
-                </span>
-              </div>
-
-              {selectedOrderDetails.otp && (
-                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 flex justify-between items-center">
-                  <span className="text-emerald-900 font-bold">Delivery Verification OTP:</span>
-                  <span className="font-mono font-black text-emerald-700 text-sm tracking-widest bg-white px-3 py-1 rounded-xl border border-emerald-200">
-                    {selectedOrderDetails.otp}
-                  </span>
+      {/* Grid Sections: Registered Shops with Shopkeeper, Delivery Boys, Low Stock */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        {/* Registered Shops & Shopkeeper */}
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+          <h4 className="font-black text-slate-900 uppercase tracking-wider text-[11px] flex items-center justify-between">
+            <span>Registered Shops & Shopkeepers</span>
+            <Store size={15} className="text-purple-600" />
+          </h4>
+          <div className="space-y-3">
+            {shops.length === 0 ? (
+              <p className="text-stone-400 font-bold py-4 text-center">No shops registered.</p>
+            ) : (
+              shops.map((shop, i) => (
+                <div key={shop.id || i} className="p-3 rounded-2xl bg-stone-50 border border-stone-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-slate-900">{shop.shop_name || shop.name || 'Store'}</span>
+                    <span className="text-[9px] font-black bg-purple-100 text-purple-800 px-2 py-0.5 rounded-lg">Active</span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 font-bold">Shopkeeper: <span className="text-emerald-700">{shop.owner_name || shop.contact_person || 'Admin / Vendor'}</span></p>
+                  <p className="text-[10px] text-stone-400 truncate">Phone: {shop.phone || shop.contact || 'N/A'}</p>
                 </div>
-              )}
+              ))
+            )}
+          </div>
+        </div>
 
-              {/* ASSIGNED DELIVERY AGENT COMPLETE DETAILS (NAME, EMAIL, PHONE) */}
-              <div className="bg-blue-50/60 p-3.5 rounded-2xl border border-blue-200 space-y-2">
-                <p className="text-blue-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                  <Truck size={14} className="text-blue-700" /> Assigned Delivery Agent
-                </p>
-                {getAssignedAgent(selectedOrderDetails) ? (
-                  <div className="space-y-1 pt-0.5">
-                    <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-                      <User size={13} className="text-blue-600 shrink-0" />
-                      <span>{getAssignedAgent(selectedOrderDetails).name}</span>
+        {/* Delivery Boys Section */}
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+          <h4 className="font-black text-slate-900 uppercase tracking-wider text-[11px] flex items-center justify-between">
+            <span>Delivery Personnel</span>
+            <Truck size={15} className="text-blue-600" />
+          </h4>
+          <div className="space-y-3">
+            {deliveryBoys.length === 0 ? (
+              <p className="text-stone-400 font-bold py-4 text-center">No delivery boys registered.</p>
+            ) : (
+              deliveryBoys.map((boy, i) => (
+                <div key={boy.id || i} className="p-3 rounded-2xl bg-stone-50 border border-stone-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-slate-900">{boy.name || boy.full_name || 'Delivery Partner'}</span>
+                    <span className="text-[9px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg">Available</span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 font-bold">Phone: <span className="text-stone-800">{boy.phone || 'N/A'}</span></p>
+                  <p className="text-[10px] text-stone-400">Vehicle: {boy.vehicle_info || 'Bike / Scooter'}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Low Stock Alert Section (< 5) */}
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+          <h4 className="font-black text-rose-600 uppercase tracking-wider text-[11px] flex items-center justify-between">
+            <span>Low Stock Alert (&lt; 5)</span>
+            <AlertTriangle size={15} className="text-rose-500" />
+          </h4>
+          <div className="space-y-3">
+            {lowStockProducts.length === 0 ? (
+              <div className="py-8 text-center text-stone-400 font-bold">All inventory levels are healthy!</div>
+            ) : (
+              lowStockProducts.map((prod, i) => {
+                const variants = prod.product_variants || prod.variants || [];
+                const stockVal = variants.length > 0 ? variants[0].stock : prod.stock;
+                return (
+                  <div key={prod.id || i} className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50/50 border border-rose-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-stone-200 overflow-hidden shrink-0">
+                        <img src={prod.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=100&auto=format&fit=crop&q=80'} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="font-bold text-stone-900 truncate">{prod.name}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-slate-600 text-xs">
-                      <Mail size={13} className="text-blue-600 shrink-0" />
-                      <span>{getAssignedAgent(selectedOrderDetails).email}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-600 font-mono text-xs">
-                      <Phone size={13} className="text-blue-600 shrink-0" />
-                      <span>{getAssignedAgent(selectedOrderDetails).phone}</span>
+                    <span className="text-[10px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-lg shrink-0">Stock: {stockVal ?? 0}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Recently Added Products showing MRP, Selling Price, and Added By */}
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-2xs space-y-4">
+        <h3 className="font-black text-slate-900 uppercase tracking-wider text-[11px]">Recently Added Products & Pricing</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {recentProducts.length === 0 ? (
+            <p className="text-stone-400 font-bold py-4">No products found.</p>
+          ) : (
+            recentProducts.map((prod, i) => {
+              const variants = prod.product_variants || prod.variants || [];
+              const firstVariant = variants.length > 0 ? variants[0] : null;
+              
+              const sellingPrice = Number(firstVariant?.price ?? prod.price ?? prod.selling_price ?? 0);
+              const mrpPrice = Number(firstVariant?.mrp ?? prod.mrp ?? 0);
+              const shopkeeperName = prod.shopkeeper_profiles?.shop_name || prod.shopkeeper_profiles?.owner_name || prod.shop_name || prod.shopkeeper_name || 'Store Admin';
+
+              return (
+                <div key={prod.id || i} className="bg-stone-50 p-3 rounded-2xl border border-stone-200/60 flex flex-col justify-between space-y-2">
+                  <div className="w-full aspect-square bg-white rounded-xl overflow-hidden border border-stone-200/50 flex items-center justify-center">
+                    <img src={prod.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80'} alt={prod.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <h5 className="font-black text-slate-900 truncate">{prod.name}</h5>
+                    <p className="text-[10px] text-stone-400 font-bold truncate">By: <span className="text-emerald-700">{shopkeeperName}</span></p>
+                  </div>
+                  <div className="flex items-baseline justify-between pt-1 border-t border-stone-200/60">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-black text-slate-900 text-sm">₹{sellingPrice}</span>
+                      {mrpPrice > sellingPrice && (
+                        <span className="text-[10px] text-stone-400 line-through font-bold">₹{mrpPrice}</span>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <p className="text-slate-400 italic text-[11px]">No delivery agent assigned yet.</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Line Items</span>
-                <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100 max-h-48 overflow-y-auto">
-                  {detailedOrderItems.map(item => {
-                    const p = item.products || {};
-                    const itemImgs = p.images || p.gallery || [p.image_url].filter(Boolean);
-                    return (
-                      <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-emerald-100 last:border-0">
-                        <div className="flex items-center gap-3">
-                          <img src={itemImgs[0] || ''} alt="" className="w-10 h-10 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
-                          <div>
-                            <span className="font-black text-slate-900 block line-clamp-1">{p.name || 'Product'}</span>
-                            <span className="text-slate-500 font-medium text-[11px]">Qty: {item.quantity} • ₹{item.price * item.quantity}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-black text-slate-900 text-sm">Order Details #{selectedOrder.id?.slice(0, 8)}</h3>
+              <button onClick={() => setSelectedOrder(null)} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 font-black text-stone-600 flex items-center justify-center cursor-pointer">✕</button>
+            </div>
+            
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between bg-stone-50 p-2.5 rounded-xl">
+                <span className="text-stone-400 font-bold">Status:</span>
+                <span className="font-black uppercase text-emerald-600">{selectedOrder.status}</span>
+              </div>
+              <div className="flex justify-between bg-stone-50 p-2.5 rounded-xl">
+                <span className="text-stone-400 font-bold">Date:</span>
+                <span className="font-bold text-stone-800">{new Date(selectedOrder.created_at).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between bg-stone-50 p-2.5 rounded-xl">
+                <span className="text-stone-400 font-bold">Total Amount:</span>
+                <span className="font-black text-slate-900">₹{selectedOrder.total_amount || selectedOrder.total || 0}</span>
               </div>
 
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Customer & Delivery Address</p>
-                <p className="text-slate-900 font-bold">{selectedOrderDetails.customer_email || 'Guest'}</p>
-                <p className="text-slate-800 font-medium leading-snug mt-0.5">{selectedOrderDetails.delivery_address}</p>
-                <p className="text-slate-500 font-mono text-[11px] pt-0.5">Phone: {selectedOrderDetails.phone || 'N/A'}</p>
-              </div>
-
-              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
-                <span>Total Amount Paid:</span>
-                <span className="text-emerald-700">₹{selectedOrderDetails.total_amount}</span>
+              <div className="space-y-1.5 pt-2">
+                <p className="font-black text-stone-400 uppercase text-[10px]">Ordered Items</p>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {(selectedOrder.items || []).map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-stone-50 px-3 py-2 rounded-xl">
+                      <span className="font-bold text-stone-800 truncate pr-2">{item.name || 'Product'} (x{item.quantity || 1})</span>
+                      <span className="font-black text-slate-900">₹{(item.price || 0) * (item.quantity || 1)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <button 
-              onClick={() => setSelectedOrderDetails(null)}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-2xl font-black text-xs uppercase"
-            >
-              Close Details
-            </button>
-
+            <div className="pt-2">
+              <button 
+                onClick={() => setSelectedOrder(null)}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs transition cursor-pointer shadow-md"
+              >
+                Close Details
+              </button>
+            </div>
           </div>
         </div>
       )}

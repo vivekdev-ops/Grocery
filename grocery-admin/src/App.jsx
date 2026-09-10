@@ -45,6 +45,7 @@ import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
 import AboutPage from './components/pages/AboutPage';
+import AdminAboutUs from './components/AdminAboutUs';
 
 
 /* ─────────────────────────────────────────────
