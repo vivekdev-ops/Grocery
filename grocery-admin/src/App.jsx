@@ -262,7 +262,7 @@ function AdminLayout() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-  
+
   const fetchBadgeCounts = async () => {
     const { data: fbData } = await supabase
       .from('customer_feedbacks').select('status, category').eq('category', 'order_support');
@@ -274,7 +274,7 @@ function AdminLayout() {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <Login />;
-
+/*Comment*/
   const menuGroups = [
     {
       title: 'Overview',
