@@ -1965,43 +1965,44 @@ export default function CustomerStorefront() {
     )}
 
     {/* 2. Product Grid Component */}
-    <ProductGrid 
-      banners={banners}
-      currentSlide={currentSlide}
-      activeFlashSale={activeFlashSale}
-      timeLeft={timeLeft}
-      formatTime={formatTime}
-      categories={categories}
-      activeCategory={activeCategory}
-      setActiveCategory={setActiveCategory}
-      loading={loading}
-      products={products}
-      searchQuery={searchQuery}
-      filteredProducts={filteredProducts}
-      currentProducts={currentProducts}
-      totalPages={totalPages}
-      currentPage={currentPage}
-      setCurrentPage={setCurrentPage}
-      wishlistIds={wishlistIds}
-      toggleWishlist={toggleWishlist}
-      selectedVariants={selectedVariants}
-      setSelectedVariants={setSelectedVariants}
-      cart={cart}
-      addToCart={addToCart}
-      updateQuantity={updateQuantity}
-      sortBy={sortBy}
-      setSortBy={setSortBy}
-      onNavigate={navigate}
-      onOpenCart={() => setIsCartOpen(true)}
-      onSelectProduct={async (product) => {
-        setSelectedProductDetails(product);
-        setIsDescriptionExpanded(false);
-        const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-        setActiveGalleryImage(pImages[0] || '');
-        setImageZoomScale(1);
-        await fetchProductReviews(product.id);
-      }}
-    />
+    <ProductGrid
+  session={session}
+  banners={banners}
+  currentSlide={currentSlide}
+  activeFlashSale={activeFlashSale}
+  timeLeft={timeLeft}
+  formatTime={formatTime}
+  categories={categories}
+  activeCategory={activeCategory}
+  setActiveCategory={setActiveCategory}
+  loading={loading}
+  products={products}
+  searchQuery={searchQuery}
+  filteredProducts={filteredProducts}
+  currentProducts={currentProducts}
+  totalPages={totalPages}
+  currentPage={currentPage}
+  setCurrentPage={setCurrentPage}
+  wishlistIds={wishlistIds}
+  toggleWishlist={toggleWishlist}
+  selectedVariants={selectedVariants}
+  setSelectedVariants={setSelectedVariants}
+  cart={cart}
+  addToCart={addToCart}
+  updateQuantity={updateQuantity}
+  sortBy={sortBy}
+  setSortBy={setSortBy}
+  onNavigate={navigate}
+  onOpenCart={() => setIsCartOpen(true)}
+  onSelectProduct={async (product) => {
+    setSelectedProductDetails(product);
+    setIsDescriptionExpanded(false);
+    const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+    setActiveGalleryImage(pImages[0] || '');
+    setImageZoomScale(1);
+    await fetchProductReviews(product.id);
+  }}
+/>
 
     {/* Product Details Modal matching reference attachments */}
     {selectedProductDetails && (() => {

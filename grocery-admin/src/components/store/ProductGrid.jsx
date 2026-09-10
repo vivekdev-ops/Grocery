@@ -1,9 +1,10 @@
 // src/components/store/ProductGrid.jsx
-import { useState } from 'react';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
+import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct }) {
+function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct, boughtProductIds }) {
   const [addedFlash, setAddedFlash] = useState(false);
 
   const fallbackDummyImages = [
@@ -36,6 +37,9 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
   const stock = Number(activeVariant ? activeVariant.stock : product.stock || 0);
   const isOutOfStock = stock <= 0;
   const isWishlisted = wishlistIds?.includes(product.id);
+
+  // Check if the logged-in user has bought this product earlier
+  const isBoughtBefore = boughtProductIds?.has(product.id) || boughtProductIds?.has(product.name?.toLowerCase());
 
   const variantIdentifier = activeVariant ? (activeVariant.id || activeVariant.unit_label || activeVariant.label || 'default') : 'default';
   const cartItemId = `${product.id}-${variantIdentifier}`;
@@ -70,8 +74,13 @@ function ProductCard({ product, wishlistIds, toggleWishlist, selectedVariants, s
         <Heart size={16} className={isWishlisted ? 'fill-rose-500' : ''} />
       </button>
 
-      {/* Full square image layout */}
+      {/* Full square image layout with Top Badge */}
       <div className="relative w-full aspect-square bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center mb-3">
+        {isBoughtBefore && (
+  <div className="absolute top-2.5 left-2.5 z-20 bg-sky-50 text-sky-800 border border-sky-200/80 shadow-xs px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 backdrop-blur-md">
+    Bought Earlier
+  </div>
+)}
         <img 
           src={displayImage} 
           alt={product.name} 
@@ -139,7 +148,7 @@ export default function ProductGrid({
   banners, currentSlide, activeFlashSale, timeLeft, formatTime,
   categories, activeCategory, setActiveCategory, loading,
   products, searchQuery = '', wishlistIds, toggleWishlist, selectedVariants, setSelectedVariants,
-  cart = [], addToCart, updateQuantity, onSelectProduct, onNavigate, onOpenCart
+  cart = [], addToCart, updateQuantity, onSelectProduct, onNavigate, onOpenCart, session
 }) {
   const fallbackImages = [
     'https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&auto=format&fit=crop&q=80',
@@ -155,7 +164,43 @@ export default function ProductGrid({
 
   const [activeSubcategoryId, setActiveSubcategoryId] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [boughtProductIds, setBoughtProductIds] = useState(new Set());
   const productsPerPage = 12;
+
+  // Fetch past orders to determine which products were bought earlier by this user
+useEffect(() => {
+    const fetchUserPurchaseHistory = async () => {
+      if (!session?.user?.id) return;
+      
+      try {
+        // Query order_items joined with orders where customer_id matches the logged-in user
+        const { data: purchasedItems, error } = await supabase
+          .from('order_items')
+          .select(`
+            product_id,
+            variant_id,
+            orders!inner (
+              customer_id
+            )
+          `)
+          .eq('orders.customer_id', session.user.id);
+
+        if (!error && purchasedItems) {
+          const purchasedSet = new Set();
+          purchasedItems.forEach(item => {
+            if (item.product_id) {
+              purchasedSet.add(item.product_id);
+            }
+          });
+          setBoughtProductIds(purchasedSet);
+        }
+      } catch (err) {
+        console.error('Error fetching purchase history:', err);
+      }
+    };
+
+    fetchUserPurchaseHistory();
+  }, [session]);
 
   const parentCategories = activeCategories.filter(c => !c.parent_id);
   const getSubcategories = (parentId) => activeCategories.filter(c => c.parent_id === parentId);
@@ -182,9 +227,6 @@ export default function ProductGrid({
 
   const isAnyCategorySelected = activeCategory !== 'All' || query.length > 0;
   const activeCategoryObj = parentCategories.find(c => c.id === activeCategory);
-
-  // Calculate total quantity of items in cart for the bottom badge
-  const totalCartCount = (cart || []).reduce((acc, item) => acc + (item.quantity || 0), 0);
 
   return (
     <main className="w-full min-h-screen max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-10 mt-2 font-sans pb-36 text-slate-900">
@@ -271,6 +313,7 @@ export default function ProductGrid({
                       addToCart={addToCart}
                       updateQuantity={updateQuantity}
                       onSelectProduct={onSelectProduct}
+                      boughtProductIds={boughtProductIds}
                     />
                   ))}
                 </div>
@@ -368,6 +411,7 @@ export default function ProductGrid({
                   addToCart={addToCart}
                   updateQuantity={updateQuantity}
                   onSelectProduct={onSelectProduct}
+                  boughtProductIds={boughtProductIds}
                 />
               ))}
             </div>
@@ -403,6 +447,7 @@ export default function ProductGrid({
                   addToCart={addToCart}
                   updateQuantity={updateQuantity}
                   onSelectProduct={onSelectProduct}
+                  boughtProductIds={boughtProductIds}
                 />
               ))}
             </div>
@@ -411,7 +456,7 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* Fixed Bottom Navigation Bar with Cart Badge */}
+      {/* Fixed Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-stone-200/80 py-2.5 px-6 z-50 shadow-2xl max-w-lg mx-auto sm:max-w-none sm:rounded-t-3xl">
         <div className="flex items-center justify-between max-w-md mx-auto">
           <button 
@@ -437,15 +482,10 @@ export default function ProductGrid({
 
           <button 
             onClick={() => { if(onOpenCart) onOpenCart(); }}
-            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition group relative"
+            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition group"
           >
-            <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100 relative">
+            <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100">
               <ShoppingBag size={20} className="stroke-[2]" />
-              {totalCartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] w-4 h-4 rounded-full font-black flex items-center justify-center shadow-md animate-pulse">
-                  {totalCartCount}
-                </span>
-              )}
             </div>
             <span className="text-[10px] font-bold">Cart</span>
           </button>
