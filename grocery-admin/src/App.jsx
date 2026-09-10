@@ -45,6 +45,7 @@ import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
 import AboutPage from './components/pages/AboutPage';
+import AdminAboutUs from './components/AdminAboutUs'
 
 
 /* ─────────────────────────────────────────────
@@ -209,11 +210,11 @@ function AdminLayout() {
       const userId = currentSession.user.id;
 
       // 1. Check if user is a Shopkeeper (Block access)
-      const { data: shopkeeperCheck } = await supabase
-        .from('shopkeeper_profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+     const { data: shopkeeperCheck } = await supabase
+  .from('shopkeeper_profiles')
+  .select('id')
+  .eq('user_id', userId)
+  .maybeSingle();
 
       if (shopkeeperCheck) {
         alert("Access Denied: Shopkeepers cannot access the Admin panel.");
