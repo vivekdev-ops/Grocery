@@ -44,8 +44,6 @@ import CustomerOrdersPage from './components/CustomerOrdersPage';
 import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
-import AboutPage from './components/pages/AboutPage';
-import AdminAboutUs from './components/AdminAboutUs';
 
 
 /* ─────────────────────────────────────────────
@@ -326,7 +324,7 @@ function AdminLayout() {
       categories: <CategoryManager />, orders: <Orders />, staff: <Staff />,
       customers: <CustomerManagement />, shopkeeperDetails: <ShopkeeperDetailsAdmin />,
       deliveryFees: <DeliveryFeeManager />, storeLocation: <StoreLocationManager />,
-      storeStatus: <StoreStatusManager />, about_us: <AdminAboutUs />,
+      /*storeStatus: <StoreStatusManager />, about_us: <AdminAboutUs />,*/
       coupons: <CouponManager />, banners: <BannerManager />, flashSales: <FlashSaleManager />,
       testimonials: <TestimonialManager />, feedback: <AdminFeedbacks />,
     };
@@ -556,7 +554,6 @@ function AnimatedRoutes() {
         <Route path="/account/profile" element={<ProfilePage />} />
         <Route path="/account/wishlist" element={<WishlistPage />} />
         <Route path="/account/address" element={<AddressBookPage />} />
-        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </AnimatePresence>
   );
