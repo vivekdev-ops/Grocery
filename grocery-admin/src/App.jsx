@@ -45,7 +45,6 @@ import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
 import AboutPage from './components/pages/AboutPage';
-import AdminAboutUs from './components/AdminAboutUs';
 
 
 /* ─────────────────────────────────────────────
@@ -139,6 +138,7 @@ function AdminRouteGuard() {
       setSession(session);
       const userId = session.user.id;
 
+      // Check if user has an admin or manager role in staff_profiles
       const { data: staff } = await supabase
         .from('staff_profiles')
         .select('role')
@@ -147,9 +147,11 @@ function AdminRouteGuard() {
 
       const role = (staff?.role || '').toLowerCase();
       
+      // Allow only admin, manager, or staff roles
       if (role === 'admin' || role === 'manager' || role === 'staff') {
         setIsAuthorized(true);
       } else {
+        // Block customers, delivery partners, and shopkeepers
         alert("Access Denied: Customers and unauthorized roles cannot access the Admin panel.");
         await supabase.auth.signOut({ scope: 'local' });
         setIsAuthorized(false);
@@ -206,6 +208,7 @@ function AdminLayout() {
 
       const userId = currentSession.user.id;
 
+      // 1. Check if user is a Shopkeeper (Block access)
       const { data: shopkeeperCheck } = await supabase
         .from('shopkeeper_profiles')
         .select('id')
@@ -221,6 +224,7 @@ function AdminLayout() {
         return;
       }
 
+      // 2. Check Staff Role (Block delivery partners, allow admin/manager)
       const { data: staffCheck } = await supabase
         .from('staff_profiles')
         .select('role')
@@ -239,6 +243,7 @@ function AdminLayout() {
         return;
       }
 
+      // Valid Admin/Manager access
       setSession(currentSession);
       setLoading(false);
       registerPushToken(currentSession.user.id, 'admin');
@@ -273,14 +278,14 @@ function AdminLayout() {
     {
       title: 'Overview',
       items: [
-        { id: 'analytics', label: 'Dashboard',        icon: LayoutDashboard },
+        { id: 'analytics', label: 'Dashboard',         icon: LayoutDashboard },
         { id: 'reports',   label: 'Financial Reports',  icon: TrendingUp },
       ],
     },
     {
       title: 'Operations',
       items: [
-        { id: 'orders',    label: 'Orders',     icon: ShoppingCart, badge: pendingOrdersCount },
+        { id: 'orders',    label: 'Orders',    icon: ShoppingCart, badge: pendingOrdersCount },
         { id: 'inventory', label: 'Inventory', icon: Package },
         { id: 'categories',label: 'Categories',icon: FolderTree },
       ],
@@ -358,7 +363,7 @@ function AdminLayout() {
                 transition={{ duration: 0.18 }}
                 className="flex items-center gap-2.5 min-w-0 flex-1"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl flex items-center justify-center shadow-md shadow-brand-500/30 shrink-0">
+                <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center shadow-md shadow-brand-500/30 shrink-0">
                   <Sparkles size={14} className="text-white" />
                 </div>
                 <div className="min-w-0">
@@ -546,13 +551,11 @@ function AnimatedRoutes() {
         <Route path="/forgot-password" element={<PageWrap><ForgotPassword /></PageWrap>} />
         <Route path="/update-password" element={<PageWrap><UpdatePassword /></PageWrap>} />
         <Route path="/profile"         element={<PageWrap><CustomerProfile /></PageWrap>} />
-        <Route path="/account"         element={<PageWrap><ProfilePage /></PageWrap>} />
-        <Route path="/account/orders"  element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
+        <Route path="/account/orders" element={<PageWrap><CustomerOrdersPage /></PageWrap>} />
         <Route path="/account/profile" element={<ProfilePage />} />
         <Route path="/account/wishlist" element={<WishlistPage />} />
-        <Route path="/wishlist"        element={<PageWrap><WishlistPage /></PageWrap>} />
         <Route path="/account/address" element={<AddressBookPage />} />
-        <Route path="/about"           element={<PageWrap><AboutPage /></PageWrap>} />
+        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </AnimatePresence>
   );
