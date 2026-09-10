@@ -1,6 +1,6 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
-import { Search, MapPin, ChevronDown, Check } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Check, Package, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import NotificationBell from '../NotificationBell';
@@ -8,7 +8,7 @@ import NotificationBell from '../NotificationBell';
 export default function StoreHeader({
   session, customerProfile, showSearch = true,
   searchQuery = '', setSearchQuery, totalItemsCount = 0, onOpenCart, onOpenProfile,
-  sortBy = 'default', setSortBy, isCategorySelected = false
+  sortBy = 'default', setSortBy, isCategorySelected = false, categories = [], selectedCategory, onSelectCategory
 }) {
   const navigate = useNavigate();
   const [addressDisplay, setAddressDisplay] = useState('Fetching location...');
@@ -78,6 +78,9 @@ export default function StoreHeader({
     setIsAddressDropdownOpen(false);
   };
 
+  // Filter only parent categories and ensure they have an image or valid icon
+  const parentCategories = categories.filter(cat => !cat.parent_id);
+
   return (
     <header className="sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-xl backdrop-blur-md">
       
@@ -96,10 +99,10 @@ export default function StoreHeader({
         <div className="flex items-center justify-between gap-4">
           
           {/* Logo & Interactive Address Selector */}
-          <div className="flex items-center gap-3 min-w-0 relative">
+          <div className="flex items-center gap-3 min-w-0 relative shrink-0">
             <button
               onClick={() => navigate('/')}
-              className="flex items-center gap-2 cursor-pointer group shrink-0"
+              className="flex items-center gap-2 cursor-pointer group"
             >
               <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md text-white flex items-center justify-center font-black shadow-inner border border-white/20 group-hover:scale-105 transition">
                 KD
@@ -119,7 +122,7 @@ export default function StoreHeader({
                 {session?.user && savedAddresses.length > 0 && <ChevronDown size={12} className="shrink-0 text-emerald-200" />}
               </button>
 
-              {/* Popup Saved Addresses Dropdown for Logged-In Users */}
+              {/* Popup Saved Addresses Dropdown */}
               {isAddressDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-72 bg-white text-stone-900 rounded-2xl shadow-xl border border-stone-200/90 py-2 z-50 space-y-1">
                   <div className="px-3 py-1.5 border-b border-stone-100 flex items-center justify-between">
@@ -148,10 +151,80 @@ export default function StoreHeader({
             </div>
           </div>
 
-          {/* Right Action Icons (Wishlist, Cart, Profile removed as requested) */}
+          {/* Search Bar */}
+          {showSearch && (
+            <div className="hidden md:flex flex-1 max-w-xl mx-4 relative">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input
+                type="text"
+                value={searchQuery || ''}
+                onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+                placeholder="Search for groceries, vegetables, essentials..."
+                className="w-full bg-white text-stone-900 placeholder:text-stone-400 text-xs font-bold pl-11 pr-4 py-3 rounded-2xl shadow-inner outline-none focus:ring-2 focus:ring-emerald-300 transition"
+              />
+            </div>
+          )}
+
+          {/* Right Action Notification Bell */}
           <div className="flex items-center gap-3 shrink-0">
             <NotificationBell session={session} size={18} className="text-white hover:bg-white/20 p-2.5 rounded-xl transition" />
           </div>
+        </div>
+
+        {/* Mobile Search Bar Row */}
+        {showSearch && (
+          <div className="flex md:hidden relative w-full pt-1">
+            <Search size={16} className="absolute left-4 top-1/2 translate-y-[-25%] text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery || ''}
+              onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+              placeholder="Search for groceries, vegetables..."
+              className="w-full bg-white text-stone-900 placeholder:text-stone-400 text-xs font-bold pl-11 pr-4 py-2.5 rounded-2xl shadow-inner outline-none focus:ring-2 focus:ring-emerald-300 transition"
+            />
+          </div>
+        )}
+
+        {/* Parent Category Horizontal Strip Bar with Image Support */}
+        <div className="pt-2 pb-1 overflow-x-auto scrollbar-none flex items-center gap-3 md:gap-6">
+          <button
+            onClick={() => onSelectCategory && onSelectCategory(null)}
+            className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition pb-2 border-b-2 ${
+              !selectedCategory ? 'border-white text-white font-black' : 'border-transparent text-emerald-100 hover:text-white'
+            }`}
+          >
+            <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25 group-hover:scale-105 transition shadow-sm mb-1">
+              <Package size={22} className="text-white" />
+            </div>
+            <span className="text-[11px] font-black tracking-tight">All</span>
+          </button>
+
+          {parentCategories.map((cat) => {
+            const isSelected = selectedCategory === cat.id || selectedCategory === cat.name;
+            return (
+              <button
+                key={cat.id || cat.name}
+                onClick={() => onSelectCategory && onSelectCategory(cat.id || cat.name)}
+                className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition pb-2 border-b-2 relative ${
+                  isSelected ? 'border-white text-white font-black' : 'border-transparent text-emerald-100 hover:text-white'
+                }`}
+              >
+                {cat.isNew && (
+                  <span className="absolute -top-1 right-0 bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter shadow-md animate-pulse z-10">
+                    New
+                  </span>
+                )}
+                <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25 group-hover:scale-105 transition shadow-sm mb-1 overflow-hidden">
+                  {cat.image_url || cat.image ? (
+                    <img src={cat.image_url || cat.image} alt={cat.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-300" />
+                  ) : (
+                    <Sparkles size={20} className="text-white" />
+                  )}
+                </div>
+                <span className="text-[11px] font-black tracking-tight truncate max-w-[80px]">{cat.name}</span>
+              </button>
+            );
+          })}
         </div>
 
       </div>
