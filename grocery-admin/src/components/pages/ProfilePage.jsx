@@ -18,9 +18,11 @@ import {
   Info,
   Share2,
   Lock,
-  CreditCard
+  CreditCard,
+  Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import PortalBottomNav from '../PortalBottomNav';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -33,6 +35,17 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  
+  // Cart state for the bottom nav bar synchronization
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,6 +56,26 @@ export default function ProfilePage() {
         navigate('/login');
       }
     });
+
+    const handleCartUpdate = (e) => {
+      if (e.detail) {
+        setCart(e.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem('cart_items');
+          setCart(saved ? JSON.parse(saved) : []);
+        } catch (err) {
+          setCart([]);
+        }
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('storage', handleCartUpdate);
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('storage', handleCartUpdate);
+    };
   }, [navigate]);
 
   const fetchProfile = async (userId) => {
@@ -131,6 +164,9 @@ export default function ProfilePage() {
     navigate('/login');
   };
 
+  const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-emerald-50 via-stone-50 to-teal-50">
@@ -147,34 +183,33 @@ export default function ProfilePage() {
   const activeAvatar = avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans text-stone-900 pb-36 select-none flex flex-col w-full selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-emerald-50/20 to-teal-50/30 font-sans text-stone-900 pb-36 select-none flex flex-col w-full selection:bg-emerald-500 selection:text-white">
       
       {activeTab === 'edit' ? (
         <>
           {/* Top Header for Edit Mode */}
-          <header className="px-6 md:px-12 py-4 flex items-center justify-between border-b border-stone-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-30 shadow-xs w-full">
+          <header className="px-6 md:px-12 py-4 flex items-center justify-between border-b border-emerald-900/10 bg-white/80 backdrop-blur-md sticky top-0 z-30 shadow-xs w-full">
             <button 
               type="button"
               onClick={() => setActiveTab('menu')}
-              className="w-10 h-10 rounded-full bg-stone-100 hover:bg-emerald-50 hover:text-emerald-600 text-stone-700 flex items-center justify-center transition cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-stone-100 hover:bg-emerald-50 hover:text-emerald-600 text-stone-700 flex items-center justify-center transition cursor-pointer"
             >
               <ArrowLeft size={18} className="stroke-[2.5]" />
             </button>
-            <h1 className="font-black text-slate-900 text-base md:text-xl tracking-tight">Edit Profile</h1>
             <div className="w-10" />
           </header>
 
-          <main className="flex-1 max-w-3xl mx-auto px-4 md:px-8 py-8 md:py-12 w-full space-y-6">
-            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-12 shadow-xl shadow-stone-200/50 border border-stone-200/80 w-full">
+          <main className="flex-1 max-w-2xl mx-auto px-4 md:px-8 py-8 md:py-10 w-full space-y-6">
+            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-10 shadow-xl shadow-emerald-900/5 border border-emerald-100 w-full">
               <form onSubmit={handleUpdateProfile} className="space-y-6">
                 
                 {/* Avatar Section */}
-                <div className="flex flex-col items-center justify-center pt-2 pb-4">
+                <div className="flex flex-col items-center justify-center pt-2 pb-2">
                   <div className="relative group">
                     <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-stone-100 overflow-hidden border-4 border-emerald-500 shadow-xl flex items-center justify-center">
                       <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                     </div>
-                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center border-4 border-white shadow-lg cursor-pointer transition transform hover:scale-110 active:scale-95">
+                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center border-4 border-white shadow-lg cursor-pointer transition transform hover:scale-110 active:scale-95">
                       <Camera size={16} />
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                     </label>
@@ -184,13 +219,13 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Name Field */}
                   <div className="space-y-1.5">
-                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Name</label>
+                    <label className="block font-black text-emerald-700 uppercase tracking-wider text-[10px] px-1">Name</label>
                     <input 
                       type="text" 
                       required
                       value={fullName}
                       onChange={e => setFullName(e.target.value)}
-                      className="w-full px-4 py-3.5 border-2 border-emerald-400/80 rounded-2xl bg-white outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      className="w-full px-4 py-3.5 border-2 border-emerald-200 rounded-2xl bg-stone-50/50 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-xs md:text-sm transition shadow-2xs"
                       placeholder="Vivek Kumar"
                     />
                   </div>
@@ -202,43 +237,43 @@ export default function ProfilePage() {
                       type="email" 
                       disabled
                       value={displayEmail}
-                      className="w-full px-4 py-3.5 border-2 border-stone-200 rounded-2xl bg-stone-100/70 text-stone-500 font-bold text-sm cursor-not-allowed shadow-2xs"
+                      className="w-full px-4 py-3.5 border-2 border-stone-200 rounded-2xl bg-stone-100/70 text-stone-500 font-bold text-xs md:text-sm cursor-not-allowed shadow-2xs"
                     />
                   </div>
 
                   {/* Mobile Number Field */}
                   <div className="space-y-1.5">
-                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
+                    <label className="block font-black text-emerald-700 uppercase tracking-wider text-[10px] px-1">Mobile Number</label>
                     <input 
                       type="tel" 
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
-                      className="w-full px-4 py-3.5 border-2 border-emerald-400/80 rounded-2xl bg-white outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      className="w-full px-4 py-3.5 border-2 border-emerald-200 rounded-2xl bg-stone-50/50 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-xs md:text-sm transition shadow-2xs"
                       placeholder="+91 98765 43210"
                     />
                   </div>
 
                   {/* Enter Address Field */}
                   <div className="space-y-1.5">
-                    <label className="block font-black text-emerald-600 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
+                    <label className="block font-black text-emerald-700 uppercase tracking-wider text-[10px] px-1">Enter Address</label>
                     <input 
                       type="text" 
                       value={address}
                       onChange={e => setAddress(e.target.value)}
-                      className="w-full px-4 py-3.5 border-2 border-emerald-400/80 rounded-2xl bg-white outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-sm transition shadow-2xs"
+                      className="w-full px-4 py-3.5 border-2 border-emerald-200 rounded-2xl bg-stone-50/50 outline-none focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 font-bold text-stone-900 text-xs md:text-sm transition shadow-2xs"
                       placeholder="Sector 3, Kataria Market"
                     />
                   </div>
                 </div>
 
                 {/* Update Button */}
-                <div className="pt-4">
+                <div className="pt-2">
                   <button 
                     type="submit" 
                     disabled={saving}
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/25 transition transform active:scale-95 cursor-pointer uppercase tracking-wider text-xs md:text-sm flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition transform active:scale-95 cursor-pointer uppercase tracking-wider text-xs md:text-sm flex items-center justify-center gap-2"
                   >
-                    {saving ? 'Updating...' : 'Update Profile'}
+                    {saving ? 'Saving Changes...' : 'Save Profile Changes'}
                   </button>
                 </div>
 
@@ -248,226 +283,155 @@ export default function ProfilePage() {
         </>
       ) : (
         <>
-          {/* Top Banner Matching Reference Image */}
-          <div className="bg-emerald-500 text-white rounded-b-[3.5rem] px-6 md:px-16 py-12 md:py-16 shadow-xl relative overflow-hidden w-full">
-            <div className="max-w-4xl mx-auto w-full relative z-10">
-              <h1 className="text-center font-black text-xl md:text-3xl tracking-tight mb-8">My Profile</h1>
+          {/* Top Banner matching modern Store aesthetics */}
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white rounded-b-[3.5rem] px-6 md:px-16 pt-10 pb-16 md:pb-20 shadow-xl relative overflow-hidden w-full">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+            
+            <div className="max-w-xl mx-auto w-full relative z-10 flex flex-col items-center text-center">
+            
+              
 
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 text-center md:text-left">
-                <div className="flex flex-col md:flex-row items-center gap-6">
-                  <div className="relative group">
-                    <img 
-                      src={activeAvatar} 
-                      alt="Profile" 
-                      className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 border-white/90 shadow-2xl bg-white"
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setActiveTab('edit')}
-                      className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full flex items-center justify-center border-2 border-white shadow-xl cursor-pointer transition transform hover:scale-110 active:scale-95"
-                      title="Edit Avatar"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                  </div>
-
-                  <div className="min-w-0 space-y-1">
-                    <h2 className="font-black text-xl md:text-2xl truncate tracking-tight text-white">{displayName}</h2>
-                    <p className="text-xs md:text-sm text-emerald-100 font-medium truncate opacity-90">{displayEmail}</p>
-                  </div>
+              <div className="flex flex-col items-center gap-4 w-full">
+                <div className="relative group">
+                  <img 
+                    src={activeAvatar} 
+                    alt="Profile" 
+                    className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 border-white shadow-2xl bg-white"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab('edit')}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-900 hover:bg-emerald-950 text-white rounded-full flex items-center justify-center border-2 border-white shadow-lg cursor-pointer transition transform hover:scale-110 active:scale-95"
+                    title="Edit Avatar"
+                  >
+                    <Edit3 size={13} />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('edit')}
-                  className="hidden md:inline-flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-black px-5 py-2.5 rounded-2xl transition shadow-xs cursor-pointer uppercase tracking-wider"
-                >
-                  <Edit3 size={14} /> Edit Profile
-                </button>
+                <div className="space-y-1">
+                  <h2 className="font-black text-lg md:text-xl truncate tracking-tight text-white">{displayName}</h2>
+                  <p className="text-xs text-emerald-100 font-medium truncate opacity-90">{displayEmail}</p>
+                </div>
+
+                
               </div>
             </div>
           </div>
 
           {/* Floating Menu Card Overlay */}
-          <main className="flex-1 max-w-xl mx-auto px-4 md:px-0 -mt-8 md:-mt-10 w-full relative z-20 space-y-6">
-            <div className="bg-white rounded-[2.5rem] border border-stone-200/80 shadow-2xl shadow-stone-200/60 overflow-hidden divide-y divide-stone-100 text-xs md:text-sm">
+          <main className="flex-1 max-w-xl mx-auto px-4 md:px-0 -mt-8 md:-mt-10 w-full relative z-20 space-y-5 mb-10">
+            <div className="bg-white rounded-[2.5rem] border border-stone-200/90 shadow-2xl shadow-stone-200/50 overflow-hidden divide-y divide-stone-100 text-xs md:text-sm">
               
-              <button 
-                type="button"
-                onClick={() => setActiveTab('edit')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <User size={20} />
-                  </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Edit Profile</span>
-                </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
-              </button>
+              
 
-              <button 
-                type="button"
-                onClick={() => navigate('/update-password')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <Lock size={20} />
-                  </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Change Password</span>
-                </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
-              </button>
+              
 
               <button 
                 type="button"
                 onClick={() => navigate('/account/address')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <CreditCard size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <CreditCard size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Payment Method</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">Address</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/account/orders')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <Package size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <Package size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">My Orders</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">My Orders</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/about')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <Info size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <Info size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">About Us</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">About Us</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={handleShareApp}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <Share2 size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <Share2 size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Share App</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">Share App</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/privacy-policy')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <ShieldCheck size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <ShieldCheck size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Privacy Policy</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">Privacy Policy</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
               <button 
                 type="button"
                 onClick={() => navigate('/terms')}
-                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-stone-50 transition cursor-pointer text-left group"
+                className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-emerald-50/40 transition cursor-pointer text-left group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs">
-                    <FileText size={20} />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition shadow-2xs border border-emerald-100">
+                    <FileText size={18} />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">Terms & Conditions</span>
+                  <span className="font-extrabold text-slate-900 text-xs md:text-sm">Terms & Conditions</span>
                 </div>
-                <ChevronRight size={18} className="text-stone-400 group-hover:translate-x-0.5 transition" />
+                <ChevronRight size={17} className="text-stone-400 group-hover:translate-x-0.5 transition" />
               </button>
 
             </div>
 
             {/* Logout Button */}
-            <div className="pt-2 pb-10">
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white py-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider shadow-lg shadow-rose-500/10 transition duration-300 flex items-center justify-center gap-2 cursor-pointer border border-rose-200"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 py-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider shadow-sm transition duration-200 flex items-center justify-center gap-2 cursor-pointer border border-rose-200"
               >
-                <LogOut size={18} /> Logout
+                <LogOut size={16} /> Logout Account
               </button>
             </div>
           </main>
         </>
       )}
 
-      {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200/80 shadow-2xl">
-        <div className="flex items-center justify-around px-2 py-2.5 max-w-xl mx-auto">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Home"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
-              <Home size={22} />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/account/wishlist')}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Wishlist"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
-              <Heart size={22} />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Cart"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 transition">
-              <ShoppingBag size={22} />
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('menu')}
-            className="flex flex-col items-center p-2 cursor-pointer group"
-            title="Profile"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
-              <User size={22} />
-            </div>
-          </button>
-        </div>
-      </div>
+      {/* Global Bottom Navigation Bar */}
+      <PortalBottomNav 
+        totalItemsCount={totalItemsCount}
+        totalPrice={cartTotal}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
 
     </div>
   );

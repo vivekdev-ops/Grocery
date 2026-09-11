@@ -7,78 +7,73 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // Don't show bottom nav on admin or driver portals
   if (currentPath.startsWith('/admin') || currentPath.startsWith('/shopkeeper') || currentPath.startsWith('/delivery')) {
     return null;
   }
 
-  const navItems = [
-    { label: 'Home', path: '/', icon: Home },
-    { label: 'Orders', path: '/account/orders', icon: ClipboardList },
-    { label: 'Cart', action: onOpenCart, icon: ShoppingBag, badge: totalItemsCount },
-    { label: 'Profile', path: '/account/profile', icon: User },
-  ];
-
   return (
     <div className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg pb-safe">
-      
-      {/* Floating Cart Strip (Shows automatically when items are added) */}
-      {totalItemsCount > 0 && onOpenCart && (
-        <div className="px-3 pt-2 pb-1 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center font-black text-xs relative">
-              <ShoppingBag size={16} />
-              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black">
+      <div className="max-w-xl mx-auto px-4 py-1.5 flex items-center justify-around">
+        
+        {/* Home */}
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
+            currentPath === '/' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
+          }`}
+        >
+          <Home size={18} className={currentPath === '/' ? 'text-emerald-600 scale-110' : ''} />
+          <span className="text-[9.5px] tracking-tight mt-0.5">Home</span>
+        </button>
+
+        {/* Orders */}
+        <button
+          type="button"
+          onClick={() => navigate('/account/orders')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
+            currentPath === '/account/orders' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
+          }`}
+        >
+          <ClipboardList size={18} className={currentPath === '/account/orders' ? 'text-emerald-600 scale-110' : ''} />
+          <span className="text-[9.5px] tracking-tight mt-0.5">Orders</span>
+        </button>
+
+        {/* Cart Button with Dynamic Badge Count */}
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof onOpenCart === 'function') {
+              onOpenCart();
+            } else {
+              window.dispatchEvent(new CustomEvent('openCartDrawer'));
+            }
+          }}
+          className="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative text-stone-400 hover:text-stone-700 font-medium"
+        >
+          <div className="relative">
+            <ShoppingBag size={18} />
+            {totalItemsCount > 0 && (
+              <span className="absolute -top-1.5 -right-2.5 bg-rose-500 text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow-xs z-20">
                 {totalItemsCount}
               </span>
-            </div>
-            <div>
-              <p className="text-[10px] font-black leading-none">{totalItemsCount} {totalItemsCount === 1 ? 'Item' : 'Items'}</p>
-              <p className="text-[9px] text-emerald-100 font-medium">₹{totalPrice ? totalPrice.toFixed(2) : '0.00'}</p>
-            </div>
+            )}
           </div>
-          <button
-            onClick={onOpenCart}
-            className="bg-white text-emerald-800 text-[10px] font-black px-3.5 py-1.5 rounded-xl shadow-xs uppercase tracking-wider cursor-pointer hover:bg-emerald-50 transition"
-          >
-            View Cart
-          </button>
-        </div>
-      )}
+          <span className="text-[9.5px] tracking-tight mt-0.5">Cart</span>
+        </button>
 
-      {/* Main Navigation Bar */}
-      <div className="max-w-xl mx-auto px-4 py-1.5 flex items-center justify-around">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = item.path ? currentPath === item.path : false;
-          const badgeCount = item.badge !== undefined ? item.badge : (item.label === 'Cart' ? totalItemsCount : 0);
+        {/* Profile */}
+        <button
+          type="button"
+          onClick={() => navigate('/account/profile')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
+            currentPath === '/account/profile' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
+          }`}
+        >
+          <User size={18} className={currentPath === '/account/profile' ? 'text-emerald-600 scale-110' : ''} />
+          <span className="text-[9.5px] tracking-tight mt-0.5">Profile</span>
+        </button>
 
-          return (
-            <button
-              key={item.label}
-              onClick={() => {
-                if (typeof item.action === 'function') {
-                  item.action();
-                } else if (item.path) {
-                  navigate(item.path);
-                }
-              }}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
-                isActive ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
-              }`}
-            >
-              <div className="relative">
-                <Icon size={18} className={isActive ? 'text-emerald-600 scale-110' : ''} />
-                {badgeCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow-xs z-10">
-                    {badgeCount}
-                  </span>
-                )}
-              </div>
-              <span className="text-[9.5px] tracking-tight mt-0.5">{item.label}</span>
-            </button>
-          );
-        })}
       </div>
     </div>
   );

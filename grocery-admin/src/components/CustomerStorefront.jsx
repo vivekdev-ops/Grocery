@@ -100,6 +100,14 @@ export default function CustomerStorefront() {
   }, []);
 
   useEffect(() => {
+  const handleOpenCartEvent = () => setIsCartOpen(true);
+  window.addEventListener('openCartDrawer', handleOpenCartEvent);
+  return () => {
+    window.removeEventListener('openCartDrawer', handleOpenCartEvent);
+  };
+}, []);
+
+  useEffect(() => {
     const handleCartUpdate = (e) => {
       if (e.detail) {
         setCart(e.detail);
@@ -1118,8 +1126,7 @@ export default function CustomerStorefront() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50/60 via-emerald-50/40 to-teal-50/50 text-slate-900 pb-36 font-sans selection:bg-emerald-600 selection:text-white">
-       
+<div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-indigo-50/60 via-emerald-50/40 to-teal-50/50 text-slate-900 pb-16 font-sans selection:bg-emerald-600 selection:text-white">       
       {/* 1. StoreHeader Component */}
       <StoreHeader 
         session={session} 
@@ -1236,29 +1243,7 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {predictedRefillItems.length > 0 && (
-                <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-4 rounded-2xl border border-emerald-700 space-y-2 shadow-md">
-                  <div className="flex items-center gap-2 text-emerald-300 font-black">
-                    <Sparkles size={16} className="shrink-0" /> AI Smart Refill Basket
-                  </div>
-                  <p className="text-[11px] text-emerald-200">Based on your past orders, you might need these staples soon:</p>
-                  <div className="space-y-1.5 pt-1">
-                    {predictedRefillItems.map(p => (
-                      <div key={p.id} className="bg-white/10 p-2 rounded-xl flex items-center justify-between border border-emerald-500/30">
-                        <span className="font-bold truncate max-w-[180px]">{p.name}</span>
-                        <button 
-                          onClick={() => addToCart(p)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
-                          title="Add"
-                        >
-                          <Package size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              
               {/* My Orders Section */}
               <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
@@ -2136,93 +2121,42 @@ export default function CustomerStorefront() {
         );
       })()}
 
-      {/* Floating AI Grocery Concierge Chatbot Widget */}
-      <div className="fixed bottom-24 right-6 z-40">
-        {!isAiChatOpen ? (
-          <button 
-            onClick={() => setIsAiChatOpen(true)}
-            className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
-            title="Ask AI Grocery Assistant"
-          >
-            <Bot size={22} className="animate-bounce" />
-            <span className="hidden sm:inline">AI Assistant</span>
-          </button>
-        ) : (
-          <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
-            <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-500/30">
-                  <Bot size={18} />
-                </div>
-                <div>
-                  <h4 className="font-black text-sm">KD Store AI Concierge</h4>
-                  <p className="text-[10px] text-emerald-200">Ask for recipes or grocery items</p>
-                </div>
-              </div>
-              <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer" title="Close"><X size={16}/></button>
-            </div>
+      
 
-            <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
-              {aiChatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
-                    msg.sender === 'user' ? 'bg-emerald-600 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
-              <input 
-                type="text" 
-                placeholder="e.g. Add ingredients for tea..." 
-                value={aiInputText}
-                onChange={e => setAiInputText(e.target.value)}
-                className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
-              />
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm" title="Send">
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
-
-      {/* 3. Cart Drawer Component */}
-      <CartDrawer 
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        totalItemsCount={totalItemsCount}
-        session={session}
-        savedAddresses={savedAddresses}
-        selectedAddressId={selectedAddressId}
-        handleSelectAddress={handleSelectAddress}
-        showAddAddressBox={showAddAddressBox}
-        setShowAddAddressBox={handleToggleAddAddressBox}
-        newAddressForm={newAddressForm}
-        setNewAddressForm={setNewAddressForm}
-        detectCustomerLocation={() => {}}
-        handleAddAddress={handleAddAddress}
-        handleDeleteAddress={handleDeleteAddress}
-        updateQuantity={updateQuantity}
-        appliedCoupon={appliedCoupon}
-        setAppliedCoupon={setAppliedCoupon}
-        couponInput={couponInput}
-        setCouponInput={setCouponInput}
-        handleApplyCoupon={handleApplyCoupon}
-        removeCoupon={() => { setAppliedCoupon(null); setDiscountAmount(0); }}
-        cartSubtotal={cartSubtotal}
-        discountAmount={discountAmount}
-        selectedAddressDistance={selectedAddressDistance}
-        deliveryFee={deliveryFee}
-        cartTotal={cartTotal}
-        checkingOut={checkingOut}
-        handleCheckout={handleCheckout}
-        navigate={navigate}
-      />
+{/* 3. Cart Drawer Component */}
+<CartDrawer 
+  isOpen={isCartOpen}
+  onClose={() => setIsCartOpen(false)}
+  cart={cart}
+  totalItemsCount={totalItemsCount}
+  session={session}
+  savedAddresses={savedAddresses}
+  selectedAddressId={selectedAddressId}
+  handleSelectAddress={handleSelectAddress}
+  showAddAddressBox={showAddAddressBox}
+  setShowAddAddressBox={handleToggleAddAddressBox}
+  newAddressForm={newAddressForm}
+  setNewAddressForm={setNewAddressForm}
+  detectCustomerLocation={() => {}}
+  handleAddAddress={handleAddAddress}
+  handleDeleteAddress={handleDeleteAddress}
+  updateQuantity={updateQuantity}
+  appliedCoupon={appliedCoupon}
+  setAppliedCoupon={setAppliedCoupon}
+  couponInput={couponInput}
+  setCouponInput={setCouponInput}
+  handleApplyCoupon={handleApplyCoupon}
+  removeCoupon={() => { setAppliedCoupon(null); setDiscountAmount(0); }}
+  cartSubtotal={cartSubtotal}
+  discountAmount={discountAmount}
+  selectedAddressDistance={selectedAddressDistance}
+  deliveryFee={deliveryFee}
+  cartTotal={cartTotal}
+  checkingOut={checkingOut}
+  handleCheckout={handleCheckout}
+  navigate={navigate}
+  addToCart={addToCart}
+/>
 
       {/* Invoice Modal */}
       <InvoiceModal 
@@ -2235,11 +2169,11 @@ export default function CustomerStorefront() {
       <CustomerFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
       {/* 3. Bottom Nav Component */}
-      <PortalBottomNav 
-        totalItemsCount={totalItemsCount}
-        totalPrice={cartTotal}
-        onOpenCart={() => setIsCartOpen(true)}
-      />
+<PortalBottomNav 
+  totalItemsCount={totalItemsCount}
+  totalPrice={cartTotal}
+  onOpenCart={() => setIsCartOpen(true)}
+/>
 
     </div>
   );

@@ -44,7 +44,6 @@ import CustomerOrdersPage from './components/CustomerOrdersPage';
 import ProfilePage from './components/pages/ProfilePage';
 import AddressBookPage from './components/pages/AddressBookPage';
 import WishlistPage from './components/pages/WishlistPage';
-import PortalBottomNav from './components/PortalBottomNav';
 
 
 /* ─────────────────────────────────────────────
@@ -536,7 +535,7 @@ function AdminLayout() {
 function AnimatedRoutes() {
   const location = useLocation();
   return (
-    <div className="pb-16"> {/* Ensures bottom content doesn't get hidden behind bottom nav */}
+    <div className="pb-16">
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/"                element={<PageWrap><CustomerStorefront /></PageWrap>} />
@@ -557,7 +556,6 @@ function AnimatedRoutes() {
           <Route path="/account/address" element={<AddressBookPage />} />
         </Routes>
       </AnimatePresence>
-      <PortalBottomNav />
     </div>
   );
 }

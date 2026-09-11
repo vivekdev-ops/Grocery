@@ -1,6 +1,6 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
-import { Search, MapPin, ChevronDown, Check, Package, Sparkles, Flame, Apple, Baby, Headphones, Sparkle, Home as HomeIcon, Zap } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Check, Package, Sparkles, Flame, Apple, Baby, Headphones, Sparkle, Home as HomeIcon, Zap, SlidersHorizontal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import NotificationBell from '../NotificationBell';
@@ -105,10 +105,10 @@ export default function StoreHeader({
   const parentCategories = activeCategories.filter(c => !c.parent_id);
 
   return (
-    <header className={`sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white shadow-xl backdrop-blur-md transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+    <header className={`sticky top-0 z-40 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-100/60 shadow-md backdrop-blur-md transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
       
       {/* Top Brand & Delivery Banner */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-3 pb-2 flex items-center justify-between gap-3">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-3.5 pb-2.5 flex items-center justify-between gap-3 border-b border-emerald-900/10">
         
         {/* Logo & Delivery Location Picker */}
         <div className="flex items-center gap-3 min-w-0 relative shrink-0">
@@ -116,25 +116,25 @@ export default function StoreHeader({
             onClick={() => navigate('/')}
             className="flex items-center cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center font-black text-sm shadow-md border border-white/30 group-hover:scale-105 transition overflow-hidden p-1">
+            <div className="w-10 h-10 rounded-2xl bg-white text-emerald-700 flex items-center justify-center font-black text-sm shadow-sm border border-emerald-200 group-hover:scale-105 transition overflow-hidden p-1">
               <img src={logoImg} alt="KD Store Logo" className="w-full h-full object-contain" />
             </div>
           </button>
           
           <div className="min-w-0 relative">
             <div className="flex items-center gap-1.5">
-              <span className="font-black text-white text-xs tracking-wider uppercase bg-emerald-900/50 px-2 py-0.5 rounded-md border border-emerald-400/30 flex items-center gap-1 shadow-xs">
-                <Zap size={10} className="text-amber-400 fill-amber-400" /> KD Store
+              <span className="font-black text-emerald-800 text-xs tracking-wider uppercase bg-emerald-200/50 px-2 py-0.5 rounded-md border border-emerald-300/60 flex items-center gap-1 shadow-2xs">
+                <Zap size={10} className="text-amber-500 fill-amber-500" /> KD Store
               </span>
             </div>
             
             <button
               onClick={() => session?.user && savedAddresses.length > 0 && setIsAddressDropdownOpen(!isAddressDropdownOpen)}
-              className="text-[11px] text-emerald-100 font-medium truncate flex items-center gap-1 hover:text-white transition cursor-pointer text-left opacity-95 leading-tight mt-1"
+              className="text-[11px] text-stone-600 font-medium truncate flex items-center gap-1 hover:text-emerald-800 transition cursor-pointer text-left leading-tight mt-1"
             >
-              <MapPin size={12} className="text-emerald-300 shrink-0" />
+              <MapPin size={12} className="text-emerald-600 shrink-0" />
               <span className="truncate max-w-[180px] sm:max-w-xs">{addressDisplay}</span>
-              {session?.user && savedAddresses.length > 0 && <ChevronDown size={11} className="shrink-0 text-emerald-200" />}
+              {session?.user && savedAddresses.length > 0 && <ChevronDown size={11} className="shrink-0 text-stone-400" />}
             </button>
 
             {isAddressDropdownOpen && (
@@ -174,30 +174,30 @@ export default function StoreHeader({
               value={searchQuery || ''}
               onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
               placeholder="Search groceries, vegetables..."
-              className="w-full bg-white text-stone-900 placeholder:text-stone-400 text-xs font-medium pl-10 pr-4 py-2.5 rounded-2xl shadow-md outline-none focus:ring-2 focus:ring-emerald-300 transition border border-stone-200/80"
+              className="w-full bg-white text-stone-900 placeholder:text-stone-400 text-xs font-medium pl-10 pr-4 py-2.5 rounded-2xl shadow-sm outline-none focus:ring-2 focus:ring-emerald-400 transition border border-stone-200/80"
             />
           </div>
         )}
 
         {/* Right Action Notification Bell */}
         <div className="flex items-center gap-2 shrink-0">
-          <NotificationBell session={session} size={18} className="text-white hover:bg-white/20 p-2.5 rounded-2xl transition shadow-xs" />
+          <NotificationBell session={session} size={18} className="text-emerald-700 hover:bg-emerald-200/40 p-2.5 rounded-2xl transition shadow-2xs border border-emerald-200/50 bg-white" />
         </div>
       </div>
 
       {/* Seamless Integrated Category Strip with Pure White Background for Content Merging */}
-      <div className="bg-white text-slate-900 px-4 sm:px-8 pt-3 pb-3.5 rounded-b-[2.5rem] shadow-lg border-t border-emerald-500/20 max-w-[1600px] mx-auto">
+      <div className="bg-white text-slate-900 px-4 sm:px-8 pt-3 pb-3.5 rounded-b-[2.5rem] shadow-md border-t border-emerald-100 max-w-[1600px] mx-auto">
         <div className="overflow-x-auto scrollbar-none flex items-center gap-6">
           <button
             onClick={() => setActiveCategory && setActiveCategory('All')}
             className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition relative w-18 text-center ${
-              activeCategory === 'All' ? 'text-emerald-600 font-black' : 'text-stone-700 hover:text-slate-900 font-bold'
+              activeCategory === 'All' ? 'text-emerald-700 font-black' : 'text-stone-600 hover:text-slate-900 font-bold'
             }`}
           >
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-105 transition shadow-2xs mb-1 mx-auto border ${
-              activeCategory === 'All' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-stone-50 border-stone-200/80 text-stone-700'
+              activeCategory === 'All' ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-xs' : 'bg-stone-50 border-stone-200/80 text-stone-600'
             }`}>
-              <Package size={20} className={activeCategory === 'All' ? 'text-emerald-600' : 'text-stone-700'} />
+              <Package size={20} className={activeCategory === 'All' ? 'text-emerald-700' : 'text-stone-600'} />
             </div>
             <span className="text-xs tracking-tight leading-tight line-clamp-1 w-full">All</span>
             {activeCategory === 'All' && (
@@ -217,16 +217,16 @@ export default function StoreHeader({
                 key={cat.id || cat.name}
                 onClick={() => setActiveCategory && setActiveCategory(cat.id)}
                 className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition relative w-18 text-center ${
-                  isSelected ? 'text-emerald-600 font-black' : 'text-stone-700 hover:text-slate-900 font-bold'
+                  isSelected ? 'text-emerald-700 font-black' : 'text-stone-600 hover:text-slate-900 font-bold'
                 }`}
               >
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-105 transition shadow-2xs mb-1 overflow-hidden p-1 mx-auto border ${
-                  isSelected ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-stone-50 border-stone-200/80 text-stone-700'
+                  isSelected ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-xs' : 'bg-stone-50 border-stone-200/80 text-stone-600'
                 }`}>
                   {catImage ? (
                     <img src={catImage} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
                   ) : (
-                    <FallbackIconComponent size={20} className={isSelected ? 'text-emerald-600' : 'text-stone-700'} />
+                    <FallbackIconComponent size={20} className={isSelected ? 'text-emerald-700' : 'text-stone-600'} />
                   )}
                 </div>
                 <span className="text-xs tracking-tight leading-tight line-clamp-1 w-full">{cat.name}</span>

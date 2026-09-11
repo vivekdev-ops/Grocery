@@ -37,6 +37,7 @@ import { supabase } from '../supabaseClient';
 import StoreHeader from './store/StoreHeader';
 import Footer from './Footer';
 import InvoiceModal from './InvoiceModal';
+import PortalBottomNav from '../components/PortalBottomNav';
 
 
 /* =========================================================
@@ -400,6 +401,17 @@ const CustomerOrdersPage = () => {
 
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
+  // Cart state for the bottom nav bar synchronization
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
 
   /* =======================================================
      AUTH INITIALIZATION
@@ -467,6 +479,22 @@ const CustomerOrdersPage = () => {
 
     initialize();
 
+    const handleCartUpdate = (e) => {
+      if (e.detail) {
+        setCart(e.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem('cart_items');
+          setCart(saved ? JSON.parse(saved) : []);
+        } catch (err) {
+          setCart([]);
+        }
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('storage', handleCartUpdate);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         navigate('/login');
@@ -476,6 +504,8 @@ const CustomerOrdersPage = () => {
     return () => {
       mounted = false;
       subscription?.unsubscribe();
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('storage', handleCartUpdate);
     };
   }, [navigate]);
 
@@ -927,19 +957,18 @@ const CustomerOrdersPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 font-sans text-xs">
-        <StoreHeader session={authUser} customerProfile={user} showSearch={false} />
-
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto mb-2" />
             <p className="text-stone-500 font-bold">Loading...</p>
           </div>
         </div>
-
-        <Footer />
       </div>
     );
   }
+
+  const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
 
   /* =======================================================
@@ -947,27 +976,29 @@ const CustomerOrdersPage = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 pb-28 md:pb-12 font-sans selection:bg-emerald-500 selection:text-white text-xs">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-emerald-50/20 to-teal-50/30 text-stone-900 pb-36 font-sans selection:bg-emerald-500 selection:text-white text-xs">
       
-      {/* Top Header matching reference */}
-      <div className="bg-white border-b border-stone-200/80 px-4 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-2xs">
+      {/* Top Header matching modern store aesthetics */}
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white px-4 md:px-12 py-5 flex items-center gap-4 sticky top-0 z-30 shadow-md">
         <button
           onClick={() => navigate('/')}
-          className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition cursor-pointer"
+          className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer border border-white/20"
+          title="Back to Home"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={18} className="stroke-[2.5]" />
         </button>
-        <h1 className="font-black text-slate-900 text-base tracking-tight">Order History</h1>
+        <div>
+          <h1 className="font-black text-white text-base md:text-xl tracking-tight">Order History</h1>
+          <p className="text-[11px] text-emerald-100 font-medium">Track, manage and review your purchases</p>
+        </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-
-       
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {/* =================================================
             FILTERS & SEARCH SECTION
         ================================================= */}
-        <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-4 space-y-3">
+        <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 shadow-xl shadow-emerald-950/5 p-4 sm:p-5 space-y-4">
           {/* Search Input Bar updated to "Search Order" */}
           <div className="relative w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
@@ -975,20 +1006,20 @@ const CustomerOrdersPage = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Order"
-              className="w-full bg-stone-50 border border-stone-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all shadow-2xs"
+              placeholder="Search Order by ID or Product Name..."
+              className="w-full bg-stone-50/70 border-2 border-stone-200/80 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-2xs"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
               >
                 <X size={14} />
               </button>
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
             {/* Status Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               {[
@@ -1000,9 +1031,9 @@ const CustomerOrdersPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3.5 py-2 rounded-2xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
                     statusFilter === tab.id
-                      ? 'bg-emerald-500 text-white shadow-xs'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/20'
                       : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
                   }`}
                 >
@@ -1016,7 +1047,7 @@ const CustomerOrdersPage = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-stone-100 border border-stone-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-stone-800 outline-none cursor-pointer"
+                className="bg-stone-100 border-2 border-stone-200 rounded-2xl px-3.5 py-2 text-[11px] font-bold text-stone-800 outline-none cursor-pointer focus:border-emerald-600 transition"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -1032,13 +1063,13 @@ const CustomerOrdersPage = () => {
         ================================================= */}
         <section>
           {loadingOrders ? (
-            <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mx-auto mb-3" />
+            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 p-12 text-center shadow-xl">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
               <p className="text-stone-500 font-bold">Loading your orders...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs space-y-3">
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100">
+            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 p-12 text-center shadow-xl space-y-3">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto border border-emerald-100 shadow-inner">
                 <Package className="w-8 h-8" />
               </div>
               <div>
@@ -1048,7 +1079,7 @@ const CustomerOrdersPage = () => {
               {!searchTerm && statusFilter === 'all' && (
                 <button
                   onClick={() => navigate('/')}
-                  className="mt-2 px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-md cursor-pointer transition active:scale-95"
+                  className="mt-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black shadow-lg shadow-emerald-600/20 cursor-pointer transition active:scale-95 uppercase tracking-wider text-xs"
                 >
                   Start Shopping
                 </button>
@@ -1065,7 +1096,7 @@ const CustomerOrdersPage = () => {
                 const isCancelled = normalizeOrderStatus(status) === 'CANCELLED';
                 const isPending = String(status).toLowerCase().trim() === 'pending' || String(status).toLowerCase().trim() === 'placed';
 
-                // Display delivery duration or status message matching screenshot style
+                // Display delivery duration or status message matching design style
                 const deliveredAtTime = order?.delivered_at || order?.updated_at;
                 const durationStr = calculateDeliveryDuration(order?.created_at, deliveredAtTime);
                 const arrivalHeader = isDelivered 
@@ -1077,15 +1108,15 @@ const CustomerOrdersPage = () => {
                 return (
                   <div
                     key={orderId}
-                    className="bg-white rounded-3xl border border-stone-200/80 shadow-xs hover:shadow-md transition duration-300 overflow-hidden p-4 space-y-4"
+                    className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 shadow-xl shadow-emerald-950/5 hover:shadow-2xl transition duration-300 overflow-hidden p-5 space-y-4"
                   >
-                    {/* Top Row: Green Check Badge, Title, Subtitle, 3-dots Menu */}
+                    {/* Top Row: Green Check Badge, Title, Subtitle, Actions */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                          isDelivered ? 'bg-emerald-50 text-emerald-500 border border-emerald-100' :
-                          isCancelled ? 'bg-rose-50 text-rose-500 border border-rose-100' :
-                          'bg-amber-50 text-amber-500 border border-amber-100'
+                      <div className="flex items-center gap-3.5">
+                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+                          isDelivered ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                          isCancelled ? 'bg-rose-50 text-rose-600 border border-rose-200' :
+                          'bg-amber-50 text-amber-600 border border-amber-200'
                         }`}>
                           {isCancelled ? <X size={20} /> : <Check size={20} className="stroke-[3]" />}
                         </div>
@@ -1099,12 +1130,12 @@ const CustomerOrdersPage = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {isPending && (
                           <button
                             onClick={() => handleCancelOrder(order)}
                             disabled={cancellingOrderId === orderId}
-                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-[10px] font-black text-rose-600 disabled:opacity-50 cursor-pointer transition"
+                            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-[10px] font-black text-rose-600 disabled:opacity-50 cursor-pointer transition border border-rose-200"
                             title="Cancel Order"
                           >
                             Cancel
@@ -1112,7 +1143,7 @@ const CustomerOrdersPage = () => {
                         )}
                         <button
                           onClick={() => setSelectedOrder(order)}
-                          className="p-1 text-stone-400 hover:text-stone-700 cursor-pointer rounded-full hover:bg-stone-100 transition"
+                          className="p-2 text-stone-400 hover:text-stone-700 cursor-pointer rounded-xl hover:bg-stone-100 transition"
                           title="Options"
                         >
                           <MoreVertical size={18} />
@@ -1120,7 +1151,7 @@ const CustomerOrdersPage = () => {
                       </div>
                     </div>
 
-                    {/* Products Horizontal Scroll / Grid matching screenshot style */}
+                    {/* Products Horizontal Scroll */}
                     <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
                       {items.map((item, index) => {
                         const product = item?.products;
@@ -1131,12 +1162,12 @@ const CustomerOrdersPage = () => {
                           product?.gallery?.[0] ||
                           '';
 
-                        if (index >= 4 && items.length > 5) return null; // Show up to 4 items and +X badge if many
+                        if (index >= 4 && items.length > 5) return null;
 
                         return (
                           <div
                             key={item?.id || index}
-                            className="w-16 h-16 bg-stone-50 rounded-2xl border border-stone-100 flex items-center justify-center p-2 shrink-0 relative"
+                            className="w-16 h-16 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-center justify-center p-2 shrink-0 relative shadow-2xs"
                             title={product?.name || 'Product'}
                           >
                             {image ? (
@@ -1145,7 +1176,7 @@ const CustomerOrdersPage = () => {
                               <Package className="w-6 h-6 text-stone-300" />
                             )}
                             {item.quantity > 1 && (
-                              <span className="absolute bottom-1 right-1 bg-stone-900 text-white font-black text-[9px] px-1 rounded-md">
+                              <span className="absolute bottom-1 right-1 bg-slate-900 text-white font-black text-[9px] px-1.5 py-0.2 rounded-md shadow-2xs">
                                 x{item.quantity}
                               </span>
                             )}
@@ -1154,18 +1185,18 @@ const CustomerOrdersPage = () => {
                       })}
 
                       {items.length > 5 && (
-                        <div className="w-16 h-16 bg-stone-100 rounded-2xl border border-stone-200 flex items-center justify-center text-stone-600 font-black text-xs shrink-0">
+                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-center text-emerald-700 font-black text-xs shrink-0 shadow-2xs">
                           +{items.length - 4}
                         </div>
                       )}
                     </div>
 
-                    {/* Bottom Split Buttons: Reorder | View Details matching screenshot */}
+                    {/* Bottom Split Buttons: Reorder | View Details */}
                     <div className="grid grid-cols-2 divide-x divide-stone-100 border-t border-stone-100 pt-3 text-center">
                       <button
                         onClick={() => handleReorder(order)}
                         disabled={reorderingOrderId === orderId}
-                        className="text-emerald-500 hover:text-emerald-600 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                        className="text-emerald-600 hover:text-emerald-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
                       >
                         {reorderingOrderId === orderId ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1175,7 +1206,7 @@ const CustomerOrdersPage = () => {
 
                       <button
                         onClick={() => setSelectedOrder(order)}
-                        className="text-emerald-500 hover:text-emerald-600 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                        className="text-emerald-600 hover:text-emerald-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
                       >
                         <span>View Details</span>
                       </button>
@@ -1189,52 +1220,27 @@ const CustomerOrdersPage = () => {
 
       </main>
 
-
-      {/* =========================================================
-          MOBILE BOTTOM NAVIGATION BAR
-      ========================================================= */}
-      <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-stone-200 shadow-2xl">
-        <div className="flex items-center justify-around px-2 py-2">
-          <button
-            onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-1.5 cursor-pointer group"
-            title="Home"
-          >
-            <div className="w-10 h-10 bg-stone-100 group-active:bg-stone-200 rounded-xl flex items-center justify-center">
-              <Home size={18} className="text-stone-700" />
-            </div>
-          </button>
-
-          <button
-            onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center p-1.5 cursor-pointer group"
-            title="Orders"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
-              <Package size={18} />
-            </div>
-          </button>
-        </div>
-      </div>
-
-
-      <Footer />
-
+      {/* Global Bottom Navigation Bar */}
+      <PortalBottomNav 
+        totalItemsCount={totalItemsCount}
+        totalPrice={cartTotal}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
 
       {/* ===================================================
           ORDER DETAILS & TRACKING MODAL
       =================================================== */}
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs font-sans">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-stone-100"
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-emerald-100"
           >
-            <div className="sticky top-0 z-10 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4 flex items-center justify-between">
               <div>
-                <h2 className="font-black text-stone-900 text-sm">
+                <h2 className="font-black text-slate-900 text-base">
                   Order {getDisplayOrderId(selectedOrder)}
                 </h2>
                 <p className="text-[11px] text-stone-400 font-medium">
@@ -1244,7 +1250,7 @@ const CustomerOrdersPage = () => {
 
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer transition"
+                className="w-9 h-9 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center cursor-pointer transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1252,8 +1258,8 @@ const CustomerOrdersPage = () => {
 
             <div className="p-6 space-y-5">
               {/* TRACKING PROGRESS */}
-              <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                <h3 className="font-black text-stone-900 mb-3 text-[11px] uppercase tracking-wider">Live Tracking Status</h3>
+              <div className="bg-emerald-50/30 p-4 rounded-3xl border border-emerald-100">
+                <h3 className="font-black text-slate-900 mb-3 text-[11px] uppercase tracking-wider">Live Tracking Status</h3>
                 <div className="overflow-x-auto pb-1">
                   <div className="flex min-w-[420px]">
                     {getTrackingSteps(selectedOrder).map((step, index, allSteps) => {
@@ -1265,7 +1271,7 @@ const CustomerOrdersPage = () => {
                             <div
                               className={`w-8 h-8 rounded-full flex items-center justify-center border shrink-0 transition-all ${
                                 step.completed || step.active
-                                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/30'
                                   : 'bg-white border-stone-300 text-stone-400'
                               }`}
                             >
@@ -1275,7 +1281,7 @@ const CustomerOrdersPage = () => {
                             {index < allSteps.length - 1 && (
                               <div
                                 className={`h-1 flex-1 mx-1.5 rounded-full ${
-                                  step.completed ? 'bg-emerald-500' : 'bg-stone-200'
+                                  step.completed ? 'bg-emerald-600' : 'bg-stone-200'
                                 }`}
                               />
                             )}
@@ -1283,7 +1289,7 @@ const CustomerOrdersPage = () => {
 
                           <p
                             className={`text-[11px] mt-2 font-bold truncate ${
-                              step.active ? 'text-emerald-600 font-black' : 'text-stone-500'
+                              step.active ? 'text-emerald-700 font-black' : 'text-stone-500'
                             }`}
                           >
                             {step.label}
@@ -1298,10 +1304,10 @@ const CustomerOrdersPage = () => {
               {/* ── OTP BANNER IN MODAL ── */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                    <ShieldCheck size={16} className="text-emerald-500" /> Delivery Verification OTP:
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-600" /> Delivery Verification OTP:
                   </span>
-                  <span className="font-mono font-black text-lg text-emerald-600 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-200 shadow-xs">
+                  <span className="font-mono font-black text-lg text-emerald-700 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-300 shadow-xs">
                     {selectedOrder?.otp || '----'}
                   </span>
                 </div>
@@ -1309,7 +1315,7 @@ const CustomerOrdersPage = () => {
 
               {/* FULFILLMENT DURATION */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
                   <span className="font-black flex items-center gap-2 text-xs">
                     <CheckCircle2 size={18} /> Successfully delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
                   </span>
@@ -1318,7 +1324,7 @@ const CustomerOrdersPage = () => {
 
               {/* ITEMS IN MODAL */}
               <div>
-                <h3 className="font-black text-stone-900 mb-3 text-[11px] uppercase tracking-wider">Ordered Items</h3>
+                <h3 className="font-black text-slate-900 mb-3 text-[11px] uppercase tracking-wider">Ordered Items</h3>
                 <div className="space-y-2.5">
                   {(Array.isArray(selectedOrder?.order_items) ? selectedOrder.order_items : []).map((item, index) => {
                     const product = item?.products;
@@ -1333,9 +1339,9 @@ const CustomerOrdersPage = () => {
                     return (
                       <div
                         key={item?.id || index}
-                        className="flex items-center gap-3.5 border border-stone-200/80 rounded-2xl p-3 bg-white shadow-2xs"
+                        className="flex items-center gap-3.5 border border-emerald-100 rounded-2xl p-3 bg-emerald-50/20 shadow-2xs"
                       >
-                        <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center overflow-hidden shrink-0 border border-stone-100">
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-emerald-200">
                           {image ? (
                             <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
@@ -1344,17 +1350,17 @@ const CustomerOrdersPage = () => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p className="font-black text-stone-900 text-xs truncate">
+                          <p className="font-black text-slate-900 text-xs truncate">
                             {product?.name || 'Product'}
                           </p>
                           {variant && (
-                            <p className="text-[11px] text-emerald-600 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
+                            <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
                           )}
                           <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <p className="font-black text-stone-900 text-xs">{formatCurrency(item?.price)}</p>
+                          <p className="font-black text-slate-900 text-xs">{formatCurrency(item?.price)}</p>
                         </div>
                       </div>
                     );
@@ -1366,7 +1372,7 @@ const CustomerOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
                   <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-500" /> Delivery Address
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Delivery Address
                   </h4>
                   <p className="text-stone-700 font-medium leading-relaxed text-xs">
                     {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
@@ -1375,9 +1381,9 @@ const CustomerOrdersPage = () => {
 
                 <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
                   <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-500" /> Payment Info
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment Info
                   </h4>
-                  <p className="font-black text-stone-900 text-xs">Cash on Delivery (COD)</p>
+                  <p className="font-black text-slate-900 text-xs">Cash on Delivery (COD)</p>
                   <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-600' : 'text-amber-700'}`}>
                     Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid / Completed' : 'Pending Payment'}
                   </p>
@@ -1404,7 +1410,7 @@ const CustomerOrdersPage = () => {
                 </div>
 
                 <div className="flex justify-between pt-3 border-t border-stone-200 font-black text-sm">
-                  <span className="text-stone-900">Total Amount</span>
+                  <span className="text-slate-900">Total Amount</span>
                   <span className="text-emerald-600 text-base">{formatCurrency(getOrderTotal(selectedOrder))}</span>
                 </div>
               </div>
@@ -1417,7 +1423,7 @@ const CustomerOrdersPage = () => {
                       onClick={() => setInvoiceOrder(selectedOrder)}
                       className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 font-black text-stone-800 cursor-pointer transition text-xs shadow-2xs"
                     >
-                      <FileText className="w-4 h-4 text-emerald-500" /> Download Invoice
+                      <FileText className="w-4 h-4 text-emerald-600" /> Download Invoice
                     </button>
 
                     <button
@@ -1430,7 +1436,7 @@ const CustomerOrdersPage = () => {
                     <button
                       onClick={() => handleReorder(selectedOrder)}
                       disabled={reorderingOrderId === getOrderId(selectedOrder)}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-500/20 active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-600/20 active:scale-95"
                     >
                       {reorderingOrderId === getOrderId(selectedOrder) ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1453,21 +1459,21 @@ const CustomerOrdersPage = () => {
       =================================================== */}
 
       {ratingOrder && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs">
+        <div className="fixed inset-0 z-[60] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs font-sans">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-stone-100"
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-emerald-100"
           >
             <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50 sticky top-0 bg-white z-10">
               <div>
-                <h2 className="font-black text-stone-900 text-sm">Rate & Review Products</h2>
+                <h2 className="font-black text-slate-900 text-sm">Rate & Review Products</h2>
                 <p className="text-[11px] text-stone-400 font-medium">Order {getDisplayOrderId(ratingOrder)}</p>
               </div>
 
               <button
                 onClick={() => setRatingOrder(null)}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer transition"
+                className="w-9 h-9 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center cursor-pointer transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1494,7 +1500,7 @@ const CustomerOrdersPage = () => {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-black text-stone-900 text-xs truncate">{product?.name || 'Product'}</p>
+                          <p className="font-black text-slate-900 text-xs truncate">{product?.name || 'Product'}</p>
                           <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {item.quantity}</p>
                         </div>
                       </div>
@@ -1522,7 +1528,7 @@ const CustomerOrdersPage = () => {
                         value={currentData.comment}
                         onChange={(e) => handleProductRatingChange(prodId, 'comment', e.target.value)}
                         placeholder="Write a helpful review for this product..."
-                        className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium transition"
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium transition"
                       />
                     </div>
                   );
@@ -1539,7 +1545,7 @@ const CustomerOrdersPage = () => {
                 <button
                   onClick={handleSubmitAllProductRatings}
                   disabled={savingRating}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 transition text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition text-xs"
                 >
                   {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Submit All Reviews
