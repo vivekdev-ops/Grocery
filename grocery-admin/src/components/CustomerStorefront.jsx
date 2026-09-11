@@ -4,16 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
   Package, X, User, MapPin, ChevronRight, ChevronDown, LogOut, Trash2, 
-  FileText, Heart, ArrowRight, Store, Navigation, MessageSquarePlus, Ban, 
-  Star, RotateCcw, MessageCircle, CheckCircle, LifeBuoy, AlertCircle, Clock, ShieldCheck,
-  Sparkles, Bot, Mic, MicOff, Search, Send, Banknote, RefreshCw, DoorOpen, ZoomIn, ZoomOut, Plus, Minus, ArrowLeft
+  FileText, Heart, MessageSquarePlus, Ban, Star, CheckCircle, LifeBuoy, 
+  Sparkles, Bot, Search, Send, Plus, Minus, ArrowLeft, ShoppingBag
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
-// import Footer from './Footer';
 import CustomerFeedbackModal from './CustomerFeedbackModal';
+import PortalBottomNav from './PortalBottomNav';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -57,6 +56,9 @@ export default function CustomerStorefront() {
   const [selectedProfileOrder, setSelectedProfileOrder] = useState(null);
   const [orderTab, setOrderTab] = useState('active'); // 'active' | 'delivered' | 'cancelled'
   const [userReviewsMap, setUserReviewsMap] = useState({});
+
+  // Invoice Modal State
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
   // Order Section Review Modal State
   const [reviewModalProduct, setReviewModalProduct] = useState(null);
@@ -125,7 +127,6 @@ export default function CustomerStorefront() {
   // Product Details Modal State & Gallery Preview & Reviews
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   const [activeGalleryImage, setActiveGalleryImage] = useState('');
-  const [imageZoomScale, setImageZoomScale] = useState(1);
   const [productReviews, setProductReviews] = useState([]);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -223,9 +224,6 @@ export default function CustomerStorefront() {
     }
   };
 
-  // Invoice Modal State
-  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
-
   // Selected Variants State for each product
   const [selectedVariants, setSelectedVariants] = useState({});
 
@@ -236,6 +234,74 @@ export default function CustomerStorefront() {
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+     
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponInput.trim().toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error || !data) {
+        alert("Invalid or inactive coupon code.");
+        return;
+      }
+
+      if (data.expiry_date) {
+        const expiry = new Date(data.expiry_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (expiry < today) {
+          alert("This coupon has expired.");
+          return;
+        }
+      }
+
+      if (data.usage_limit_type === 'one_time') {
+        const userEmail = session?.user?.email || session?.user?.user_metadata?.email;
+        if (!userEmail) {
+          alert("Please log in to use this one-time coupon.");
+          return;
+        }
+
+        const { data: pastOrders, error: orderError } = await supabase
+          .from('orders')
+          .select('id, coupon_code, customer_email')
+          .eq('customer_email', userEmail)
+          .eq('coupon_code', data.code);
+
+        if (orderError) {
+          alert(`Could not verify usage history: ${orderError.message}`);
+          return;
+        }
+
+        if (pastOrders && pastOrders.length > 0) {
+          alert("You have already used this one-time coupon on a previous order.");
+          return;
+        }
+      }
+
+      if (cartSubtotal < (data.min_order_value || 0)) {
+        alert(`Minimum order value of ₹${data.min_order_value} required for this coupon.`);
+        return;
+      }
+
+      let discount = data.discount_type === 'percentage' 
+        ? (cartSubtotal * data.discount_value) / 100 
+        : data.discount_value;
+
+      setDiscountAmount(Math.min(discount, cartSubtotal));
+      setAppliedCoupon(data);
+      setCouponInput('');
+      alert("Coupon applied successfully!");
+    } catch (err) {
+      alert(`Failed to apply coupon: ${err.message || err}`);
+    }
+  };
 
   // Addresses State
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -388,13 +454,10 @@ export default function CustomerStorefront() {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [banners]);
+  const fetchBanners = async () => {
+    const { data } = await supabase.from('banners').select('*').eq('is_active', true).order('display_order', { ascending: true });
+    if (data) setBanners(data);
+  };
 
   const fetchStoreData = async () => {
     setLoading(true);
@@ -559,7 +622,7 @@ export default function CustomerStorefront() {
         });
         setAiChatMessages(prev => [
           ...prev, 
-          { sender: 'ai', text: `I found matching items for your request! I've added **${addedNames.join(', ')}** to your cart. Ready for fast 10-minute delivery.` }
+          { sender: 'ai', text: `I found matching items for your request! I've added **${addedNames.join(', ')}** to your cart. Ready for fast delivery.` }
         ]);
       } else {
         setAiChatMessages(prev => [
@@ -661,7 +724,9 @@ export default function CustomerStorefront() {
   };
 
   const toggleWishlist = async (productId, e) => {
-    e.stopPropagation();
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
     if (!session) { navigate('/login'); return; }
 
     const isAlreadyWishlisted = wishlistIds.includes(productId);
@@ -685,11 +750,6 @@ export default function CustomerStorefront() {
   const fetchDeliveryRules = async () => {
     const { data } = await supabase.from('delivery_rules').select('*');
     if (data) setDeliveryRules(data);
-  };
-
-  const fetchBanners = async () => {
-    const { data } = await supabase.from('banners').select('*').eq('is_active', true).order('display_order', { ascending: true });
-    if (data) setBanners(data);
   };
 
   const fetchMyOrders = async (email) => {
@@ -976,95 +1036,6 @@ export default function CustomerStorefront() {
     }
   }, [cartSubtotal]);
 
-  const handleApplyCoupon = async () => {
-    if (!couponInput.trim()) return;
-     
-    try {
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', couponInput.trim().toUpperCase())
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error || !data) {
-        alert("Invalid or inactive coupon code.");
-        return;
-      }
-
-      if (data.expiry_date) {
-        const expiry = new Date(data.expiry_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (expiry < today) {
-          alert("This coupon has expired.");
-          return;
-        }
-      }
-
-      if (data.usage_limit_type === 'one_time') {
-        const userEmail = session?.user?.email || session?.user?.user_metadata?.email;
-        if (!userEmail) {
-          alert("Please log in to use this one-time coupon.");
-          return;
-        }
-
-        const { data: pastOrders, error: orderError } = await supabase
-          .from('orders')
-          .select('id, coupon_code, customer_email')
-          .eq('customer_email', userEmail)
-          .eq('coupon_code', data.code);
-
-        if (orderError) {
-          alert(`Could not verify usage history: ${orderError.message}`);
-          return;
-        }
-
-        if (pastOrders && pastOrders.length > 0) {
-          alert("You have already used this one-time coupon on a previous order.");
-          return;
-        }
-      }
-
-      if (cartSubtotal < (data.min_order_value || 0)) {
-        alert(`Minimum order value of ₹${data.min_order_value} required for this coupon.`);
-        return;
-      }
-
-      if (data.product_id) {
-        const hasEligibleProduct = cart.some(item => (item.product?.id || item.id || item.product_id) === data.product_id);
-        if (!hasEligibleProduct) {
-          alert("This coupon is only valid for a specific product in your cart.");
-          return;
-        }
-      }
-
-      if (data.category_id) {
-        const hasEligibleCategory = cart.some(item => (item.product?.category_id || item.category_id) === data.category_id);
-        if (!hasEligibleCategory) {
-          alert("This coupon is only valid for items from a specific category.");
-          return;
-        }
-      }
-
-      let discount = data.discount_type === 'percentage' 
-        ? (cartSubtotal * data.discount_value) / 100 
-        : data.discount_value;
-
-      setDiscountAmount(Math.min(discount, cartSubtotal));
-      setAppliedCoupon(data);
-      setCouponInput('');
-      alert("Coupon applied successfully!");
-    } catch (err) {
-      alert(`Failed to apply coupon: ${err.message || err}`);
-    }
-  };
-
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
-    setDiscountAmount(0);
-  };
-
   const cartTotal = Math.max(0, cartSubtotal - discountAmount) + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -1088,7 +1059,7 @@ export default function CustomerStorefront() {
     if (sortBy === 'rating_desc') {
       const ratingA = Number(a.avgRating || a.rating || 0);
       const ratingB = Number(b.avgRating || b.rating || 0);
-      return ratingB - ratingB;
+      return ratingB - ratingA;
     }
     return 0;
   });
@@ -1098,7 +1069,6 @@ export default function CustomerStorefront() {
   const currentProducts = sortedProducts.slice(indexOfFirstProduct, indexOfLastProduct);
   const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
 
-  // Full-screen loading splash screen until categories, subcategories, and products are fully loaded
   if (checkingStatus || loading) {
     return (
       <div className="fixed inset-0 bg-slate-950 z-[9999] flex items-center justify-center overflow-hidden">
@@ -1108,10 +1078,10 @@ export default function CustomerStorefront() {
           className="w-full h-full object-cover filter brightness-75 animate-pulse"
         />
         <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs flex flex-col items-center justify-center space-y-3">
-          <div className="w-12 h-12 bg-purple-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl animate-bounce">
+          <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl animate-bounce">
             KD
           </div>
-          <p className="text-white font-black text-xs uppercase tracking-widest bg-slate-900/80 px-4 py-2 rounded-full border border-purple-500/30">
+          <p className="text-white font-black text-xs uppercase tracking-widest bg-slate-900/80 px-4 py-2 rounded-full border border-emerald-500/30">
             Opening KD Store...
           </p>
         </div>
@@ -1136,141 +1106,62 @@ export default function CustomerStorefront() {
             className="absolute inset-0 w-full h-full object-cover filter brightness-50"
           />
         )}
-        <div className="relative z-10 max-w-md w-full space-y-4 bg-slate-900/90 backdrop-blur-md border border-purple-500/30 p-8 rounded-3xl shadow-2xl">
-          <div className="w-14 h-14 bg-purple-600 text-white rounded-2xl flex items-center justify-center mx-auto border border-purple-400/30 font-black text-xl shadow-xl">
+        <div className="relative z-10 max-w-md w-full space-y-4 bg-slate-900/90 backdrop-blur-md border border-emerald-500/30 p-8 rounded-3xl shadow-2xl">
+          <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto border border-emerald-400/30 font-black text-xl shadow-xl">
             KD
           </div>
           <h1 className="text-xl font-black tracking-tight text-white">We'll be back soon!</h1>
-          <p className="text-purple-200 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
+          <p className="text-emerald-200 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
         </div>
       </div>
     );
   }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50/60 via-purple-50/40 to-pink-50/50 text-slate-900 pb-36 font-sans selection:bg-purple-600 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50/60 via-emerald-50/40 to-teal-50/50 text-slate-900 pb-36 font-sans selection:bg-emerald-600 selection:text-white">
        
-      {/* 1. Header Component */}
+      {/* 1. StoreHeader Component */}
       <StoreHeader 
-  session={session} 
-  customerProfile={customerProfile}
-  searchQuery={searchQuery} 
-  setSearchQuery={setSearchQuery} 
-  totalItemsCount={totalItemsCount} 
-  onOpenProfile={() => setIsProfileOpen(true)} 
-  onOpenCart={() => setIsCartOpen(true)}
-  categories={categories}
-  activeCategory={activeCategory}
-  setActiveCategory={setActiveCategory}
-  sortBy={sortBy}
-  setSortBy={setSortBy}
-/>
-
-      {personalizedDeals.length > 0 && activeCategory === 'All' && !searchQuery && (
-        <div className="max-w-7xl mx-auto px-4 mt-6">
-          <div className="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl space-y-5 border border-purple-500/30 relative overflow-hidden">
-            <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
-              <Sparkles size={180} />
-            </div>
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-400/30 text-purple-300">
-                  <Sparkles size={20} className="animate-pulse" />
-                </div>
-                <h3 className="font-black text-base md:text-xl tracking-tight text-purple-100">Deals Picked For Your Routine</h3>
-              </div>
-              <span className="text-[10px] bg-purple-500/20 text-purple-300 font-black px-3.5 py-1.5 rounded-full border border-purple-500/30 uppercase tracking-widest shadow-inner">Limited Time</span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
-              {personalizedDeals.map(deal => {
-                const prod = deal.products;
-                if (!prod) return null;
-                 
-                const pImages = prod.images || prod.gallery || [prod.image_url].filter(Boolean);
-                 
-                const originalPrice = Number(prod.price || prod.mrp || 0);
-                const baseMrp = Number(prod.mrp || originalPrice);
-
-                const badgeText = String(deal.discount_tag || deal.discount_badge || deal.badge_label || '');
-                const matchPercent = badgeText.match(/(\d+)\s*%/);
-                const extractedPercent = matchPercent ? parseInt(matchPercent[1], 10) : 0;
-
-                let finalPrice = originalPrice;
-                let displayMrp = baseMrp > originalPrice ? baseMrp : null;
-
-                if (extractedPercent > 0) {
-                  if (!displayMrp || displayMrp <= originalPrice) {
-                    displayMrp = originalPrice;
-                  }
-                  finalPrice = Math.round(displayMrp * (1 - extractedPercent / 100));
-                }
-                 
-                const productWithDealPrice = { ...prod, price: finalPrice, mrp: displayMrp || originalPrice };
-
-                return (
-                  <div key={deal.id} className="bg-white/10 hover:bg-white/15 p-4 rounded-3xl border border-purple-500/20 flex flex-col justify-between space-y-3 backdrop-blur-md transition-all duration-300 group shadow-lg">
-                    <div className="space-y-2">
-                      <div className="relative h-36 rounded-2xl overflow-hidden bg-black/20 flex items-center justify-center p-2 border border-purple-500/20">
-                        <img src={pImages[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" />
-                         
-                        {badgeText && (
-                          <span className="absolute top-2 left-2 bg-pink-600 text-white font-black text-[9px] px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider">
-                            {badgeText}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="font-bold text-xs text-white line-clamp-1 group-hover:text-purple-200 transition">{prod.name}</h4>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-purple-500/20">
-                      <div>
-                        <span className="font-black text-sm md:text-base text-purple-200">₹{finalPrice}</span>
-                        {displayMrp && displayMrp > finalPrice && (
-                          <span className="text-[10px] text-purple-300/60 line-through ml-1.5 font-bold">₹{displayMrp}</span>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => addToCart(productWithDealPrice)}
-                        className="bg-purple-600 hover:bg-purple-500 text-white px-3.5 py-2 rounded-xl font-black text-xs transition cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
-                        title="Add"
-                      >
-                        <Package size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+        session={session} 
+        customerProfile={customerProfile}
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery} 
+        totalItemsCount={totalItemsCount} 
+        onOpenProfile={() => setIsProfileOpen(true)} 
+        onOpenCart={() => setIsCartOpen(true)}
+        categories={categories}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+      />
 
       {/* Profile & Dashboard Drawer */}
       {isProfileOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-[999] transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
-            <div className="p-6 border-b border-purple-100 flex justify-between items-center bg-purple-50/50">
+            <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
               <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5">
-                <User size={20} className="text-purple-600 shrink-0" /> 
+                <User size={20} className="text-emerald-600 shrink-0" /> 
                 <span className="truncate">My Account & Dashboard</span>
               </h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-purple-100/60 rounded-full text-slate-600 hover:bg-purple-100 transition cursor-pointer" title="Close"><X size={16} /></button>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer" title="Close"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 p-4 rounded-2xl shadow-2xs">
-                <p className="text-[10px] text-purple-700 uppercase font-black tracking-widest">Signed in as</p>
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
+                <p className="text-[10px] text-emerald-700 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
 
               {/* Edit Profile Section */}
-              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'profile_edit' ? null : 'profile_edit')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <User size={16} className="text-purple-600 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
+                    <User size={16} className="text-emerald-600 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
                   </span>
                   {openSection === 'profile_edit' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
@@ -1295,7 +1186,7 @@ export default function CustomerStorefront() {
                       setCustomerProfile(updates);
                       alert('Profile updated successfully!');
                     }
-                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100">
+                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     <div className="space-y-1 pt-2">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Full Name</label>
                       <input 
@@ -1303,7 +1194,7 @@ export default function CustomerStorefront() {
                         name="fullName"
                         placeholder="Enter your name" 
                         defaultValue={customerProfile?.full_name || ''}
-                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
                       />
                     </div>
                     <div className="space-y-1">
@@ -1313,43 +1204,18 @@ export default function CustomerStorefront() {
                         name="phone"
                         placeholder="+91 98765 43210" 
                         defaultValue={customerProfile?.phone || ''}
-                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
                       />
                     </div>
                      
                     <div className="space-y-1.5">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Profile Avatar</label>
-                      <p className="text-[10px] text-stone-400">Choose a preset avatar or paste a custom image URL below:</p>
-                      <div className="flex gap-2 py-1 overflow-x-auto">
-                        {[
-                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
-                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Zack',
-                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Mimi',
-                          'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo'
-                        ].map((presetUrl, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              const urlInput = document.getElementById('avatarUrlInput');
-                              if (urlInput) urlInput.value = presetUrl;
-                            }}
-                            className="w-10 h-10 rounded-full border-2 border-purple-200 overflow-hidden shrink-0 hover:scale-105 transition bg-purple-50 cursor-pointer flex items-center justify-center"
-                            title="Select preset avatar"
-                          >
-                            <img src={presetUrl} alt="Preset" className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-
                       <input 
-                        id="avatarUrlInput"
                         type="url" 
                         name="avatarUrl"
                         placeholder="https://example.com/avatar.jpg" 
                         defaultValue={customerProfile?.avatar_url || ''}
-                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium" 
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
                       />
                     </div>
 
@@ -1360,10 +1226,10 @@ export default function CustomerStorefront() {
                         rows="2"
                         placeholder="e.g. Organic, Snacks, Dairy..." 
                         defaultValue={customerProfile?.interests || ''}
-                        className="w-full border border-purple-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-purple-600 font-medium resize-none" 
+                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium resize-none" 
                       />
                     </div>
-                    <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
+                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
                       Save Profile Changes
                     </button>
                   </form>
@@ -1371,18 +1237,18 @@ export default function CustomerStorefront() {
               </div>
 
               {predictedRefillItems.length > 0 && (
-                <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-4 rounded-2xl border border-purple-700 space-y-2 shadow-md">
-                  <div className="flex items-center gap-2 text-pink-300 font-black">
+                <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-4 rounded-2xl border border-emerald-700 space-y-2 shadow-md">
+                  <div className="flex items-center gap-2 text-emerald-300 font-black">
                     <Sparkles size={16} className="shrink-0" /> AI Smart Refill Basket
                   </div>
-                  <p className="text-[11px] text-purple-200">Based on your past orders, you might need these staples soon:</p>
+                  <p className="text-[11px] text-emerald-200">Based on your past orders, you might need these staples soon:</p>
                   <div className="space-y-1.5 pt-1">
                     {predictedRefillItems.map(p => (
-                      <div key={p.id} className="bg-white/10 p-2 rounded-xl flex items-center justify-between border border-purple-500/30">
+                      <div key={p.id} className="bg-white/10 p-2 rounded-xl flex items-center justify-between border border-emerald-500/30">
                         <span className="font-bold truncate max-w-[180px]">{p.name}</span>
                         <button 
                           onClick={() => addToCart(p)}
-                          className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-lg font-black text-[10px] cursor-pointer shrink-0"
                           title="Add"
                         >
                           <Package size={12} />
@@ -1394,13 +1260,13 @@ export default function CustomerStorefront() {
               )}
 
               {/* My Orders Section */}
-              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Package size={16} className="text-purple-600 shrink-0" /> 
+                    <Package size={16} className="text-emerald-600 shrink-0" /> 
                     <span className="truncate">My Orders ({myOrders.length})</span>
                   </span>
                   {openSection === 'orders' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
@@ -1415,7 +1281,7 @@ export default function CustomerStorefront() {
                     const showOtp = order.status !== 'delivered' && order.status !== 'cancelled';
 
                     return (
-                      <div key={order.id} className="p-3.5 bg-purple-50/20 rounded-2xl border border-purple-100 space-y-2">
+                      <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
                         <div className="flex justify-between items-center gap-2">
                           <span className="font-mono font-bold text-slate-900 truncate">#{order.id.slice(0, 8)}</span>
                           <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black shrink-0 ${
@@ -1425,14 +1291,14 @@ export default function CustomerStorefront() {
                         </div>
 
                         {showOtp && (
-                          <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-purple-200 rounded-2xl p-2.5 flex items-center justify-between">
+                          <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-2.5 flex items-center justify-between">
                             <div>
-                              <span className="text-[9px] font-black uppercase tracking-wider text-purple-800 block">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block">
                                 Delivery OTP
                               </span>
                               <p className="text-[9px] text-stone-500">Show to delivery partner</p>
                             </div>
-                            <div className="bg-white px-3 py-1 rounded-xl border border-purple-300 font-mono font-black text-sm text-purple-700 tracking-widest shadow-2xs">
+                            <div className="bg-white px-3 py-1 rounded-xl border border-emerald-300 font-mono font-black text-sm text-emerald-700 tracking-widest shadow-2xs">
                               {order.otp || '----'}
                             </div>
                           </div>
@@ -1445,7 +1311,7 @@ export default function CustomerStorefront() {
                         <div className="flex gap-1.5 pt-1">
                           <button 
                             onClick={() => setSelectedProfileOrder(order)}
-                            className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-purple-200 cursor-pointer"
+                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
                           >
                             <FileText size={14} className="shrink-0" />
                             <span>Details</span>
@@ -1456,16 +1322,16 @@ export default function CustomerStorefront() {
                   };
 
                   return (
-                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100 text-xs">
+                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100 text-xs">
                       {myOrders.length === 0 ? (
                         <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
                       ) : (
                         <>
-                          <div className="flex gap-1 bg-purple-50/70 p-1 rounded-2xl border border-purple-100 mt-2">
+                          <div className="flex gap-1 bg-emerald-50/70 p-1 rounded-2xl border border-emerald-100 mt-2">
                             <button
                               onClick={() => setOrderTab('active')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'active' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'active' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Active ({activeOrders.length})
@@ -1473,7 +1339,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('delivered')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'delivered' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'delivered' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Delivered ({deliveredOrders.length})
@@ -1481,7 +1347,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('cancelled')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'cancelled' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'cancelled' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Cancelled ({cancelledOrders.length})
@@ -1520,10 +1386,10 @@ export default function CustomerStorefront() {
                 })()}
               </div>
 
-              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     <Heart size={16} className="text-pink-600 shrink-0" /> 
@@ -1533,24 +1399,24 @@ export default function CustomerStorefront() {
                 </button>
 
                 {openSection === 'wishlist' && (
-                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-purple-100">
+                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-emerald-100">
                     {wishlistProducts.length === 0 ? (
                       <p className="text-slate-400 italic py-3 text-center">Your wishlist is empty.</p>
                     ) : (
                       wishlistProducts.map(p => {
                         const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
                         return (
-                          <div key={p.id} className="p-3 bg-purple-50/20 rounded-2xl border border-purple-100 flex items-center justify-between gap-3">
+                          <div key={p.id} className="p-3 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-purple-200 bg-white shrink-0" />
+                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
                               <div className="min-w-0">
                                 <span className="font-bold text-slate-900 block truncate">{p.name}</span>
-                                <span className="font-black text-purple-700">₹{p.price}</span>
+                                <span className="font-black text-emerald-700">₹{p.price}</span>
                               </div>
                             </div>
                             <button 
                               onClick={() => addToCart(p)}
-                              className="bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
                               title="Add"
                             >
                               <Package size={14} />
@@ -1563,29 +1429,29 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              <div className="bg-purple-50/30 rounded-2xl border border-purple-200/80 overflow-hidden">
+              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-purple-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin size={16} className="text-purple-600 shrink-0" /> 
+                    <MapPin size={16} className="text-emerald-600 shrink-0" /> 
                     <span className="truncate">Saved Addresses ({savedAddresses.length})</span>
                   </span>
                   {openSection === 'addresses' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'addresses' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-purple-100">
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => setShowAddAddressBox(true)} className="text-purple-600 font-black hover:underline cursor-pointer">
+                      <button onClick={() => setShowAddAddressBox(true)} className="text-emerald-600 font-black hover:underline cursor-pointer">
                         + Add Address
                       </button>
                     </div>
 
                     {savedAddresses.map(addr => (
-                      <div key={addr.id} className="p-3.5 bg-purple-50/20 rounded-2xl border border-purple-200 flex justify-between items-start gap-2">
+                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start gap-2">
                         <div className="min-w-0">
                           <span className="font-black text-slate-900 block truncate">{addr.title}</span>
                           <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
@@ -1600,10 +1466,10 @@ export default function CustomerStorefront() {
 
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
-                className="w-full bg-purple-50/60 hover:bg-purple-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-purple-200 transition cursor-pointer"
+                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
               >
                 <span className="flex items-center gap-2.5 truncate">
-                  <MessageSquarePlus size={16} className="text-purple-600 shrink-0" /> 
+                  <MessageSquarePlus size={16} className="text-emerald-600 shrink-0" /> 
                   <span className="truncate">Send Feedback & Suggestions</span>
                 </span>
                 <ChevronRight size={16} className="shrink-0" />
@@ -1611,7 +1477,7 @@ export default function CustomerStorefront() {
 
             </div>
 
-            <div className="p-6 border-t border-purple-100 bg-purple-50/50">
+            <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
                 className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer shadow-2xs"
@@ -1626,14 +1492,14 @@ export default function CustomerStorefront() {
       {/* Order Details Modal */}
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fadeIn font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-purple-100 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-purple-100 pb-3">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
-              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-purple-50/40 p-3.5 rounded-2xl border border-purple-100 flex justify-between items-center">
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center">
                 <span className="text-slate-500 font-bold">Order Status:</span>
                 <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
                   selectedProfileOrder.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
@@ -1642,26 +1508,26 @@ export default function CustomerStorefront() {
               </div>
 
               {selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
-                <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 border border-purple-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
+                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-purple-800 block">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
                       Delivery Verification OTP
                     </span>
                     <p className="text-[10px] text-stone-600 font-medium">
                       Share this code with the delivery partner
                     </p>
                   </div>
-                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-purple-300 font-mono font-black text-base text-purple-700 tracking-widest shadow-sm">
+                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
                     {selectedProfileOrder.otp || '----'}
                   </div>
                 </div>
               )}
 
               {myComplaintsMap[selectedProfileOrder.id] && (
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-2xl border border-indigo-200 space-y-1.5">
+                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-indigo-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                      <LifeBuoy size={14} className="text-indigo-600" /> Support Ticket Status
+                    <span className="text-teal-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                      <LifeBuoy size={14} className="text-teal-600" /> Support Ticket Status
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
                       myComplaintsMap[selectedProfileOrder.id].status === 'resolved' ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
@@ -1687,10 +1553,10 @@ export default function CustomerStorefront() {
               {selectedProfileOrder.status === 'delivered' && !myComplaintsMap[selectedProfileOrder.id] && (
                 <button
                   onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: null })}
-                  className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-900 p-3 rounded-2xl border border-indigo-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  className="w-full bg-teal-50 hover:bg-teal-100 text-teal-900 p-3 rounded-2xl border border-teal-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
                 >
                   <span className="flex items-center gap-2">
-                    <LifeBuoy size={16} className="text-indigo-600" /> Need Help with this Whole Order?
+                    <LifeBuoy size={16} className="text-teal-600" /> Need Help with this Whole Order?
                   </span>
                   <ChevronRight size={14} />
                 </button>
@@ -1698,7 +1564,7 @@ export default function CustomerStorefront() {
 
               <div className="space-y-1">
                 <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Items</span>
-                <div className="space-y-2 bg-purple-50/30 p-3.5 rounded-2xl border border-purple-100">
+                <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100">
                   {selectedProfileOrder.order_items?.map(item => {
                     const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
                     const itemImg = itemImages[0] || '';
@@ -1725,15 +1591,15 @@ export default function CustomerStorefront() {
                     const discountPct = hasMrp ? Math.round(((itemMrp - itemPrice) / itemMrp) * 100) : 0;
 
                     return (
-                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-purple-100 last:border-0">
+                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-purple-200 bg-white shrink-0" />
+                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
                             <div className="min-w-0">
                               <span className="font-black text-slate-900 block truncate">{item.products?.name || 'Item'}</span>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 {item.variant_label && (
-                                  <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-md">
+                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
                                     {item.variant_label}
                                   </span>
                                 )}
@@ -1744,7 +1610,7 @@ export default function CustomerStorefront() {
                                   <span className="text-stone-400 line-through text-[10px]">₹{itemMrp * item.quantity}</span>
                                 )}
                                 {discountPct > 0 && (
-                                  <span className="text-[9px] text-purple-700 font-black bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                                  <span className="text-[9px] text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                                     {discountPct}% OFF
                                   </span>
                                 )}
@@ -1756,7 +1622,7 @@ export default function CustomerStorefront() {
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: item.products })}
-                                className="p-2 rounded-xl font-bold text-[11px] bg-indigo-50 text-indigo-900 border border-indigo-200 hover:bg-indigo-100 transition flex items-center justify-center cursor-pointer"
+                                className="p-2 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100 transition flex items-center justify-center cursor-pointer"
                                 title="Item Help"
                               >
                                 <LifeBuoy size={14} className="shrink-0" />
@@ -1774,7 +1640,7 @@ export default function CustomerStorefront() {
                                 className={`p-2 rounded-xl font-bold text-[11px] transition flex items-center justify-center cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
-                                    : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
                                 }`}
                                 title={hasReviewed ? "Review" : "Rate"}
                               >
@@ -1789,14 +1655,14 @@ export default function CustomerStorefront() {
                 </div>
               </div>
 
-              <div className="bg-purple-50/40 p-3.5 rounded-2xl border border-purple-100 space-y-1">
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
                 <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
               </div>
 
-              <div className="pt-2 border-t border-purple-100 flex justify-between items-center font-black text-sm text-slate-900">
+              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
                 <span>Total Amount Paid:</span>
-                <span className="text-purple-600">₹{selectedProfileOrder.total_amount}</span>
+                <span className="text-emerald-600">₹{selectedProfileOrder.total_amount}</span>
               </div>
             </div>
 
@@ -1820,338 +1686,375 @@ export default function CustomerStorefront() {
         </div>
       )}
 
-    {orderHelpTarget && (
-      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-purple-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-purple-100 pb-3">
-            <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-              <LifeBuoy size={16} className="text-indigo-600" />
-              {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
-            </h3>
-            <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
-          </div>
-
-          <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
-            <div className="bg-indigo-50/60 p-3 rounded-2xl border border-indigo-200 space-y-1">
-              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider block">Target Reference</span>
-              <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
-              {orderHelpTarget.item && (
-                <p className="text-indigo-700 font-bold">Product: {orderHelpTarget.item.name}</p>
-              )}
+      {orderHelpTarget && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                <LifeBuoy size={16} className="text-teal-600" />
+                {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
+              </h3>
+              <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Issue Category</label>
-              <select 
-                value={helpForm.issueType} 
-                onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
-                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 font-bold outline-none cursor-pointer"
-              >
-                <option value="Damaged / Defective Item">Damaged / Defective Item</option>
-                <option value="Missing Item from Package">Missing Item from Package</option>
-                <option value="Expired / Freshness Issue">Expired / Freshness Issue</option>
-                <option value="Wrong Item Delivered">Wrong Item Delivered</option>
-                <option value="Billing / Payment Dispute">Billing / Payment Dispute</option>
-                <option value="Other Issue">Other Issue</option>
-              </select>
-            </div>
+            <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
+              <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
+                <span className="text-[10px] font-bold text-teal-900 uppercase tracking-wider block">Target Reference</span>
+                <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
+                {orderHelpTarget.item && (
+                  <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
+                )}
+              </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Describe the Issue</label>
-              <textarea 
-                rows="3"
-                placeholder="Explain the issue in detail so our support team can assist..." 
-                required
-                value={helpForm.message}
-                onChange={e => setHelpForm({...helpForm, message: e.target.value})}
-                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 outline-none resize-none focus:border-purple-500"
-              />
-            </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Issue Category</label>
+                <select 
+                  value={helpForm.issueType} 
+                  onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                >
+                  <option value="Damaged / Defective Item">Damaged / Defective Item</option>
+                  <option value="Missing Item from Package">Missing Item from Package</option>
+                  <option value="Expired / Freshness Issue">Expired / Freshness Issue</option>
+                  <option value="Wrong Item Delivered">Wrong Item Delivered</option>
+                  <option value="Billing / Payment Dispute">Billing / Payment Dispute</option>
+                  <option value="Other Issue">Other Issue</option>
+                </select>
+              </div>
 
-            <button 
-              type="submit" 
-              disabled={submittingHelp}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
-            >
-              {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
-            </button>
-          </form>
-        </div>
-      </div>
-    )}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Describe the Issue</label>
+                <textarea 
+                  rows="3"
+                  placeholder="Explain the issue in detail so our support team can assist..." 
+                  required
+                  value={helpForm.message}
+                  onChange={e => setHelpForm({...helpForm, message: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                />
+              </div>
 
-    {reviewModalProduct && (
-      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-purple-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-purple-100 pb-3">
-            <h3 className="font-black text-sm text-slate-900">
-              {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
-            </h3>
-            <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-purple-50 rounded-full text-slate-600 hover:bg-purple-100 cursor-pointer" title="Close"><X size={16}/></button>
-          </div>
-
-          <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
-            <div className="flex items-center gap-3 bg-purple-50/40 p-3 rounded-2xl border border-purple-100">
-              <img 
-                src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
-                alt="" 
-                className="w-11 h-11 object-cover rounded-xl bg-white border border-purple-200" 
-              />
-              <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Star Rating</label>
-              <select 
-                value={newReviewForm.rating} 
-                onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
-                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 font-bold outline-none cursor-pointer"
-              >
-                <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
-                <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
-                <option value="3">⭐⭐⭐ (3/5 - Average)</option>
-                <option value="2">⭐⭐ (2/5 - Poor)</option>
-                <option value="1">⭐ (1/5 - Terrible)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Your Review</label>
-              <textarea 
-                rows="3"
-                placeholder="Share details of your experience with this item..." 
-                required
-                value={newReviewForm.review_text}
-                onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
-                className="w-full border border-purple-200 p-3 rounded-2xl bg-purple-50/30 text-slate-900 outline-none resize-none focus:border-purple-500"
-              />
-            </div>
-
-            <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-purple-600/20 cursor-pointer">
-              {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
-            </button>
-          </form>
-        </div>
-      </div>
-    )}
-
-    {orderSuccess && (
-      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-stone-100 space-y-4">
-          <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
-            <CheckCircle size={40} className="stroke-[2.5]" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Order Place Successfully</h2>
-            <p className="text-stone-400 text-xs font-medium">You have successfully made order</p>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            <button
-              onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/20 cursor-pointer"
-            >
-              View Order Status
-            </button>
-            <button
-              onClick={() => { setOrderSuccess(null); setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className="w-full py-3 rounded-2xl font-extrabold text-xs text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </div>
-      </div>
-      
-    )}
-
-    {/* 2. Product Grid Component */}
-    <ProductGrid
-  session={session}
-  banners={banners}
-  currentSlide={currentSlide}
-  activeFlashSale={activeFlashSale}
-  timeLeft={timeLeft}
-  formatTime={formatTime}
-  categories={categories}
-  activeCategory={activeCategory}
-  setActiveCategory={setActiveCategory}
-  loading={loading}
-  products={products}
-  searchQuery={searchQuery}
-  filteredProducts={filteredProducts}
-  currentProducts={currentProducts}
-  totalPages={totalPages}
-  currentPage={currentPage}
-  setCurrentPage={setCurrentPage}
-  wishlistIds={wishlistIds}
-  toggleWishlist={toggleWishlist}
-  selectedVariants={selectedVariants}
-  setSelectedVariants={setSelectedVariants}
-  cart={cart}
-  addToCart={addToCart}
-  updateQuantity={updateQuantity}
-  sortBy={sortBy}
-  setSortBy={setSortBy}
-  onNavigate={navigate}
-  onOpenCart={() => setIsCartOpen(true)}
-  onSelectProduct={async (product) => {
-    setSelectedProductDetails(product);
-    setIsDescriptionExpanded(false);
-    const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
-    setActiveGalleryImage(pImages[0] || '');
-    setImageZoomScale(1);
-    await fetchProductReviews(product.id);
-  }}
-/>
-
-    {/* Product Details Modal matching reference attachments */}
-    {selectedProductDetails && (() => {
-      const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
-      const variants = selectedProductDetails.variants || selectedProductDetails.product_variants || [];
-      const hasVariants = variants.length > 0;
-
-      const currentVariantKey = selectedVariants[selectedProductDetails.id] || (hasVariants ? (variants[0].id || variants[0].label || variants[0].unit_label) : null);
-      const modalActiveVariant = variants.find(
-        v => v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey
-      ) || variants[0];
-       
-      const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
-      const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
-      const hasModalMrp = modalMrp > modalPrice;
-      const discountPct = hasModalMrp ? Math.round(((modalMrp - modalPrice) / modalMrp) * 100) : 0;
-      const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
-      const isModalOutOfStock = modalStock <= 0;
-
-      const variantIdentifier = modalActiveVariant ? (modalActiveVariant.id || modalActiveVariant.unit_label || modalActiveVariant.label || 'default') : 'default';
-      const cartKey = `${selectedProductDetails.id}-${variantIdentifier}`;
-      const modalCartItem = cart.find(item => item.cartItemId === cartKey);
-      const modalQty = modalCartItem ? modalCartItem.quantity : 0;
-
-      const similarProducts = products.filter(p => 
-        p.id !== selectedProductDetails.id && 
-        (
-          (selectedProductDetails.category_id && p.category_id === selectedProductDetails.category_id) ||
-          (selectedProductDetails.category && (p.category === selectedProductDetails.category || p.category_id === selectedProductDetails.category))
-        )
-      ).slice(0, 4);
-
-      const ratingNum = selectedProductDetails.avgRating ? Number(selectedProductDetails.avgRating) : 4.0;
-      const reviewCountNum = selectedProductDetails.reviewCount || productReviews.length || 1;
-
-      return (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 font-sans p-0 sm:p-4">
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="bg-white rounded-t-[2.5rem] sm:rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
-          >
-            {/* Header: Back arrow, "Item Details", and Wishlist heart */}
-            <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-20">
               <button 
-                onClick={() => setSelectedProductDetails(null)}
-                className="p-1 -ml-1 text-slate-900 hover:bg-stone-100 rounded-full transition cursor-pointer"
+                type="submit" 
+                disabled={submittingHelp}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-600/20 disabled:opacity-50 cursor-pointer"
               >
-                <ArrowLeft size={22} className="stroke-[2.5]" />
+                {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
               </button>
-              <h3 className="font-black text-slate-900 text-base">Item Details</h3>
-              <button 
-                onClick={(e) => toggleWishlist(selectedProductDetails.id, e)}
-                className="p-1 text-stone-700 hover:text-rose-500 transition cursor-pointer"
+            </form>
+          </div>
+        </div>
+      )}
+
+      {reviewModalProduct && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+              <h3 className="font-black text-sm text-slate-900">
+                {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
+              </h3>
+              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
+            </div>
+
+            <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
+              <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
+                <img 
+                  src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
+                  alt="" 
+                  className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
+                />
+                <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Star Rating</label>
+                <select 
+                  value={newReviewForm.rating} 
+                  onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                >
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
+                  <option value="3">⭐⭐⭐ (3/5 - Average)</option>
+                  <option value="2">⭐⭐ (2/5 - Poor)</option>
+                  <option value="1">⭐ (1/5 - Terrible)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Your Review</label>
+                <textarea 
+                  rows="3"
+                  placeholder="Share details of your experience with this item..." 
+                  required
+                  value={newReviewForm.review_text}
+                  onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
+                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-600/20 cursor-pointer">
+                {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {orderSuccess && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-stone-100 space-y-4">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+              <CheckCircle size={40} className="stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Order Placed Successfully</h2>
+              <p className="text-stone-400 text-xs font-medium">You have successfully placed your order</p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/20 cursor-pointer"
               >
-                <Heart size={22} className={wishlistIds.includes(selectedProductDetails.id) ? 'fill-rose-500 text-rose-500' : ''} />
+                View Order Status
+              </button>
+              <button
+                onClick={() => { setOrderSuccess(null); setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="w-full py-3 rounded-2xl font-extrabold text-xs text-stone-500 hover:text-stone-900 hover:bg-stone-50 transition cursor-pointer"
+              >
+                Continue Shopping
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
-              {/* Product Image Carousel with Dots */}
-              <div className="space-y-4">
-                <div className="aspect-[4/3] bg-stone-50 rounded-3xl flex items-center justify-center p-4 relative">
-                  <img 
-                    src={activeGalleryImage || modalImages[0] || ''} 
-                    alt={selectedProductDetails.name} 
-                    className="w-full h-full object-contain" 
-                  />
-                  {isModalOutOfStock && (
-                    <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20">
-                      <span className="bg-white text-stone-950 text-xs font-black px-4 py-1.5 rounded-full uppercase">Sold Out</span>
+      {/* 2. Product Grid Component */}
+      <ProductGrid
+        session={session}
+        banners={banners}
+        currentSlide={currentSlide}
+        activeFlashSale={activeFlashSale}
+        timeLeft={timeLeft}
+        formatTime={formatTime}
+        categories={categories}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+        loading={loading}
+        products={products}
+        searchQuery={searchQuery}
+        filteredProducts={filteredProducts}
+        currentProducts={currentProducts}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        wishlistIds={wishlistIds}
+        toggleWishlist={toggleWishlist}
+        selectedVariants={selectedVariants}
+        setSelectedVariants={setSelectedVariants}
+        cart={cart}
+        addToCart={addToCart}
+        updateQuantity={updateQuantity}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        onNavigate={navigate}
+        onOpenCart={() => setIsCartOpen(true)}
+        onSelectProduct={async (product) => {
+          setSelectedProductDetails(product);
+          setIsDescriptionExpanded(false);
+          const pImages = product.images || product.gallery || [product.image_url].filter(Boolean);
+          setActiveGalleryImage(pImages[0] || '');
+          await fetchProductReviews(product.id);
+        }}
+      />
+
+      {/* Product Details Modal */}
+      {selectedProductDetails && (() => {
+        const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
+        const variants = selectedProductDetails.variants || selectedProductDetails.product_variants || [];
+        const hasVariants = variants.length > 0;
+
+        const currentVariantKey = selectedVariants[selectedProductDetails.id] || (hasVariants ? (variants[0].id || variants[0].label || variants[0].unit_label) : null);
+        const modalActiveVariant = variants.find(
+          v => v.id === currentVariantKey || v.label === currentVariantKey || v.unit_label === currentVariantKey
+        ) || variants[0];
+         
+        const modalPrice = Number(modalActiveVariant ? modalActiveVariant.price : selectedProductDetails.price || 0);
+        const modalMrp = Number(modalActiveVariant?.mrp || selectedProductDetails.mrp || 0);
+        const hasModalMrp = modalMrp > modalPrice;
+        const discountPct = hasModalMrp ? Math.round(((modalMrp - modalPrice) / modalMrp) * 100) : 0;
+        const modalStock = Number(modalActiveVariant ? modalActiveVariant.stock : selectedProductDetails.stock || 0);
+        const isModalOutOfStock = modalStock <= 0;
+
+        const variantIdentifier = modalActiveVariant ? (modalActiveVariant.id || modalActiveVariant.unit_label || modalActiveVariant.label || 'default') : 'default';
+        const cartKey = `${selectedProductDetails.id}-${variantIdentifier}`;
+        const modalCartItem = cart.find(item => item.cartItemId === cartKey);
+        const modalQty = modalCartItem ? modalCartItem.quantity : 0;
+
+        const similarProducts = products.filter(p => 
+          p.id !== selectedProductDetails.id && 
+          (
+            (selectedProductDetails.category_id && p.category_id === selectedProductDetails.category_id) ||
+            (selectedProductDetails.category && (p.category === selectedProductDetails.category || p.category_id === selectedProductDetails.category))
+          )
+        ).slice(0, 4);
+
+        const ratingNum = selectedProductDetails.avgRating ? Number(selectedProductDetails.avgRating) : 4.0;
+        const reviewCountNum = selectedProductDetails.reviewCount || productReviews.length || 1;
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 font-sans p-0 sm:p-4">
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-white rounded-t-[2.5rem] sm:rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            >
+              <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-20">
+                <button 
+                  onClick={() => setSelectedProductDetails(null)}
+                  className="p-1 -ml-1 text-slate-900 hover:bg-stone-100 rounded-full transition cursor-pointer"
+                >
+                  <ArrowLeft size={22} className="stroke-[2.5]" />
+                </button>
+                <h3 className="font-black text-slate-900 text-base">Item Details</h3>
+                <button 
+                  onClick={(e) => toggleWishlist(selectedProductDetails.id, e)}
+                  className="p-1 text-stone-700 hover:text-rose-500 transition cursor-pointer"
+                >
+                  <Heart size={22} className={wishlistIds.includes(selectedProductDetails.id) ? 'fill-rose-500 text-rose-500' : ''} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="aspect-[4/3] bg-stone-50 rounded-3xl flex items-center justify-center p-4 relative">
+                    <img 
+                      src={activeGalleryImage || modalImages[0] || ''} 
+                      alt={selectedProductDetails.name} 
+                      className="w-full h-full object-contain" 
+                    />
+                    {isModalOutOfStock && (
+                      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20">
+                        <span className="bg-white text-stone-950 text-xs font-black px-4 py-1.5 rounded-full uppercase">Sold Out</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
+                    {selectedProductDetails.name}
+                  </h2>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5 text-emerald-500">
+                      {[1, 2, 3, 4, 5].map((starIdx) => (
+                        <Star 
+                          key={starIdx} 
+                          size={14} 
+                          className={starIdx <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} 
+                        />
+                      ))}
+                    </div>
+                    <span className="font-extrabold text-slate-800 text-xs">
+                      {ratingNum.toFixed(1)} ({reviewCountNum} Reviews)
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-2xl font-black text-slate-900">₹{modalPrice.toFixed(0)}</span>
+                    {hasModalMrp && (
+                      <span className="text-stone-400 line-through font-bold text-sm">₹{modalMrp.toFixed(0)}</span>
+                    )}
+                    {discountPct > 0 && (
+                      <span className="bg-emerald-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        {discountPct}% OFF
+                      </span>
+                    )}
+                  </div>
+
+                  {hasVariants && (
+                    <div className="pt-2">
+                      <label className="block text-[10px] font-black uppercase text-stone-400 mb-1">Select Size / Unit</label>
+                      <div className="flex flex-wrap gap-2">
+                        {variants.map((v, idx) => {
+                          const vKey = v.id || v.label || v.unit_label || idx;
+                          const vLabel = v.unit_label || v.label || `Option ${idx + 1}`;
+                          const isVarSelected = (currentVariantKey === v.id || currentVariantKey === v.label || currentVariantKey === v.unit_label);
+                          return (
+                            <button
+                              key={vKey}
+                              type="button"
+                              onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer ${
+                                isVarSelected 
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' 
+                                  : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                              }`}
+                            >
+                              {vLabel} • ₹{v.price}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Pagination Dots */}
-                <div className="flex justify-center items-center gap-1.5">
-                  {(modalImages.length > 0 ? modalImages : [1, 2, 3, 4]).map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveGalleryImage(modalImages[idx] || modalImages[0])}
-                      className={`h-2 rounded-full transition-all ${
-                        (activeGalleryImage === (modalImages[idx] || modalImages[0]) || (!activeGalleryImage && idx === 0))
-                          ? 'w-6 bg-slate-900' 
-                          : 'w-2 bg-stone-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Title, Rating, Price */}
-              <div className="space-y-3">
-                <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
-                  {selectedProductDetails.name}
-                </h2>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-0.5 text-emerald-500">
-                    {[1, 2, 3, 4, 5].map((starIdx) => (
-                      <Star 
-                        key={starIdx} 
-                        size={14} 
-                        className={starIdx <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} 
-                      />
-                    ))}
-                  </div>
-                  <span className="font-extrabold text-slate-800 text-xs">
-                    {ratingNum.toFixed(1)} ({reviewCountNum} Reviews)
-                  </span>
+                <div className="space-y-1 text-xs text-stone-600 leading-relaxed font-medium">
+                  <p>
+                    {isDescriptionExpanded 
+                      ? (selectedProductDetails.description || "No description provided by admin.")
+                      : ((selectedProductDetails.description || "No description provided by admin.").slice(0, 140) + ((selectedProductDetails.description || "").length > 140 ? '...' : ''))}
+                    {(selectedProductDetails.description || "").length > 140 && (
+                      <button 
+                        onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
+                        className="text-emerald-500 font-extrabold ml-1 hover:underline cursor-pointer"
+                      >
+                        {isDescriptionExpanded ? 'Read Less' : 'Read More'}
+                      </button>
+                    )}
+                  </p>
                 </div>
 
-                <div className="flex items-baseline gap-3">
-                  <span className="text-2xl font-black text-slate-900">₹{modalPrice.toFixed(0)}</span>
-                  {hasModalMrp && (
-                    <span className="text-stone-400 line-through font-bold text-sm">₹{modalMrp.toFixed(0)}</span>
-                  )}
-                  {discountPct > 0 && (
-                    <span className="bg-emerald-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      {discountPct}% OFF
-                    </span>
-                  )}
-                </div>
+                {similarProducts.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-stone-100">
+                    <h3 className="font-black text-base text-slate-900 tracking-tight">Similar Products</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {similarProducts.map(p => {
+                        const pImgs = p.images || p.gallery || [p.image_url].filter(Boolean);
+                        const pVariants = p.variants || p.product_variants || [];
+                        const pVar = pVariants[0] || null;
+                        const pPrice = Number(pVar ? pVar.price : p.price || 0);
 
-                {hasVariants && (
-                  <div className="pt-2">
-                    <label className="block text-[10px] font-black uppercase text-stone-400 mb-1">Select Size / Unit</label>
-                    <div className="flex flex-wrap gap-2">
-                      {variants.map((v, idx) => {
-                        const vKey = v.id || v.label || v.unit_label || idx;
-                        const vLabel = v.unit_label || v.label || `Option ${idx + 1}`;
-                        const isVarSelected = (currentVariantKey === v.id || currentVariantKey === v.label || currentVariantKey === v.unit_label);
                         return (
-                          <button
-                            key={vKey}
-                            type="button"
-                            onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer ${
-                              isVarSelected 
-                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' 
-                                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                            }`}
+                          <div 
+                            key={p.id}
+                            onClick={async () => {
+                              setSelectedProductDetails(p);
+                              setActiveGalleryImage(pImgs[0] || '');
+                              await fetchProductReviews(p.id);
+                            }}
+                            className="bg-stone-50/70 p-3.5 rounded-3xl border border-stone-100 cursor-pointer space-y-2 group"
                           >
-                            {vLabel} • ₹{v.price}
-                          </button>
+                            <div className="aspect-square bg-white rounded-2xl p-2 flex items-center justify-center relative">
+                              <img src={pImgs[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+                              <Heart size={14} className="absolute top-2.5 right-2.5 text-stone-400" />
+                            </div>
+                            <h4 className="font-extrabold text-xs text-slate-900 line-clamp-1">{p.name}</h4>
+                            <p className="text-[10px] text-stone-400 font-bold">{p.unit || '1 unit'}</p>
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="font-black text-sm text-slate-900">₹{pPrice.toFixed(0)}</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); addToCart(p, pVar); }}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -2159,215 +2062,105 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              {/* Description (Exact as configured by Admin) */}
-              <div className="space-y-1 text-xs text-stone-600 leading-relaxed font-medium">
-                <p>
-                  {isDescriptionExpanded 
-                    ? (selectedProductDetails.description || "No description provided by admin.")
-                    : ((selectedProductDetails.description || "No description provided by admin.").slice(0, 140) + ((selectedProductDetails.description || "").length > 140 ? '...' : ''))}
-                  {(selectedProductDetails.description || "").length > 140 && (
-                    <button 
-                      onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
-                      className="text-emerald-500 font-extrabold ml-1 hover:underline cursor-pointer"
-                    >
-                      {isDescriptionExpanded ? 'Read Less' : 'Read More'}
-                    </button>
-                  )}
-                </p>
-              </div>
-
-              {/* Reviews & Ratings Section (Fetched dynamically) */}
-              <div className="space-y-4 pt-4 border-t border-stone-100">
-                <h3 className="font-black text-base text-slate-900 tracking-tight">Reviews & Ratings</h3>
-                
-                <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-3xl">
-                  <span className="text-3xl font-black text-slate-900">{ratingNum.toFixed(1)}</span>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-emerald-500">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} size={14} className={s <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} />
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-stone-400 font-bold">{reviewCountNum} Reviews</p>
-                  </div>
+              <div className="p-4 bg-white border-t border-stone-100 flex items-center gap-4 sticky bottom-0 z-30">
+                <div className="flex items-center bg-stone-100 rounded-2xl px-3 py-2 gap-3">
+                  <button 
+                    onClick={() => {
+                      if (modalQty > 0) {
+                        updateQuantity(modalCartItem.cartItemId, -1);
+                      }
+                    }}
+                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <span className="font-black text-sm text-slate-900 w-4 text-center">{modalQty > 0 ? modalQty : 1}</span>
+                  <button 
+                    onClick={() => {
+                      if (modalQty > 0) {
+                        updateQuantity(modalCartItem.cartItemId, 1);
+                      } else {
+                        addToCart(selectedProductDetails, modalActiveVariant);
+                      }
+                    }}
+                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
 
-                {productReviews.length === 0 ? (
-                  <p className="text-xs text-stone-400 italic">No reviews yet for this product.</p>
-                ) : (
-                  productReviews.map(rev => (
-                    <div key={rev.id} className="space-y-3 p-4 bg-white rounded-3xl border border-stone-100 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-10 h-10 rounded-full bg-stone-200 overflow-hidden flex items-center justify-center font-bold text-stone-600 text-xs">
-                            {rev.user_email?.[0]?.toUpperCase() || 'U'}
-                          </div>
-                          <div>
-                            <h4 className="font-extrabold text-xs text-slate-900">{rev.user_email?.split('@')[0] || 'Customer'}</h4>
-                            <p className="text-[10px] text-stone-400">{new Date(rev.created_at).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 text-emerald-500">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <Star key={s} size={12} className={s <= rev.rating ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} />
-                          ))}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-stone-700 font-medium leading-relaxed">
-                        {rev.review_text}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Similar Products Shelf */}
-              {similarProducts.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-stone-100">
-                  <h3 className="font-black text-base text-slate-900 tracking-tight">Similar Products</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {similarProducts.map(p => {
-                      const pImgs = p.images || p.gallery || [p.image_url].filter(Boolean);
-                      const pVariants = p.variants || p.product_variants || [];
-                      const hasPVar = pVariants.length > 0;
-                      const pVar = pVariants[0] || null;
-                      const pPrice = Number(pVar ? pVar.price : p.price || 0);
-
-                      return (
-                        <div 
-                          key={p.id}
-                          onClick={async () => {
-                            setSelectedProductDetails(p);
-                            setActiveGalleryImage(pImgs[0] || '');
-                            await fetchProductReviews(p.id);
-                          }}
-                          className="bg-stone-50/70 p-3.5 rounded-3xl border border-stone-100 cursor-pointer space-y-2 group"
-                        >
-                          <div className="aspect-square bg-white rounded-2xl p-2 flex items-center justify-center relative">
-                            <img src={pImgs[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
-                            <Heart size={14} className="absolute top-2.5 right-2.5 text-stone-400" />
-                          </div>
-                          <h4 className="font-extrabold text-xs text-slate-900 line-clamp-1">{p.name}</h4>
-                          <p className="text-[10px] text-stone-400 font-bold">{p.unit || '1 unit'}</p>
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="font-black text-sm text-slate-900">₹{pPrice.toFixed(0)}</span>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); addToCart(p, pVar); }}
-                              className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Bottom Sticky Add to Cart Bar */}
-            <div className="p-4 bg-white border-t border-stone-100 flex items-center gap-4 sticky bottom-0 z-30">
-              <div className="flex items-center bg-stone-100 rounded-2xl px-3 py-2 gap-3">
                 <button 
                   onClick={() => {
-                    if (modalQty > 0) {
-                      updateQuantity(modalCartItem.cartItemId, -1);
-                    }
-                  }}
-                  className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
-                >
-                  <Minus size={16} />
-                </button>
-                <span className="font-black text-sm text-slate-900 w-4 text-center">{modalQty > 0 ? modalQty : 1}</span>
-                <button 
-                  onClick={() => {
-                    if (modalQty > 0) {
-                      updateQuantity(modalCartItem.cartItemId, 1);
-                    } else {
+                    if (modalQty === 0) {
                       addToCart(selectedProductDetails, modalActiveVariant);
                     }
+                    setIsCartOpen(true);
+                    setSelectedProductDetails(null);
                   }}
-                  className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-500/25 transition cursor-pointer"
                 >
-                  <Plus size={16} />
+                  <span>Add to Cart</span>
+                  <span className="border-l border-emerald-400 pl-4">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
                 </button>
               </div>
-
-              <button 
-                onClick={() => {
-                  if (modalQty === 0) {
-                    addToCart(selectedProductDetails, modalActiveVariant);
-                  }
-                  setIsCartOpen(true);
-                  setSelectedProductDetails(null);
-                }}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-500/25 transition cursor-pointer"
-              >
-                <span>Add to Cart</span>
-                <span className="border-l border-emerald-400 pl-4">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      );
-    })()}
-
-    {/* Floating AI Grocery Concierge Chatbot Widget */}
-    <div className="fixed bottom-24 right-6 z-40">
-      {!isAiChatOpen ? (
-        <button 
-          onClick={() => setIsAiChatOpen(true)}
-          className="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-purple-500/20"
-          title="Ask AI Grocery Assistant"
-        >
-          <Bot size={22} className="animate-bounce" />
-          <span className="hidden sm:inline">AI Assistant</span>
-        </button>
-      ) : (
-        <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-purple-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
-          <div className="bg-gradient-to-r from-purple-900 to-indigo-950 text-white p-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-purple-500/20 text-purple-300 rounded-xl border border-purple-500/30">
-                <Bot size={18} />
-              </div>
-              <div>
-                <h4 className="font-black text-sm">KD Store AI Concierge</h4>
-                <p className="text-[10px] text-purple-200">Ask for recipes or grocery items</p>
-            </div>
+            </motion.div>
           </div>
-          <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-purple-900/60 hover:bg-purple-900 rounded-full text-purple-200 cursor-pointer" title="Close"><X size={16}/></button>
-        </div>
+        );
+      })()}
 
-        <div className="p-4 h-72 overflow-y-auto space-y-3 bg-purple-50/20">
-          {aiChatMessages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
-                msg.sender === 'user' ? 'bg-purple-600 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-purple-200 rounded-bl-none shadow-2xs font-medium'
-              }`}>
-                {msg.text}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-purple-100 bg-white flex gap-2">
-          <input 
-            type="text" 
-            placeholder="e.g. Add ingredients for tea..." 
-            value={aiInputText}
-            onChange={e => setAiInputText(e.target.value)}
-            className="flex-1 bg-purple-50/50 border border-purple-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-purple-600 font-medium"
-          />
-          <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm" title="Send">
-            <Send size={16} />
+      {/* Floating AI Grocery Concierge Chatbot Widget */}
+      <div className="fixed bottom-24 right-6 z-40">
+        {!isAiChatOpen ? (
+          <button 
+            onClick={() => setIsAiChatOpen(true)}
+            className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2.5 font-black text-xs uppercase tracking-wider transition transform hover:scale-105 cursor-pointer ring-4 ring-emerald-500/20"
+            title="Ask AI Grocery Assistant"
+          >
+            <Bot size={22} className="animate-bounce" />
+            <span className="hidden sm:inline">AI Assistant</span>
           </button>
-        </form>
+        ) : (
+          <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-emerald-200 flex flex-col overflow-hidden animate-slideUp font-sans text-xs">
+            <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-500/30">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm">KD Store AI Concierge</h4>
+                  <p className="text-[10px] text-emerald-200">Ask for recipes or grocery items</p>
+                </div>
+              </div>
+              <button onClick={() => setIsAiChatOpen(false)} className="p-1.5 bg-emerald-900/60 hover:bg-emerald-900 rounded-full text-emerald-200 cursor-pointer" title="Close"><X size={16}/></button>
+            </div>
+
+            <div className="p-4 h-72 overflow-y-auto space-y-3 bg-emerald-50/20">
+              {aiChatMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`p-3 rounded-2xl max-w-[80%] leading-relaxed ${
+                    msg.sender === 'user' ? 'bg-emerald-600 text-white rounded-br-none font-medium' : 'bg-white text-slate-800 border border-emerald-200 rounded-bl-none shadow-2xs font-medium'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAiChatSubmit} className="p-3 border-t border-emerald-100 bg-white flex gap-2">
+              <input 
+                type="text" 
+                placeholder="e.g. Add ingredients for tea..." 
+                value={aiInputText}
+                onChange={e => setAiInputText(e.target.value)}
+                className="flex-1 bg-emerald-50/50 border border-emerald-200 px-3.5 py-2.5 rounded-2xl outline-none text-slate-900 focus:border-emerald-600 font-medium"
+              />
+              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white p-2.5 rounded-2xl transition cursor-pointer shadow-sm" title="Send">
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
-    )}
-  </div>
 
       {/* 3. Cart Drawer Component */}
       <CartDrawer 
@@ -2392,7 +2185,7 @@ export default function CustomerStorefront() {
         couponInput={couponInput}
         setCouponInput={setCouponInput}
         handleApplyCoupon={handleApplyCoupon}
-        removeCoupon={removeCoupon}
+        removeCoupon={() => { setAppliedCoupon(null); setDiscountAmount(0); }}
         cartSubtotal={cartSubtotal}
         discountAmount={discountAmount}
         selectedAddressDistance={selectedAddressDistance}
@@ -2412,6 +2205,13 @@ export default function CustomerStorefront() {
 
       {/* Feedback Modal */}
       <CustomerFeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+
+      {/* 3. Bottom Nav Component */}
+      <PortalBottomNav 
+        totalItemsCount={totalItemsCount}
+        totalPrice={cartTotal}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
 
     </div>
   );

@@ -1,8 +1,8 @@
 // src/components/store/ProductGrid.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Heart, Clock, Package, Star, Sparkles, Filter, ChevronRight, ChevronLeft, Flame, Zap, LayoutGrid, SlidersHorizontal, ArrowUpDown, Plus, Minus, Home, ShoppingBag, User, CheckCircle2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Heart, Package, Star, ChevronRight, Flame, Zap, Plus, Minus, Home, ShoppingBag, User } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct, boughtProductIds }) {
   const [addedFlash, setAddedFlash] = useState(false);
@@ -450,7 +450,7 @@ export default function ProductGrid({
       )}
 
       {/* Fixed Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-stone-200/80 py-2.5 px-6 z-50 shadow-2xl max-w-lg mx-auto sm:max-w-none sm:rounded-t-3xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200/80 py-2.5 px-6 z-50 shadow-2xl max-w-lg mx-auto sm:max-w-none sm:rounded-t-3xl">
         <div className="flex items-center justify-between max-w-md mx-auto">
           <button 
             onClick={() => { setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
