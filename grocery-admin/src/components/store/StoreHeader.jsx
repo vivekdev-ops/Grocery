@@ -1,10 +1,10 @@
 // src/components/store/StoreHeader.jsx
 import { useState, useEffect } from 'react';
-import { Search, MapPin, ChevronDown, Check, Package, Sparkles, Flame, Apple, Baby, Headphones, Sparkle, Home as HomeIcon } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Check, Package, Sparkles, Flame, Apple, Baby, Headphones, Sparkle, Home as HomeIcon, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import NotificationBell from '../NotificationBell';
-import logoImg from '../../assets/logo.png'; // Update this path if you place your logo file elsewhere in your src directory
+import logoImg from '../../assets/logo.png';
 
 export default function StoreHeader({
   session, customerProfile, showSearch = true,
@@ -15,7 +15,7 @@ export default function StoreHeader({
   const [addressDisplay, setAddressDisplay] = useState('Fetching location...');
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [isAddressDropdownOpen, setIsAddressDropdownOpen] = useState(false);
-  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
   useEffect(() => {
@@ -29,10 +29,15 @@ export default function StoreHeader({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        setIsScrolledUp(true); // Scrolling down -> hide the top brand/address section
+      
+      if (currentScrollY <= 20) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY) {
+        // Scrolling down -> hide completely
+        setIsVisible(false);
       } else {
-        setIsScrolledUp(false); // Scrolling up -> show it back
+        // Scrolling up -> show header
+        setIsVisible(true);
       }
       setLastScrollY(currentScrollY);
     };
@@ -100,107 +105,103 @@ export default function StoreHeader({
   const parentCategories = activeCategories.filter(c => !c.parent_id);
 
   return (
-    <header className="sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md backdrop-blur-md transition-all duration-300">
+    <header className={`sticky top-0 z-40 bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white shadow-xl backdrop-blur-md transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
       
-      {/* Marquee Banner */}
-      <div className="bg-emerald-900/60 text-emerald-100 overflow-hidden py-1 px-3 text-[10px] font-bold tracking-wider uppercase border-b border-emerald-500/20">
-        <div className="whitespace-nowrap animate-marquee flex items-center justify-around">
-          <span>⚡ Quick & Free Delivery in Harraiya</span>
-          <span className="hidden sm:inline">⚡ Quick & Free Delivery in Harraiya</span>
-          <span className="hidden md:inline">⚡ Quick & Free Delivery in Harraiya</span>
+      {/* Top Brand & Delivery Banner */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-3 pb-2 flex items-center justify-between gap-3">
+        
+        {/* Logo & Delivery Location Picker */}
+        <div className="flex items-center gap-3 min-w-0 relative shrink-0">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center font-black text-sm shadow-md border border-white/30 group-hover:scale-105 transition overflow-hidden p-1">
+              <img src={logoImg} alt="KD Store Logo" className="w-full h-full object-contain" />
+            </div>
+          </button>
+          
+          <div className="min-w-0 relative">
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-white text-xs tracking-wider uppercase bg-emerald-900/50 px-2 py-0.5 rounded-md border border-emerald-400/30 flex items-center gap-1 shadow-xs">
+                <Zap size={10} className="text-amber-400 fill-amber-400" /> KD Store
+              </span>
+            </div>
+            
+            <button
+              onClick={() => session?.user && savedAddresses.length > 0 && setIsAddressDropdownOpen(!isAddressDropdownOpen)}
+              className="text-[11px] text-emerald-100 font-medium truncate flex items-center gap-1 hover:text-white transition cursor-pointer text-left opacity-95 leading-tight mt-1"
+            >
+              <MapPin size={12} className="text-emerald-300 shrink-0" />
+              <span className="truncate max-w-[180px] sm:max-w-xs">{addressDisplay}</span>
+              {session?.user && savedAddresses.length > 0 && <ChevronDown size={11} className="shrink-0 text-emerald-200" />}
+            </button>
+
+            {isAddressDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white text-stone-900 rounded-2xl shadow-xl border border-stone-200/90 py-1.5 z-50 space-y-0.5">
+                <div className="px-3 py-1.5 border-b border-stone-100 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Select Address</span>
+                  <button 
+                    onClick={() => { setIsAddressDropdownOpen(false); navigate('/account/address'); }}
+                    className="text-[10px] font-bold text-emerald-600 hover:underline cursor-pointer"
+                  >
+                    Manage
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-0.5 px-1">
+                  {savedAddresses.map((addr, idx) => (
+                    <button
+                      key={addr.id || idx}
+                      onClick={() => handleSelectAddress(addr)}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-50 transition flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <span className="font-bold text-stone-700 truncate pr-2">{addr.address || addr.street || addr.city}</span>
+                      {addressDisplay.includes(addr.address || addr.street) && <Check size={12} className="text-emerald-600 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        {showSearch && (
+          <div className="flex flex-1 max-w-sm sm:max-w-md mx-3 relative">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery || ''}
+              onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+              placeholder="Search groceries, vegetables..."
+              className="w-full bg-white text-stone-900 placeholder:text-stone-400 text-xs font-medium pl-10 pr-4 py-2.5 rounded-2xl shadow-md outline-none focus:ring-2 focus:ring-emerald-300 transition border border-stone-200/80"
+            />
+          </div>
+        )}
+
+        {/* Right Action Notification Bell */}
+        <div className="flex items-center gap-2 shrink-0">
+          <NotificationBell session={session} size={18} className="text-white hover:bg-white/20 p-2.5 rounded-2xl transition shadow-xs" />
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-10 py-2.5 space-y-2.5">
-        
-        {/* Main Row: Brand, Search, and Notification (Collapses/Hides on Scroll Down) */}
-        <div className={`flex items-center justify-between gap-3 transition-all duration-300 overflow-hidden ${isScrolledUp ? 'max-h-0 opacity-0 py-0 m-0 pointer-events-none' : 'max-h-24 opacity-100'}`}>
-          
-          {/* Logo & Address Selector */}
-          <div className="flex items-center gap-2 min-w-0 relative shrink-0">
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center cursor-pointer group"
-            >
-              <div className="w-8 h-8 rounded-xl bg-white/15 backdrop-blur-md text-white flex items-center justify-center font-black text-xs shadow-inner border border-white/20 group-hover:scale-105 transition overflow-hidden p-0.5">
-                <img src={logoImg} alt="KD Store Logo" className="w-full h-full object-contain" />
-              </div>
-            </button>
-            
-            <div className="min-w-0 relative">
-              <h1 className="font-black text-white text-xs tracking-tight truncate drop-shadow-sm leading-tight">KD Store</h1>
-              
-              <button
-                onClick={() => session?.user && savedAddresses.length > 0 && setIsAddressDropdownOpen(!isAddressDropdownOpen)}
-                className="text-[10.5px] text-emerald-100 font-medium truncate flex items-center gap-1 hover:text-white transition cursor-pointer text-left opacity-90 leading-tight"
-              >
-                <MapPin size={10} className="text-emerald-300 shrink-0" />
-                <span className="truncate max-w-[150px] sm:max-w-xs">{addressDisplay}</span>
-                {session?.user && savedAddresses.length > 0 && <ChevronDown size={10} className="shrink-0 text-emerald-200" />}
-              </button>
-
-              {isAddressDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white text-stone-900 rounded-2xl shadow-xl border border-stone-200/90 py-1.5 z-50 space-y-0.5">
-                  <div className="px-2.5 py-1.5 border-b border-stone-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Select Address</span>
-                    <button 
-                      onClick={() => { setIsAddressDropdownOpen(false); navigate('/account/address'); }}
-                      className="text-[10px] font-bold text-emerald-600 hover:underline cursor-pointer"
-                    >
-                      Manage
-                    </button>
-                  </div>
-                  <div className="max-h-40 overflow-y-auto space-y-0.5 px-1">
-                    {savedAddresses.map((addr, idx) => (
-                      <button
-                        key={addr.id || idx}
-                        onClick={() => handleSelectAddress(addr)}
-                        className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-emerald-50 transition flex items-center justify-between group cursor-pointer text-xs"
-                      >
-                        <span className="font-bold text-stone-700 truncate pr-2">{addr.address || addr.street || addr.city}</span>
-                        {addressDisplay.includes(addr.address || addr.street) && <Check size={12} className="text-emerald-600 shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Central Search Bar */}
-          {showSearch && (
-            <div className="flex flex-1 max-w-sm sm:max-w-md mx-3 relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                value={searchQuery || ''}
-                onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-                placeholder="Search groceries, vegetables..."
-                className="w-full bg-white/95 text-stone-900 placeholder:text-stone-400 text-xs font-medium pl-9 pr-3.5 py-2 rounded-2xl shadow-inner outline-none focus:ring-2 focus:ring-emerald-300 transition"
-              />
-            </div>
-          )}
-
-          {/* Right Action Notification Bell */}
-          <div className="flex items-center gap-2 shrink-0">
-            <NotificationBell session={session} size={16} className="text-white hover:bg-white/20 p-2 rounded-xl transition" />
-          </div>
-        </div>
-
-        {/* Seamless Integrated Category Strip */}
-        <div className="pt-2 pb-1.5 overflow-x-auto scrollbar-none flex items-start gap-6 border-t border-emerald-500/20 mt-1">
+      {/* Seamless Integrated Category Strip with Pure White Background for Content Merging */}
+      <div className="bg-white text-slate-900 px-4 sm:px-8 pt-3 pb-3.5 rounded-b-[2.5rem] shadow-lg border-t border-emerald-500/20 max-w-[1600px] mx-auto">
+        <div className="overflow-x-auto scrollbar-none flex items-center gap-6">
           <button
             onClick={() => setActiveCategory && setActiveCategory('All')}
-            className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition pb-2 border-b-2 relative w-18 text-center ${
-              activeCategory === 'All' ? 'border-white text-white font-black' : 'border-transparent text-emerald-100 hover:text-white'
+            className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition relative w-18 text-center ${
+              activeCategory === 'All' ? 'text-emerald-600 font-black' : 'text-stone-700 hover:text-slate-900 font-bold'
             }`}
           >
-            <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center group-hover:scale-105 transition shadow-sm mb-1 mx-auto">
-              <Package size={20} className="text-white" />
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-105 transition shadow-2xs mb-1 mx-auto border ${
+              activeCategory === 'All' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-stone-50 border-stone-200/80 text-stone-700'
+            }`}>
+              <Package size={20} className={activeCategory === 'All' ? 'text-emerald-600' : 'text-stone-700'} />
             </div>
-            <span className="text-xs font-black tracking-tight leading-tight line-clamp-2 w-full">All</span>
+            <span className="text-xs tracking-tight leading-tight line-clamp-1 w-full">All</span>
             {activeCategory === 'All' && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-7 h-1 bg-white rounded-t-full" />
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-1 bg-emerald-600 rounded-t-full" />
             )}
           </button>
 
@@ -215,27 +216,29 @@ export default function StoreHeader({
               <button
                 key={cat.id || cat.name}
                 onClick={() => setActiveCategory && setActiveCategory(cat.id)}
-                className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition pb-2 border-b-2 relative w-18 text-center ${
-                  isSelected ? 'border-white text-white font-black' : 'border-transparent text-emerald-100 hover:text-white'
+                className={`flex flex-col items-center justify-center shrink-0 cursor-pointer group transition relative w-18 text-center ${
+                  isSelected ? 'text-emerald-600 font-black' : 'text-stone-700 hover:text-slate-900 font-bold'
                 }`}
               >
-                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center group-hover:scale-105 transition shadow-sm mb-1 overflow-hidden p-1 mx-auto">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-105 transition shadow-2xs mb-1 overflow-hidden p-1 mx-auto border ${
+                  isSelected ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-stone-50 border-stone-200/80 text-stone-700'
+                }`}>
                   {catImage ? (
                     <img src={catImage} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
                   ) : (
-                    <FallbackIconComponent size={20} className="text-white" />
+                    <FallbackIconComponent size={20} className={isSelected ? 'text-emerald-600' : 'text-stone-700'} />
                   )}
                 </div>
-                <span className="text-xs font-black tracking-tight leading-tight line-clamp-2 w-full">{cat.name}</span>
+                <span className="text-xs tracking-tight leading-tight line-clamp-1 w-full">{cat.name}</span>
                 {isSelected && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-7 h-1 bg-white rounded-t-full" />
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-1 bg-emerald-600 rounded-t-full" />
                 )}
               </button>
             );
           })}
         </div>
-
       </div>
+
     </header>
   );
 }

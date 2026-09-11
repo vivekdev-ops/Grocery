@@ -12,7 +12,7 @@ import CustomerFeedbackModal from './CustomerFeedbackModal';
 import PortalBottomNav from './PortalBottomNav';
 import { calculateDistanceKm } from '../utils/distance';
 import { registerPushToken, notifyAdminOrderPlaced, notifyShopkeeperOrderPlaced, notifyCustomerOrderStatus } from '../utils/notifications';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Import Modular Components
 import StoreHeader from './store/StoreHeader';
@@ -1868,7 +1868,7 @@ export default function CustomerStorefront() {
         }}
       />
 
-      {/* Product Details Modal */}
+      {/* Product Details Modal - Optimized Layout with Floating Action Bar above Bottom Nav */}
       {selectedProductDetails && (() => {
         const modalImages = selectedProductDetails.images || selectedProductDetails.gallery || [selectedProductDetails.image_url].filter(Boolean);
         const variants = selectedProductDetails.variants || selectedProductDetails.product_variants || [];
@@ -1903,81 +1903,104 @@ export default function CustomerStorefront() {
         const reviewCountNum = selectedProductDetails.reviewCount || productReviews.length || 1;
 
         return (
-          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 font-sans p-0 sm:p-4">
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center z-[1100] font-sans p-0 sm:p-4">
             <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-white rounded-t-[2.5rem] sm:rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 220 }}
+              className="bg-white rounded-t-[2.5rem] sm:rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh] mb-16 sm:mb-0"
             >
+              {/* Modal Sticky Top Header */}
               <div className="px-6 py-4 flex items-center justify-between border-b border-stone-100 bg-white sticky top-0 z-20">
                 <button 
                   onClick={() => setSelectedProductDetails(null)}
-                  className="p-1 -ml-1 text-slate-900 hover:bg-stone-100 rounded-full transition cursor-pointer"
+                  className="p-1.5 -ml-1 text-slate-900 hover:bg-stone-100 rounded-full transition cursor-pointer"
+                  title="Back"
                 >
-                  <ArrowLeft size={22} className="stroke-[2.5]" />
+                  <ArrowLeft size={20} className="stroke-[2.5]" />
                 </button>
-                <h3 className="font-black text-slate-900 text-base">Item Details</h3>
+                <h3 className="font-black text-slate-900 text-sm sm:text-base">Product Details</h3>
                 <button 
                   onClick={(e) => toggleWishlist(selectedProductDetails.id, e)}
-                  className="p-1 text-stone-700 hover:text-rose-500 transition cursor-pointer"
+                  className="p-2 text-stone-700 hover:text-rose-500 transition cursor-pointer"
+                  title="Wishlist"
                 >
-                  <Heart size={22} className={wishlistIds.includes(selectedProductDetails.id) ? 'fill-rose-500 text-rose-500' : ''} />
+                  <Heart size={20} className={wishlistIds.includes(selectedProductDetails.id) ? 'fill-rose-500 text-rose-500' : ''} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div className="space-y-4">
-                  <div className="aspect-[4/3] bg-stone-50 rounded-3xl flex items-center justify-center p-4 relative">
+              {/* Modal Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 pb-24">
+                
+                {/* Clean Product Image Carousel */}
+                <div className="space-y-3">
+                  <div className="aspect-[4/3] bg-stone-50/80 rounded-3xl flex items-center justify-center p-6 relative border border-stone-100">
                     <img 
                       src={activeGalleryImage || modalImages[0] || ''} 
                       alt={selectedProductDetails.name} 
-                      className="w-full h-full object-contain" 
+                      className="w-full h-full object-contain drop-shadow-md" 
                     />
                     {isModalOutOfStock && (
-                      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20">
-                        <span className="bg-white text-stone-950 text-xs font-black px-4 py-1.5 rounded-full uppercase">Sold Out</span>
+                      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20 rounded-3xl">
+                        <span className="bg-white text-stone-950 text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider">Sold Out</span>
                       </div>
                     )}
                   </div>
+
+                  {modalImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {modalImages.map((imgUrl, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveGalleryImage(imgUrl)}
+                          className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition cursor-pointer shrink-0 bg-stone-50 ${
+                            activeGalleryImage === imgUrl ? 'border-emerald-600 scale-105' : 'border-stone-200 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-3">
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
+                {/* Title, Rating & Pricing Block */}
+                <div className="space-y-3 bg-stone-50/50 p-5 rounded-3xl border border-stone-100">
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-snug">
                     {selectedProductDetails.name}
                   </h2>
 
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5 text-emerald-500">
+                    <div className="flex items-center gap-0.5 text-amber-500">
                       {[1, 2, 3, 4, 5].map((starIdx) => (
                         <Star 
                           key={starIdx} 
-                          size={14} 
-                          className={starIdx <= Math.round(ratingNum) ? 'fill-emerald-500 text-emerald-500' : 'text-stone-300'} 
+                          size={13} 
+                          className={starIdx <= Math.round(ratingNum) ? 'fill-amber-500 text-amber-500' : 'text-stone-300'} 
                         />
                       ))}
                     </div>
-                    <span className="font-extrabold text-slate-800 text-xs">
-                      {ratingNum.toFixed(1)} ({reviewCountNum} Reviews)
+                    <span className="font-bold text-slate-700 text-xs">
+                      {ratingNum.toFixed(1)} <span className="text-stone-400">({reviewCountNum} reviews)</span>
                     </span>
                   </div>
 
-                  <div className="flex items-baseline gap-3">
+                  <div className="flex items-baseline gap-3 pt-1">
                     <span className="text-2xl font-black text-slate-900">₹{modalPrice.toFixed(0)}</span>
                     {hasModalMrp && (
                       <span className="text-stone-400 line-through font-bold text-sm">₹{modalMrp.toFixed(0)}</span>
                     )}
                     {discountPct > 0 && (
-                      <span className="bg-emerald-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      <span className="bg-emerald-500 text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
                         {discountPct}% OFF
                       </span>
                     )}
                   </div>
 
                   {hasVariants && (
-                    <div className="pt-2">
-                      <label className="block text-[10px] font-black uppercase text-stone-400 mb-1">Select Size / Unit</label>
+                    <div className="pt-3 border-t border-stone-200/60 space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-stone-500">Select Variant / Unit</label>
                       <div className="flex flex-wrap gap-2">
                         {variants.map((v, idx) => {
                           const vKey = v.id || v.label || v.unit_label || idx;
@@ -1988,10 +2011,10 @@ export default function CustomerStorefront() {
                               key={vKey}
                               type="button"
                               onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer ${
+                              className={`px-3.5 py-2 rounded-2xl text-xs font-black border transition cursor-pointer ${
                                 isVarSelected 
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' 
-                                  : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                                  : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
                               }`}
                             >
                               {vLabel} • ₹{v.price}
@@ -2003,25 +2026,30 @@ export default function CustomerStorefront() {
                   )}
                 </div>
 
-                <div className="space-y-1 text-xs text-stone-600 leading-relaxed font-medium">
-                  <p>
-                    {isDescriptionExpanded 
-                      ? (selectedProductDetails.description || "No description provided by admin.")
-                      : ((selectedProductDetails.description || "No description provided by admin.").slice(0, 140) + ((selectedProductDetails.description || "").length > 140 ? '...' : ''))}
-                    {(selectedProductDetails.description || "").length > 140 && (
-                      <button 
-                        onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
-                        className="text-emerald-500 font-extrabold ml-1 hover:underline cursor-pointer"
-                      >
-                        {isDescriptionExpanded ? 'Read Less' : 'Read More'}
-                      </button>
-                    )}
-                  </p>
-                </div>
+                {/* Description Block */}
+                {selectedProductDetails.description && (
+                  <div className="space-y-2 bg-white p-5 rounded-3xl border border-stone-100">
+                    <h4 className="font-black text-xs uppercase tracking-wider text-stone-400">Product Information</h4>
+                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
+                      {isDescriptionExpanded 
+                        ? selectedProductDetails.description 
+                        : (selectedProductDetails.description.slice(0, 160) + (selectedProductDetails.description.length > 160 ? '...' : ''))}
+                      {selectedProductDetails.description.length > 160 && (
+                        <button 
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
+                          className="text-emerald-600 font-extrabold ml-1 hover:underline cursor-pointer"
+                        >
+                          {isDescriptionExpanded ? 'Show less' : 'Read more'}
+                        </button>
+                      )}
+                    </p>
+                  </div>
+                )}
 
+                {/* Similar Products Shelf */}
                 {similarProducts.length > 0 && (
-                  <div className="space-y-4 pt-4 border-t border-stone-100">
-                    <h3 className="font-black text-base text-slate-900 tracking-tight">Similar Products</h3>
+                  <div className="space-y-3 pt-2">
+                    <h4 className="font-black text-sm text-slate-900 tracking-tight">Similar Products</h4>
                     <div className="grid grid-cols-2 gap-3">
                       {similarProducts.map(p => {
                         const pImgs = p.images || p.gallery || [p.image_url].filter(Boolean);
@@ -2037,21 +2065,19 @@ export default function CustomerStorefront() {
                               setActiveGalleryImage(pImgs[0] || '');
                               await fetchProductReviews(p.id);
                             }}
-                            className="bg-stone-50/70 p-3.5 rounded-3xl border border-stone-100 cursor-pointer space-y-2 group"
+                            className="bg-white p-3.5 rounded-3xl border border-stone-200/80 cursor-pointer space-y-2 group hover:shadow-md transition"
                           >
-                            <div className="aspect-square bg-white rounded-2xl p-2 flex items-center justify-center relative">
+                            <div className="aspect-square bg-stone-50 rounded-2xl p-2 flex items-center justify-center relative">
                               <img src={pImgs[0] || ''} alt="" className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
-                              <Heart size={14} className="absolute top-2.5 right-2.5 text-stone-400" />
                             </div>
-                            <h4 className="font-extrabold text-xs text-slate-900 line-clamp-1">{p.name}</h4>
-                            <p className="text-[10px] text-stone-400 font-bold">{p.unit || '1 unit'}</p>
+                            <h5 className="font-bold text-xs text-slate-900 line-clamp-1">{p.name}</h5>
                             <div className="flex items-center justify-between pt-1">
                               <span className="font-black text-sm text-slate-900">₹{pPrice.toFixed(0)}</span>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); addToCart(p, pVar); }}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
                               >
-                                Add
+                                ADD
                               </button>
                             </div>
                           </div>
@@ -2060,21 +2086,23 @@ export default function CustomerStorefront() {
                     </div>
                   </div>
                 )}
+
               </div>
 
-              <div className="p-4 bg-white border-t border-stone-100 flex items-center gap-4 sticky bottom-0 z-30">
-                <div className="flex items-center bg-stone-100 rounded-2xl px-3 py-2 gap-3">
+              {/* Modal Floating Bottom Action Bar (Lifted above Bottom Nav) */}
+              <div className="p-3.5 bg-white/95 backdrop-blur-md border-t border-stone-200/80 flex items-center gap-3 sticky bottom-16 sm:bottom-0 z-30 shadow-2xl">
+                <div className="flex items-center bg-stone-100 rounded-2xl px-2.5 py-2 gap-2.5 border border-stone-200">
                   <button 
                     onClick={() => {
                       if (modalQty > 0) {
                         updateQuantity(modalCartItem.cartItemId, -1);
                       }
                     }}
-                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer p-1"
                   >
-                    <Minus size={16} />
+                    <Minus size={15} />
                   </button>
-                  <span className="font-black text-sm text-slate-900 w-4 text-center">{modalQty > 0 ? modalQty : 1}</span>
+                  <span className="font-black text-xs text-slate-900 w-4 text-center">{modalQty > 0 ? modalQty : 1}</span>
                   <button 
                     onClick={() => {
                       if (modalQty > 0) {
@@ -2083,9 +2111,9 @@ export default function CustomerStorefront() {
                         addToCart(selectedProductDetails, modalActiveVariant);
                       }
                     }}
-                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                    className="text-slate-600 hover:text-slate-900 font-bold cursor-pointer p-1"
                   >
-                    <Plus size={16} />
+                    <Plus size={15} />
                   </button>
                 </div>
 
@@ -2097,10 +2125,10 @@ export default function CustomerStorefront() {
                     setIsCartOpen(true);
                     setSelectedProductDetails(null);
                   }}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-500/25 transition cursor-pointer"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-600/25 transition cursor-pointer"
                 >
                   <span>Add to Cart</span>
-                  <span className="border-l border-emerald-400 pl-4">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
+                  <span className="border-l border-emerald-500 pl-3 font-mono text-xs">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
                 </button>
               </div>
             </motion.div>

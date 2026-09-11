@@ -51,12 +51,13 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.path ? currentPath === item.path : false;
+          const badgeCount = item.badge !== undefined ? item.badge : (item.label === 'Cart' ? totalItemsCount : 0);
 
           return (
             <button
               key={item.label}
               onClick={() => {
-                if (item.action) {
+                if (typeof item.action === 'function') {
                   item.action();
                 } else if (item.path) {
                   navigate(item.path);
@@ -68,9 +69,9 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
             >
               <div className="relative">
                 <Icon size={18} className={isActive ? 'text-emerald-600 scale-110' : ''} />
-                {item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black">
-                    {item.badge}
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow-xs z-10">
+                    {badgeCount}
                   </span>
                 )}
               </div>
