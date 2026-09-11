@@ -449,52 +449,7 @@ export default function ProductGrid({
         </div>
       )}
 
-      {/* Fixed Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200/80 py-2.5 px-6 z-50 shadow-2xl max-w-lg mx-auto sm:max-w-none sm:rounded-t-3xl">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          <button 
-            onClick={() => { setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 text-emerald-600 cursor-pointer group"
-          >
-            <div className="relative p-1.5 bg-emerald-50 rounded-xl transition group-hover:scale-105">
-              <Home size={20} className="stroke-[2.5]" />
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-emerald-500 rounded-full" />
-            </div>
-            <span className="text-[10px] font-black">Shop</span>
-          </button>
-
-          <button 
-            onClick={() => { if(onNavigate) onNavigate('wishlist'); else setActiveCategory(parentCategories[0]?.id || 'All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition group"
-          >
-            <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100">
-              <Heart size={20} className="stroke-[2]" />
-            </div>
-            <span className="text-[10px] font-bold">Favourite</span>
-          </button>
-
-          <button 
-            onClick={() => { if(onOpenCart) onOpenCart(); }}
-            className="flex flex-col items-center gap-1 text-stone-400 hover:text-stone-700 cursor-pointer transition group"
-          >
-            <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100">
-              <ShoppingBag size={20} className="stroke-[2]" />
-            </div>
-            <span className="text-[10px] font-bold">Cart</span>
-          </button>
-
-          <button 
-            onClick={() => { if(onNavigate) onNavigate('profile'); }}
-            className="flex flex-col items-center group cursor-pointer transition text-stone-400 hover:text-stone-700"
-          >
-            <div className="p-1.5 rounded-xl transition group-hover:bg-stone-100">
-              <User size={20} className="stroke-[2]" />
-            </div>
-            <span className="text-[10px] font-bold">Account</span>
-          </button>
-        </div>
-      </div>
-
+      
     </main>
   );
 }
