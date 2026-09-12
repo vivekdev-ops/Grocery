@@ -40,13 +40,12 @@ import StoreHeader from './store/StoreHeader';
 import Footer from './Footer';
 import InvoiceModal from './InvoiceModal';
 import PortalBottomNav from '../components/PortalBottomNav';
+import CartDrawer from './store/CartDrawer';
 
 
 /* =========================================================
    HELPERS
 ========================================================= */
-
-const PAGE_SIZE = 5;
 
 const formatCurrency = (value) => {
   const amount = Number(value) || 0;
@@ -416,6 +415,31 @@ const CustomerOrdersPage = () => {
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // Checkout and Address states for CartDrawer
+  const [deliveryRules, setDeliveryRules] = useState([]);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [selectedAddressDistance, setSelectedAddressDistance] = useState(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [showAddAddressBox, setShowAddAddressBox] = useState(false);
+  const [newAddressForm, setNewAddressForm] = useState({
+    title: 'Home',
+    house_no: '',
+    ward_no_name: '',
+    city: 'Harraiya',
+    district: 'Basti',
+    state: 'Uttar Pradesh',
+    pincode: '272155',
+    phone: '',
+    latitude: null,
+    longitude: null
+  });
+  const [addressForm, setAddressForm] = useState({ phone: '', address: '' });
+  const [checkingOut, setCheckingOut] = useState(false);
+
 
   /* =======================================================
      AUTH INITIALIZATION
@@ -468,6 +492,8 @@ const CustomerOrdersPage = () => {
         setUser(profile);
 
         await loadOrders(currentUser.email);
+        await fetchSavedAddresses(currentUser.id);
+        await fetchDeliveryRules();
       } catch (error) {
         console.error(
           'Customer orders initialization error:',
@@ -515,7 +541,7 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     LOAD ALL ORDERS WITH FLEXIBLE STAFF LOOKUP
+     LOAD ALL ORDERS WITH DECOUPLED STAFF PROFILE FETCHING
   ======================================================= */
 
   const loadOrders = async (emailOverride = null) => {
@@ -552,7 +578,7 @@ const CustomerOrdersPage = () => {
 
       const rawOrders = Array.isArray(ordersData) ? ordersData : [];
 
-      // Collect all potential staff identifier keys across the 3 columns
+      // Collect all potential staff identifier keys across delivery columns
       const staffIds = new Set();
       rawOrders.forEach(o => {
         if (o.delivery_boy_id) staffIds.add(o.delivery_boy_id);
@@ -564,8 +590,6 @@ const CustomerOrdersPage = () => {
 
       if (staffIds.size > 0) {
         const idsArray = Array.from(staffIds);
-        
-        // Fetch from staff_profiles matching either primary id or user_id
         const { data: staffData } = await supabase
           .from('staff_profiles')
           .select('id, user_id, full_name, name, phone, role')
@@ -579,7 +603,6 @@ const CustomerOrdersPage = () => {
         }
       }
 
-      // Map the correct staff profile to each order based on any available assignment column
       const enrichedOrders = rawOrders.map(order => {
         const assignedKey = order.delivery_boy_id || order.delivery_partner_id || order.delivery_agent_id;
         return {
@@ -594,6 +617,115 @@ const CustomerOrdersPage = () => {
       setOrders([]);
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+
+  /* =======================================================
+     ADDRESS & CHECKOUT HELPERS
+  ======================================================= */
+
+  const fetchSavedAddresses = async (userId) => {
+    const { data } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      setSavedAddresses(data);
+      handleSelectAddress(data[0]);
+    }
+  };
+
+  const fetchDeliveryRules = async () => {
+    const { data } = await supabase.from('delivery_rules').select('*');
+    if (data) setDeliveryRules(data);
+  };
+
+  const handleSelectAddress = (addrObj) => {
+    setSelectedAddressId(addrObj.id);
+    setAddressForm(prev => ({ ...prev, phone: addrObj.phone, address: addrObj.address }));
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponInput.trim().toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error || !data) {
+        alert("Invalid or inactive coupon code.");
+        return;
+      }
+      setAppliedCoupon(data);
+      setCouponInput('');
+      alert("Coupon applied successfully!");
+    } catch (err) {
+      alert("Failed to apply coupon.");
+    }
+  };
+
+  const handleCheckout = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (!authUser) { navigate('/login'); return; }
+
+    if (!cart || cart.length === 0) {
+      alert("Your cart is empty.");
+      return;
+    }
+
+    setCheckingOut(true);
+    try {
+      const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const cartTotal = Math.max(0, cartSubtotal - discountAmount) + deliveryFee;
+
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_email: authUser.email,
+          customer_id: authUser.id,
+          total_amount: cartTotal,
+          status: 'pending',
+          delivery_address: addressForm.address,
+          phone: addressForm.phone,
+          otp: generatedOtp,
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          discount_amount: discountAmount,
+          delivery_fee: deliveryFee,
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const itemsToInsert = cart.map(item => ({
+        order_id: orderData.id,
+        product_id: item?.product?.id || item?.id || item?.product_id,
+        variant_id: item?.variant?.id || null,
+        variant_label: item?.variant?.unit_label || item?.variant?.label || null,
+        quantity: Number(item?.quantity) || 1,
+        price: Number(item?.price) || 0
+      }));
+
+      await supabase.from('order_items').insert(itemsToInsert);
+
+      setCart([]);
+      localStorage.removeItem('cart_items');
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: [] }));
+      window.dispatchEvent(new Event('storage'));
+      setIsCartOpen(false);
+      alert("Order placed successfully!");
+      navigate('/account/orders');
+    } catch (err) {
+      alert(`Checkout failed: ${err.message}`);
+    } finally {
+      setCheckingOut(false);
     }
   };
 
@@ -1035,7 +1167,6 @@ const CustomerOrdersPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 text-stone-900 pb-36 font-sans selection:bg-orange-600 selection:text-white text-xs">
       
-
       {/* Top Header matching dark orange aesthetic */}
       <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 md:px-12 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-md">
         <button
@@ -1289,6 +1420,41 @@ const CustomerOrdersPage = () => {
         onOpenCart={() => setIsCartOpen(true)}
       />
 
+      {/* Cart Drawer Component */}
+      <CartDrawer 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        totalItemsCount={totalItemsCount}
+        session={authUser ? { user: authUser } : null}
+        savedAddresses={savedAddresses}
+        selectedAddressId={selectedAddressId}
+        handleSelectAddress={handleSelectAddress}
+        showAddAddressBox={showAddAddressBox}
+        setShowAddAddressBox={setShowAddAddressBox}
+        newAddressForm={newAddressForm}
+        setNewAddressForm={setNewAddressForm}
+        detectCustomerLocation={() => {}}
+        handleAddAddress={() => {}}
+        handleDeleteAddress={() => {}}
+        updateQuantity={() => {}}
+        appliedCoupon={appliedCoupon}
+        setAppliedCoupon={setAppliedCoupon}
+        couponInput={couponInput}
+        setCouponInput={setCouponInput}
+        handleApplyCoupon={handleApplyCoupon}
+        removeCoupon={() => { setAppliedCoupon(null); setDiscountAmount(0); }}
+        cartSubtotal={cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+        discountAmount={discountAmount}
+        selectedAddressDistance={selectedAddressDistance}
+        deliveryFee={deliveryFee}
+        cartTotal={cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) - discountAmount + deliveryFee}
+        checkingOut={checkingOut}
+        handleCheckout={handleCheckout}
+        navigate={navigate}
+        addToCart={() => {}}
+      />
+
       {/* ===================================================
           ORDER DETAILS & TRACKING MODAL
       =================================================== */}
@@ -1384,7 +1550,7 @@ const CustomerOrdersPage = () => {
                 </div>
               )}
 
-{/* ASSIGNED DELIVERY PARTNER CARD */}
+              {/* ASSIGNED DELIVERY PARTNER CARD OR STATUS */}
               {selectedOrder?.delivery_boy_id || selectedOrder?.delivery_partner_id || selectedOrder?.delivery_agent_id ? (
                 <div className="bg-orange-50/70 rounded-2xl p-4 border border-orange-200/80 space-y-2">
                   <h4 className="font-black text-orange-900 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
