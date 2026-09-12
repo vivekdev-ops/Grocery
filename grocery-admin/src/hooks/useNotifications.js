@@ -1,8 +1,9 @@
+// src/hooks/useNotifications.js
 /**
  * useNotifications.js
  *
  * Fetches in-app notifications and subscribes to new ones in real-time.
- * Falls back to polling every 10s if Realtime subscription fails.
+ * Uses a unique channel instance per mount to prevent duplicate subscription collisions.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -13,7 +14,7 @@ const PAGE_SIZE = 30;
 export function useNotifications(session) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
-  const [loading, setLoading]             = useState(false);
+  const [loading, setLoading]            = useState(false);
   const channelRef  = useRef(null);
   const pollRef     = useRef(null);
 
@@ -45,9 +46,11 @@ export function useNotifications(session) {
 
     fetchNotifications();
 
-    // 1. Try Realtime subscription
+    // Use a unique channel suffix per mount to avoid collision with cached channel names in Supabase
+    const uniqueChannelName = `notifications_${userId}_${Math.random().toString(36).substring(2, 9)}`;
+
     const channel = supabase
-      .channel(`notifications_${userId}`)
+      .channel(uniqueChannelName)
       .on(
         'postgres_changes',
         {
@@ -65,13 +68,11 @@ export function useNotifications(session) {
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          // Realtime is working — no need for polling
           if (pollRef.current) {
             clearInterval(pollRef.current);
             pollRef.current = null;
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Realtime failed — start polling every 8 seconds as fallback
           console.warn('[useNotifications] Realtime unavailable, falling back to polling');
           if (!pollRef.current) {
             pollRef.current = setInterval(fetchNotifications, 8000);

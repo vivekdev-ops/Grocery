@@ -1,5 +1,5 @@
 // src/pages/CustomerOrdersPage.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -28,7 +28,9 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
-  MoreVertical
+  MoreVertical,
+  Layers,
+  Tag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -43,6 +45,8 @@ import PortalBottomNav from '../components/PortalBottomNav';
 /* =========================================================
    HELPERS
 ========================================================= */
+
+const PAGE_SIZE = 5;
 
 const formatCurrency = (value) => {
   const amount = Number(value) || 0;
@@ -511,7 +515,7 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     LOAD ORDERS
+     LOAD ALL ORDERS WITH FLEXIBLE STAFF LOOKUP
   ======================================================= */
 
   const loadOrders = async (emailOverride = null) => {
@@ -525,7 +529,7 @@ const CustomerOrdersPage = () => {
     try {
       setLoadingOrders(true);
 
-      const { data, error } = await supabase
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -544,9 +548,47 @@ const CustomerOrdersPage = () => {
           ascending: false,
         });
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      setOrders(Array.isArray(data) ? data : []);
+      const rawOrders = Array.isArray(ordersData) ? ordersData : [];
+
+      // Collect all potential staff identifier keys across the 3 columns
+      const staffIds = new Set();
+      rawOrders.forEach(o => {
+        if (o.delivery_boy_id) staffIds.add(o.delivery_boy_id);
+        if (o.delivery_partner_id) staffIds.add(o.delivery_partner_id);
+        if (o.delivery_agent_id) staffIds.add(o.delivery_agent_id);
+      });
+
+      let staffMap = {};
+
+      if (staffIds.size > 0) {
+        const idsArray = Array.from(staffIds);
+        
+        // Fetch from staff_profiles matching either primary id or user_id
+        const { data: staffData } = await supabase
+          .from('staff_profiles')
+          .select('id, user_id, full_name, name, phone, role')
+          .or(`id.in.(${idsArray.join(',')}),user_id.in.(${idsArray.join(',')})`);
+
+        if (staffData) {
+          staffData.forEach(staff => {
+            staffMap[staff.id] = staff;
+            staffMap[staff.user_id] = staff;
+          });
+        }
+      }
+
+      // Map the correct staff profile to each order based on any available assignment column
+      const enrichedOrders = rawOrders.map(order => {
+        const assignedKey = order.delivery_boy_id || order.delivery_partner_id || order.delivery_agent_id;
+        return {
+          ...order,
+          staff_profiles: assignedKey ? staffMap[assignedKey] || null : null
+        };
+      });
+
+      setOrders(enrichedOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
       setOrders([]);
@@ -959,7 +1001,7 @@ const CustomerOrdersPage = () => {
       <div className="min-h-screen bg-stone-50 font-sans text-xs">
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto mb-2" />
+            <Loader2 className="w-6 h-6 animate-spin text-orange-600 mx-auto mb-2" />
             <p className="text-stone-500 font-bold">Loading...</p>
           </div>
         </div>
@@ -970,36 +1012,52 @@ const CustomerOrdersPage = () => {
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+  // Calculations for selected order modal
+  const selectedOrderItems = Array.isArray(selectedOrder?.order_items) ? selectedOrder.order_items : [];
+  
+  const totalMrpSum = selectedOrderItems.reduce((sum, item) => {
+    const product = item?.products;
+    const variant = findOrderItemVariant(item, product);
+    const itemPrice = Number(item?.price) || 0;
+    const itemMrp = Number(variant?.mrp || item?.mrp || product?.mrp) || itemPrice;
+    const qty = Number(item?.quantity) || 1;
+    return sum + (itemMrp * qty);
+  }, 0);
+
+  const orderItemsSubtotal = getOrderItemsSubtotal(selectedOrder);
+  const totalDiscountFromMrp = Math.max(0, totalMrpSum - orderItemsSubtotal);
+
 
   /* =======================================================
      MAIN UI
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50/40 via-emerald-50/20 to-teal-50/30 text-stone-900 pb-36 font-sans selection:bg-emerald-500 selection:text-white text-xs">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 text-stone-900 pb-36 font-sans selection:bg-orange-600 selection:text-white text-xs">
       
-      {/* Top Header matching modern store aesthetics */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white px-4 md:px-12 py-5 flex items-center gap-4 sticky top-0 z-30 shadow-md">
+
+      {/* Top Header matching dark orange aesthetic */}
+      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 md:px-12 py-3 flex items-center gap-3 sticky top-0 z-30 shadow-md">
         <button
           onClick={() => navigate('/')}
-          className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer border border-white/20"
+          className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md hover:bg-white/30 text-white flex items-center justify-center transition cursor-pointer border border-white/30"
           title="Back to Home"
         >
-          <ArrowLeft size={18} className="stroke-[2.5]" />
+          <ArrowLeft size={16} className="stroke-[2.5]" />
         </button>
         <div>
-          <h1 className="font-black text-white text-base md:text-xl tracking-tight">Order History</h1>
-          <p className="text-[11px] text-emerald-100 font-medium">Track, manage and review your purchases</p>
+          <h1 className="font-black text-white text-sm md:text-base tracking-tight">Order History</h1>
+          <p className="text-[10px] text-amber-100 font-medium">Track, manage and review your purchases</p>
         </div>
       </div>
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {/* =================================================
-            FILTERS & SEARCH SECTION
+            FILTERS & SEARCH SECTION (Grouped as Compact Icon Pills)
         ================================================= */}
-        <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 shadow-xl shadow-emerald-950/5 p-4 sm:p-5 space-y-4">
-          {/* Search Input Bar updated to "Search Order" */}
+        <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-orange-100 shadow-xl shadow-orange-950/5 p-3.5 sm:p-4 space-y-3">
+          {/* Search Input Bar */}
           <div className="relative w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
             <input
@@ -1007,7 +1065,7 @@ const CustomerOrdersPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search Order by ID or Product Name..."
-              className="w-full bg-stone-50/70 border-2 border-stone-200/80 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-2xs"
+              className="w-full bg-stone-50/70 border-2 border-stone-200/80 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:bg-white focus:border-orange-600 focus:ring-4 focus:ring-orange-500/10 transition-all shadow-2xs"
             />
             {searchTerm && (
               <button
@@ -1019,27 +1077,31 @@ const CustomerOrdersPage = () => {
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-            {/* Status Filter Pills */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+            {/* Status Filter Grouped Icons / Compact Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               {[
-                { id: 'all', label: 'All Orders' },
-                { id: 'active', label: 'Active' },
-                { id: 'delivered', label: 'Delivered' },
-                { id: 'cancelled', label: 'Cancelled' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3.5 py-2 rounded-2xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
-                    statusFilter === tab.id
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/20'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                { id: 'all', label: 'All', icon: Layers },
+                { id: 'active', label: 'Active', icon: Clock },
+                { id: 'delivered', label: 'Delivered', icon: CheckCircle2 },
+                { id: 'cancelled', label: 'Cancelled', icon: Ban }
+              ].map((tab) => {
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setStatusFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap shadow-2xs inline-flex items-center gap-1.5 ${
+                      statusFilter === tab.id
+                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-orange-600/20'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
+                    }`}
+                  >
+                    <IconComponent size={13} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Sort Dropdown */}
@@ -1047,7 +1109,7 @@ const CustomerOrdersPage = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-stone-100 border-2 border-stone-200 rounded-2xl px-3.5 py-2 text-[11px] font-bold text-stone-800 outline-none cursor-pointer focus:border-emerald-600 transition"
+                className="bg-stone-100 border-2 border-stone-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-stone-800 outline-none cursor-pointer focus:border-orange-600 transition"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -1063,13 +1125,13 @@ const CustomerOrdersPage = () => {
         ================================================= */}
         <section>
           {loadingOrders ? (
-            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 p-12 text-center shadow-xl">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
-              <p className="text-stone-500 font-bold">Loading your orders...</p>
+            <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto mb-3" />
+              <p className="text-stone-500 font-bold">Loading orders...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 p-12 text-center shadow-xl space-y-3">
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto border border-emerald-100 shadow-inner">
+            <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl space-y-3">
+              <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-3xl flex items-center justify-center mx-auto border border-orange-100 shadow-inner">
                 <Package className="w-8 h-8" />
               </div>
               <div>
@@ -1079,7 +1141,7 @@ const CustomerOrdersPage = () => {
               {!searchTerm && statusFilter === 'all' && (
                 <button
                   onClick={() => navigate('/')}
-                  className="mt-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black shadow-lg shadow-emerald-600/20 cursor-pointer transition active:scale-95 uppercase tracking-wider text-xs"
+                  className="mt-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black shadow-lg shadow-orange-600/20 cursor-pointer transition active:scale-95 uppercase tracking-wider text-xs"
                 >
                   Start Shopping
                 </button>
@@ -1108,13 +1170,13 @@ const CustomerOrdersPage = () => {
                 return (
                   <div
                     key={orderId}
-                    className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] border border-emerald-100 shadow-xl shadow-emerald-950/5 hover:shadow-2xl transition duration-300 overflow-hidden p-5 space-y-4"
+                    className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 shadow-xl shadow-orange-950/5 hover:shadow-2xl transition duration-300 overflow-hidden p-5 space-y-4"
                   >
-                    {/* Top Row: Green Check Badge, Title, Subtitle, Actions */}
+                    {/* Top Row: Icon Badge, Title, Subtitle, Actions */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3.5">
                         <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
-                          isDelivered ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                          isDelivered ? 'bg-orange-50 text-orange-600 border border-orange-200' :
                           isCancelled ? 'bg-rose-50 text-rose-600 border border-rose-200' :
                           'bg-amber-50 text-amber-600 border border-amber-200'
                         }`}>
@@ -1185,7 +1247,7 @@ const CustomerOrdersPage = () => {
                       })}
 
                       {items.length > 5 && (
-                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-center text-emerald-700 font-black text-xs shrink-0 shadow-2xs">
+                        <div className="w-16 h-16 bg-orange-50 rounded-2xl border border-orange-200 flex items-center justify-center text-orange-700 font-black text-xs shrink-0 shadow-2xs">
                           +{items.length - 4}
                         </div>
                       )}
@@ -1196,7 +1258,7 @@ const CustomerOrdersPage = () => {
                       <button
                         onClick={() => handleReorder(order)}
                         disabled={reorderingOrderId === orderId}
-                        className="text-emerald-600 hover:text-emerald-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                        className="text-orange-600 hover:text-orange-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
                       >
                         {reorderingOrderId === orderId ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1206,7 +1268,7 @@ const CustomerOrdersPage = () => {
 
                       <button
                         onClick={() => setSelectedOrder(order)}
-                        className="text-emerald-600 hover:text-emerald-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
+                        className="text-orange-600 hover:text-orange-700 font-extrabold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 py-1"
                       >
                         <span>View Details</span>
                       </button>
@@ -1236,7 +1298,7 @@ const CustomerOrdersPage = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-emerald-100"
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-orange-100"
           >
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4 flex items-center justify-between">
               <div>
@@ -1258,7 +1320,7 @@ const CustomerOrdersPage = () => {
 
             <div className="p-6 space-y-5">
               {/* TRACKING PROGRESS */}
-              <div className="bg-emerald-50/30 p-4 rounded-3xl border border-emerald-100">
+              <div className="bg-orange-50/30 p-4 rounded-3xl border border-orange-100">
                 <h3 className="font-black text-slate-900 mb-3 text-[11px] uppercase tracking-wider">Live Tracking Status</h3>
                 <div className="overflow-x-auto pb-1">
                   <div className="flex min-w-[420px]">
@@ -1271,7 +1333,7 @@ const CustomerOrdersPage = () => {
                             <div
                               className={`w-8 h-8 rounded-full flex items-center justify-center border shrink-0 transition-all ${
                                 step.completed || step.active
-                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                  ? 'bg-orange-600 border-orange-600 text-white shadow-md shadow-orange-600/30'
                                   : 'bg-white border-stone-300 text-stone-400'
                               }`}
                             >
@@ -1281,7 +1343,7 @@ const CustomerOrdersPage = () => {
                             {index < allSteps.length - 1 && (
                               <div
                                 className={`h-1 flex-1 mx-1.5 rounded-full ${
-                                  step.completed ? 'bg-emerald-600' : 'bg-stone-200'
+                                  step.completed ? 'bg-orange-600' : 'bg-stone-200'
                                 }`}
                               />
                             )}
@@ -1289,7 +1351,7 @@ const CustomerOrdersPage = () => {
 
                           <p
                             className={`text-[11px] mt-2 font-bold truncate ${
-                              step.active ? 'text-emerald-700 font-black' : 'text-stone-500'
+                              step.active ? 'text-orange-700 font-black' : 'text-stone-500'
                             }`}
                           >
                             {step.label}
@@ -1303,11 +1365,11 @@ const CustomerOrdersPage = () => {
 
               {/* ── OTP BANNER IN MODAL ── */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'DELIVERED' && normalizeOrderStatus(getOrderStatus(selectedOrder)) !== 'CANCELLED' && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                    <ShieldCheck size={16} className="text-emerald-600" /> Delivery Verification OTP:
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-orange-600" /> Delivery Verification OTP:
                   </span>
-                  <span className="font-mono font-black text-lg text-emerald-700 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-emerald-300 shadow-xs">
+                  <span className="font-mono font-black text-lg text-orange-700 tracking-widest bg-white px-4 py-1.5 rounded-xl border border-orange-300 shadow-xs">
                     {selectedOrder?.otp || '----'}
                   </span>
                 </div>
@@ -1315,10 +1377,47 @@ const CustomerOrdersPage = () => {
 
               {/* FULFILLMENT DURATION */}
               {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' && selectedOrder?.created_at && (
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
+                <div className="bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md">
                   <span className="font-black flex items-center gap-2 text-xs">
                     <CheckCircle2 size={18} /> Successfully delivered in {calculateDeliveryDuration(selectedOrder.created_at, selectedOrder.delivered_at || selectedOrder.updated_at)}
                   </span>
+                </div>
+              )}
+
+{/* ASSIGNED DELIVERY PARTNER CARD */}
+              {selectedOrder?.delivery_boy_id || selectedOrder?.delivery_partner_id || selectedOrder?.delivery_agent_id ? (
+                <div className="bg-orange-50/70 rounded-2xl p-4 border border-orange-200/80 space-y-2">
+                  <h4 className="font-black text-orange-900 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <Truck className="w-3.5 h-3.5 text-orange-600" /> Assigned Delivery Partner
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-black text-slate-900 text-xs">
+                        {selectedOrder?.staff_profiles?.full_name || selectedOrder?.staff_profiles?.name || 'Assigned Partner'}
+                      </p>
+                      <p className="text-stone-500 font-mono text-[11px] mt-0.5">
+                        {selectedOrder?.staff_profiles?.phone || 'Contact number hidden'}
+                      </p>
+                    </div>
+
+                    {selectedOrder?.staff_profiles?.phone && (
+                      <a
+                        href={`tel:${selectedOrder.staff_profiles.phone}`}
+                        className="bg-orange-600 hover:bg-orange-700 text-white px-3.5 py-2 rounded-xl font-black text-[11px] inline-flex items-center gap-1.5 shadow-xs transition"
+                      >
+                        <Phone size={13} /> Call
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/70 space-y-1">
+                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <Truck className="w-3.5 h-3.5 text-orange-600" /> Delivery Partner Status
+                  </h4>
+                  <p className="text-stone-600 font-medium text-xs">
+                    Delivery boy will be assigned soon.
+                  </p>
                 </div>
               )}
 
@@ -1336,12 +1435,18 @@ const CustomerOrdersPage = () => {
                       product?.gallery?.[0] ||
                       '';
 
+                    const itemPrice = Number(item?.price) || 0;
+                    const itemMrp = Number(variant?.mrp || item?.mrp || product?.mrp) || itemPrice;
+                    const hasMrp = itemMrp > itemPrice;
+                    const discountPct = hasMrp ? Math.round(((itemMrp - itemPrice) / itemMrp) * 100) : 0;
+                    const qty = Number(item?.quantity) || 1;
+
                     return (
                       <div
                         key={item?.id || index}
-                        className="flex items-center gap-3.5 border border-emerald-100 rounded-2xl p-3 bg-emerald-50/20 shadow-2xs"
+                        className="flex items-center gap-3.5 border border-orange-100 rounded-2xl p-3 bg-orange-50/20 shadow-2xs"
                       >
-                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-emerald-200">
+                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-orange-200">
                           {image ? (
                             <img src={image} alt="" className="w-full h-full object-contain" />
                           ) : (
@@ -1354,13 +1459,25 @@ const CustomerOrdersPage = () => {
                             {product?.name || 'Product'}
                           </p>
                           {variant && (
-                            <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
+                            <p className="text-[11px] text-orange-700 font-extrabold mt-0.5">{getVariantLabel(variant)}</p>
                           )}
-                          <p className="text-[11px] text-stone-400 font-bold mt-0.5">Quantity: {Number(item?.quantity) || 1}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-stone-500 font-medium text-[11px]">Qty: {qty}</span>
+                            <span>•</span>
+                            <span className="font-black text-slate-900 text-[11px]">{formatCurrency(itemPrice * qty)}</span>
+                            {hasMrp && (
+                              <span className="text-stone-400 line-through text-[10px] font-bold">{formatCurrency(itemMrp * qty)}</span>
+                            )}
+                            {discountPct > 0 && (
+                              <span className="text-[9px] text-orange-700 font-black bg-orange-50 px-1.5 py-0.2 rounded border border-orange-200">
+                                {discountPct}% OFF
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <p className="font-black text-slate-900 text-xs">{formatCurrency(item?.price)}</p>
+                          <p className="font-black text-slate-900 text-xs">{formatCurrency(itemPrice * qty)}</p>
                         </div>
                       </div>
                     );
@@ -1368,37 +1485,29 @@ const CustomerOrdersPage = () => {
                 </div>
               </div>
 
-              {/* ADDRESS & PAYMENT INFO */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
-                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Delivery Address
-                  </h4>
-                  <p className="text-stone-700 font-medium leading-relaxed text-xs">
-                    {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
-                  </p>
-                </div>
-
-                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
-                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Payment Info
-                  </h4>
-                  <p className="font-black text-slate-900 text-xs">Cash on Delivery (COD)</p>
-                  <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-emerald-600' : 'text-amber-700'}`}>
-                    Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid / Completed' : 'Pending Payment'}
-                  </p>
-                </div>
-              </div>
-
-              {/* BILLING BREAKDOWN */}
+               {/* BILLING BREAKDOWN */}
               <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/70 space-y-2">
                 <div className="flex justify-between text-stone-600 font-medium text-xs">
-                  <span>Items Subtotal</span>
-                  <span>{formatCurrency(getOrderItemsSubtotal(selectedOrder))}</span>
+                  <span>Items Subtotal (MRP)</span>
+                  <span>{formatCurrency(totalMrpSum)}</span>
                 </div>
 
-                {getDiscount(selectedOrder) > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold text-xs">
+                <div className="flex justify-between text-orange-600 font-bold text-xs">
+                  <span>Product Discount</span>
+                  <span>-{formatCurrency(totalDiscountFromMrp)}</span>
+                </div>
+
+                {selectedOrder?.coupon_code && (
+                  <div className="flex justify-between items-center bg-orange-50 px-3 py-2 rounded-2xl border border-orange-200 text-orange-900">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Tag size={12} className="text-orange-600" /> Coupon ({selectedOrder.coupon_code})
+                    </span>
+                    <span className="font-black">-{formatCurrency(getDiscount(selectedOrder))}</span>
+                  </div>
+                )}
+
+                {!selectedOrder?.coupon_code && getDiscount(selectedOrder) > 0 && (
+                  <div className="flex justify-between text-orange-600 font-bold text-xs">
                     <span>Discount Applied</span>
                     <span>-{formatCurrency(getDiscount(selectedOrder))}</span>
                   </div>
@@ -1411,7 +1520,29 @@ const CustomerOrdersPage = () => {
 
                 <div className="flex justify-between pt-3 border-t border-stone-200 font-black text-sm">
                   <span className="text-slate-900">Total Amount</span>
-                  <span className="text-emerald-600 text-base">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                  <span className="text-orange-600 text-base font-black">{formatCurrency(getOrderTotal(selectedOrder))}</span>
+                </div>
+              </div>
+
+              {/* ADDRESS & PAYMENT INFO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
+                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <MapPin className="w-3.5 h-3.5 text-orange-600" /> Delivery Address
+                  </h4>
+                  <p className="text-stone-700 font-medium leading-relaxed text-xs">
+                    {selectedOrder?.shipping_address || selectedOrder?.delivery_address || selectedOrder?.address || '-'}
+                  </p>
+                </div>
+
+                <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/70 space-y-1">
+                  <h4 className="font-black text-stone-600 flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                    <CreditCard className="w-3.5 h-3.5 text-orange-600" /> Payment Info
+                  </h4>
+                  <p className="font-black text-slate-900 text-xs">Cash on Delivery (COD)</p>
+                  <p className={`font-black text-[11px] mt-0.5 ${normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'text-orange-600' : 'text-amber-700'}`}>
+                    Status: {normalizeOrderStatus(getOrderStatus(selectedOrder)) === 'DELIVERED' ? 'Paid / Completed' : 'Pending Payment'}
+                  </p>
                 </div>
               </div>
 
@@ -1423,7 +1554,7 @@ const CustomerOrdersPage = () => {
                       onClick={() => setInvoiceOrder(selectedOrder)}
                       className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 font-black text-stone-800 cursor-pointer transition text-xs shadow-2xs"
                     >
-                      <FileText className="w-4 h-4 text-emerald-600" /> Download Invoice
+                      <FileText className="w-4 h-4 text-orange-600" /> Download Invoice
                     </button>
 
                     <button
@@ -1436,7 +1567,7 @@ const CustomerOrdersPage = () => {
                     <button
                       onClick={() => handleReorder(selectedOrder)}
                       disabled={reorderingOrderId === getOrderId(selectedOrder)}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-emerald-600/20 active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white disabled:opacity-50 font-black cursor-pointer transition text-xs shadow-md shadow-orange-600/20 active:scale-95"
                     >
                       {reorderingOrderId === getOrderId(selectedOrder) ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1463,7 +1594,7 @@ const CustomerOrdersPage = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-emerald-100"
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-orange-100"
           >
             <div className="p-5 border-b border-stone-100 flex items-center justify-between bg-stone-50 sticky top-0 bg-white z-10">
               <div>
@@ -1528,7 +1659,7 @@ const CustomerOrdersPage = () => {
                         value={currentData.comment}
                         onChange={(e) => handleProductRatingChange(prodId, 'comment', e.target.value)}
                         placeholder="Write a helpful review for this product..."
-                        className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-medium transition"
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 font-medium transition"
                       />
                     </div>
                   );
@@ -1545,7 +1676,7 @@ const CustomerOrdersPage = () => {
                 <button
                   onClick={handleSubmitAllProductRatings}
                   disabled={savingRating}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white disabled:opacity-50 font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md shadow-orange-600/20 transition text-xs"
                 >
                   {savingRating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Submit All Reviews

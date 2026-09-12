@@ -1,6 +1,7 @@
 // src/components/PortalBottomNav.jsx
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, User, ClipboardList } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, onOpenCart }) {
   const navigate = useNavigate();
@@ -11,36 +12,54 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
     return null;
   }
 
+  const navItems = [
+    { label: 'Shop', path: '/', icon: Home },
+    { label: 'Orders', path: '/account/orders', icon: ClipboardList },
+    { label: 'Profile', path: '/account/profile', icon: User },
+  ];
+
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg pb-safe">
-      <div className="max-w-xl mx-auto px-4 py-1.5 flex items-center justify-around">
+    <motion.div 
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      className="fixed bottom-3 inset-x-4 max-w-lg mx-auto z-50 font-sans"
+    >
+      <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] px-3 py-2 flex items-center justify-between">
         
-        {/* Home */}
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
-            currentPath === '/' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
-          }`}
-        >
-          <Home size={18} className={currentPath === '/' ? 'text-emerald-600 scale-110' : ''} />
-          <span className="text-[9.5px] tracking-tight mt-0.5">Home</span>
-        </button>
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentPath === item.path;
 
-        {/* Orders */}
-        <button
-          type="button"
-          onClick={() => navigate('/account/orders')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
-            currentPath === '/account/orders' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
-          }`}
-        >
-          <ClipboardList size={18} className={currentPath === '/account/orders' ? 'text-emerald-600 scale-110' : ''} />
-          <span className="text-[9.5px] tracking-tight mt-0.5">Orders</span>
-        </button>
+            return (
+              <motion.button
+                key={item.path}
+                type="button"
+                onClick={() => navigate(item.path)}
+                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                className={`relative flex items-center gap-2 py-2 px-3.5 rounded-full transition-colors cursor-pointer ${
+                  isActive ? 'text-white font-black' : 'text-stone-400 hover:text-stone-200 font-bold'
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="pillActiveIndicator"
+                    className="absolute inset-0 bg-gradient-to-r from-amber-600 to-orange-600 rounded-full -z-10 shadow-md shadow-orange-600/30"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <Icon size={16} className={isActive ? 'text-white stroke-[2.5]' : 'text-stone-400 stroke-[2]' } />
+                <span className="text-[11px] tracking-tight">{item.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
 
-        {/* Cart Button with Dynamic Badge Count */}
-        <button
+        {/* Floating Capsule Cart Action */}
+        <motion.button
           type="button"
           onClick={() => {
             if (typeof onOpenCart === 'function') {
@@ -49,32 +68,26 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
               window.dispatchEvent(new CustomEvent('openCartDrawer'));
             }
           }}
-          className="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative text-stone-400 hover:text-stone-700 font-medium"
+          whileTap={{ scale: 0.93 }}
+          whileHover={{ scale: 1.04 }}
+          className="flex items-center gap-2 bg-white text-slate-900 px-4 py-2 rounded-full shadow-lg cursor-pointer font-black text-xs transition"
         >
-          <div className="relative">
-            <ShoppingBag size={18} />
+          <div className="relative flex items-center justify-center">
+            <ShoppingBag size={15} className="text-orange-600" />
             {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 bg-rose-500 text-white text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-black shadow-xs z-20">
+              <motion.span 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-2.5 -right-3 bg-orange-600 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-xs"
+              >
                 {totalItemsCount}
-              </span>
+              </motion.span>
             )}
           </div>
-          <span className="text-[9.5px] tracking-tight mt-0.5">Cart</span>
-        </button>
-
-        {/* Profile */}
-        <button
-          type="button"
-          onClick={() => navigate('/account/profile')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition cursor-pointer relative ${
-            currentPath === '/account/profile' ? 'text-emerald-600 font-black' : 'text-stone-400 hover:text-stone-700 font-medium'
-          }`}
-        >
-          <User size={18} className={currentPath === '/account/profile' ? 'text-emerald-600 scale-110' : ''} />
-          <span className="text-[9.5px] tracking-tight mt-0.5">Profile</span>
-        </button>
+          <span className="font-mono font-black text-orange-600">₹{totalPrice.toFixed(0)}</span>
+        </motion.button>
 
       </div>
-    </div>
+    </motion.div>
   );
 }

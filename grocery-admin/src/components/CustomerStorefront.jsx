@@ -906,7 +906,7 @@ export default function CustomerStorefront() {
   };
 
   const calculateFee = (subtotal, distKm) => {
-    if (!deliveryRules || deliveryRules.length === 0) return 40;
+    if (!deliveryRules || deliveryRules.length === 0) return 0;
 
     const currentDist = Number(distKm || 0);
 
@@ -929,7 +929,7 @@ export default function CustomerStorefront() {
 
     if (cartFallback) return Number(cartFallback.delivery_fee);
 
-    return 40;
+    return 0;
   };
 
   const handleSelectAddress = (addrObj) => {
@@ -1086,10 +1086,10 @@ export default function CustomerStorefront() {
           className="w-full h-full object-cover filter brightness-75 animate-pulse"
         />
         <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs flex flex-col items-center justify-center space-y-3">
-          <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl animate-bounce">
+          <div className="w-12 h-12 bg-orange-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl animate-bounce">
             KD
           </div>
-          <p className="text-white font-black text-xs uppercase tracking-widest bg-slate-900/80 px-4 py-2 rounded-full border border-emerald-500/30">
+          <p className="text-white font-black text-xs uppercase tracking-widest bg-slate-900/80 px-4 py-2 rounded-full border border-orange-500/30">
             Opening KD Store...
           </p>
         </div>
@@ -1114,19 +1114,19 @@ export default function CustomerStorefront() {
             className="absolute inset-0 w-full h-full object-cover filter brightness-50"
           />
         )}
-        <div className="relative z-10 max-w-md w-full space-y-4 bg-slate-900/90 backdrop-blur-md border border-emerald-500/30 p-8 rounded-3xl shadow-2xl">
-          <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mx-auto border border-emerald-400/30 font-black text-xl shadow-xl">
+        <div className="relative z-10 max-w-md w-full space-y-4 bg-slate-900/90 backdrop-blur-md border border-orange-500/30 p-8 rounded-3xl shadow-2xl">
+          <div className="w-14 h-14 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto border border-orange-400/30 font-black text-xl shadow-xl">
             KD
           </div>
           <h1 className="text-xl font-black tracking-tight text-white">We'll be back soon!</h1>
-          <p className="text-emerald-200 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
+          <p className="text-orange-200 text-xs leading-relaxed">{storeStatus.message || 'The store is temporarily offline for maintenance.'}</p>
         </div>
       </div>
     );
   }
 
   return (
-<div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-indigo-50/60 via-emerald-50/40 to-teal-50/50 text-slate-900 pb-16 font-sans selection:bg-emerald-600 selection:text-white">       
+<div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-amber-50/60 via-orange-50/40 to-amber-100/50 text-slate-900 pb-16 font-sans selection:bg-orange-600 selection:text-white">       
       {/* 1. StoreHeader Component */}
       <StoreHeader 
         session={session} 
@@ -1147,28 +1147,28 @@ export default function CustomerStorefront() {
       {isProfileOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex justify-end z-[999] transition-opacity duration-300">
           <div className="bg-white w-full max-w-md h-full flex flex-col shadow-2xl transition-transform duration-300">
-            <div className="p-6 border-b border-emerald-100 flex justify-between items-center bg-emerald-50/50">
+            <div className="p-6 border-b border-orange-100 flex justify-between items-center bg-orange-50/50">
               <h3 className="font-black text-base text-slate-900 flex items-center gap-2.5">
-                <User size={20} className="text-emerald-600 shrink-0" /> 
+                <User size={20} className="text-orange-600 shrink-0" /> 
                 <span className="truncate">My Account & Dashboard</span>
               </h3>
-              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-emerald-100/60 rounded-full text-slate-600 hover:bg-emerald-100 transition cursor-pointer" title="Close"><X size={16} /></button>
+              <button onClick={() => setIsProfileOpen(false)} className="p-2 bg-orange-100/60 rounded-full text-slate-600 hover:bg-orange-100 transition cursor-pointer" title="Close"><X size={16} /></button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-2xl shadow-2xs">
-                <p className="text-[10px] text-emerald-700 uppercase font-black tracking-widest">Signed in as</p>
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-orange-200 p-4 rounded-2xl shadow-2xs">
+                <p className="text-[10px] text-orange-700 uppercase font-black tracking-widest">Signed in as</p>
                 <p className="font-bold text-slate-900 mt-1 truncate text-sm">{session?.user?.email}</p>
               </div>
 
               {/* Edit Profile Section */}
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-orange-50/30 rounded-2xl border border-orange-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'profile_edit' ? null : 'profile_edit')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-orange-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <User size={16} className="text-emerald-600 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
+                    <User size={16} className="text-orange-600 shrink-0" /> <span className="truncate">Edit Profile & Preferences</span>
                   </span>
                   {openSection === 'profile_edit' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
@@ -1193,7 +1193,7 @@ export default function CustomerStorefront() {
                       setCustomerProfile(updates);
                       alert('Profile updated successfully!');
                     }
-                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
+                  }} className="p-4 pt-0 space-y-3 bg-white border-t border-orange-100">
                     <div className="space-y-1 pt-2">
                       <label className="block font-bold text-slate-600 uppercase text-[10px]">Full Name</label>
                       <input 
@@ -1201,7 +1201,7 @@ export default function CustomerStorefront() {
                         name="fullName"
                         placeholder="Enter your name" 
                         defaultValue={customerProfile?.full_name || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-orange-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-orange-600 font-medium" 
                       />
                     </div>
                     <div className="space-y-1">
@@ -1211,7 +1211,7 @@ export default function CustomerStorefront() {
                         name="phone"
                         placeholder="+91 98765 43210" 
                         defaultValue={customerProfile?.phone || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-orange-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-orange-600 font-medium" 
                       />
                     </div>
                      
@@ -1222,7 +1222,7 @@ export default function CustomerStorefront() {
                         name="avatarUrl"
                         placeholder="https://example.com/avatar.jpg" 
                         defaultValue={customerProfile?.avatar_url || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium" 
+                        className="w-full border border-orange-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-orange-600 font-medium" 
                       />
                     </div>
 
@@ -1233,10 +1233,10 @@ export default function CustomerStorefront() {
                         rows="2"
                         placeholder="e.g. Organic, Snacks, Dairy..." 
                         defaultValue={customerProfile?.interests || ''}
-                        className="w-full border border-emerald-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-emerald-600 font-medium resize-none" 
+                        className="w-full border border-orange-200 p-2.5 rounded-xl bg-stone-50 outline-none focus:border-orange-600 font-medium resize-none" 
                       />
                     </div>
-                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
+                    <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-xl font-black cursor-pointer shadow-sm">
                       Save Profile Changes
                     </button>
                   </form>
@@ -1245,13 +1245,13 @@ export default function CustomerStorefront() {
 
               
               {/* My Orders Section */}
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-orange-50/30 rounded-2xl border border-orange-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'orders' ? null : 'orders')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-orange-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Package size={16} className="text-emerald-600 shrink-0" /> 
+                    <Package size={16} className="text-orange-600 shrink-0" /> 
                     <span className="truncate">My Orders ({myOrders.length})</span>
                   </span>
                   {openSection === 'orders' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
@@ -1266,24 +1266,24 @@ export default function CustomerStorefront() {
                     const showOtp = order.status !== 'delivered' && order.status !== 'cancelled';
 
                     return (
-                      <div key={order.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-100 space-y-2">
+                      <div key={order.id} className="p-3.5 bg-orange-50/20 rounded-2xl border border-orange-100 space-y-2">
                         <div className="flex justify-between items-center gap-2">
                           <span className="font-mono font-bold text-slate-900 truncate">#{order.id.slice(0, 8)}</span>
-                          <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black shrink-0 ${
-                            order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                          <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
+                            order.status === 'delivered' ? 'bg-orange-100 text-orange-800' :
                             order.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                           }`}>{order.status}</span>
                         </div>
 
                         {showOtp && (
-                          <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-2.5 flex items-center justify-between">
+                          <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-orange-200 rounded-2xl p-2.5 flex items-center justify-between">
                             <div>
-                              <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-orange-800 block">
                                 Delivery OTP
                               </span>
                               <p className="text-[9px] text-stone-500">Show to delivery partner</p>
                             </div>
-                            <div className="bg-white px-3 py-1 rounded-xl border border-emerald-300 font-mono font-black text-sm text-emerald-700 tracking-widest shadow-2xs">
+                            <div className="bg-white px-3 py-1 rounded-xl border border-orange-300 font-mono font-black text-sm text-orange-700 tracking-widest shadow-2xs">
                               {order.otp || '----'}
                             </div>
                           </div>
@@ -1296,7 +1296,7 @@ export default function CustomerStorefront() {
                         <div className="flex gap-1.5 pt-1">
                           <button 
                             onClick={() => setSelectedProfileOrder(order)}
-                            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
+                            className="flex-1 bg-orange-50 hover:bg-orange-100 text-orange-800 py-2 px-3 rounded-2xl font-bold transition flex items-center justify-center gap-1.5 border border-orange-200 cursor-pointer"
                           >
                             <FileText size={14} className="shrink-0" />
                             <span>Details</span>
@@ -1307,16 +1307,16 @@ export default function CustomerStorefront() {
                   };
 
                   return (
-                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100 text-xs">
+                    <div className="p-4 pt-0 space-y-3 bg-white border-t border-orange-100 text-xs">
                       {myOrders.length === 0 ? (
                         <p className="text-slate-400 italic py-3 text-center">No orders placed yet.</p>
                       ) : (
                         <>
-                          <div className="flex gap-1 bg-emerald-50/70 p-1 rounded-2xl border border-emerald-100 mt-2">
+                          <div className="flex gap-1 bg-orange-50/70 p-1 rounded-2xl border border-orange-100 mt-2">
                             <button
                               onClick={() => setOrderTab('active')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'active' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'active' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Active ({activeOrders.length})
@@ -1324,7 +1324,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('delivered')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'delivered' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'delivered' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Delivered ({deliveredOrders.length})
@@ -1332,7 +1332,7 @@ export default function CustomerStorefront() {
                             <button
                               onClick={() => setOrderTab('cancelled')}
                               className={`flex-1 py-2 px-2 rounded-xl font-black text-[10px] uppercase tracking-wider transition cursor-pointer text-center truncate ${
-                                orderTab === 'cancelled' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                orderTab === 'cancelled' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                               }`}
                             >
                               Cancelled ({cancelledOrders.length})
@@ -1371,10 +1371,10 @@ export default function CustomerStorefront() {
                 })()}
               </div>
 
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-orange-50/30 rounded-2xl border border-orange-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'wishlist' ? null : 'wishlist')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-orange-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     <Heart size={16} className="text-pink-600 shrink-0" /> 
@@ -1384,24 +1384,24 @@ export default function CustomerStorefront() {
                 </button>
 
                 {openSection === 'wishlist' && (
-                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-emerald-100">
+                  <div className="p-4 pt-0 space-y-2.5 bg-white border-t border-orange-100">
                     {wishlistProducts.length === 0 ? (
                       <p className="text-slate-400 italic py-3 text-center">Your wishlist is empty.</p>
                     ) : (
                       wishlistProducts.map(p => {
                         const pImages = p.images || p.gallery || [p.image_url].filter(Boolean);
                         return (
-                          <div key={p.id} className="p-3 bg-emerald-50/20 rounded-2xl border border-emerald-100 flex items-center justify-between gap-3">
+                          <div key={p.id} className="p-3 bg-orange-50/20 rounded-2xl border border-orange-100 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
+                              <img src={pImages[0] || ''} alt="" className="w-11 h-11 object-cover rounded-xl border border-orange-200 bg-white shrink-0" />
                               <div className="min-w-0">
                                 <span className="font-bold text-slate-900 block truncate">{p.name}</span>
-                                <span className="font-black text-emerald-700">₹{p.price}</span>
+                                <span className="font-black text-orange-700">₹{p.price}</span>
                               </div>
                             </div>
                             <button 
                               onClick={() => addToCart(p)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
+                              className="bg-orange-600 hover:bg-orange-700 text-white p-2 rounded-xl font-black shadow-sm transition cursor-pointer shrink-0"
                               title="Add"
                             >
                               <Package size={14} />
@@ -1414,29 +1414,29 @@ export default function CustomerStorefront() {
                 )}
               </div>
 
-              <div className="bg-emerald-50/30 rounded-2xl border border-emerald-200/80 overflow-hidden">
+              <div className="bg-orange-50/30 rounded-2xl border border-orange-200/80 overflow-hidden">
                 <button 
                   onClick={() => setOpenSection(openSection === 'addresses' ? null : 'addresses')}
-                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-emerald-50/60 transition cursor-pointer"
+                  className="w-full p-4 flex items-center justify-between font-bold text-slate-800 hover:bg-orange-50/60 transition cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin size={16} className="text-emerald-600 shrink-0" /> 
+                    <MapPin size={16} className="text-orange-600 shrink-0" /> 
                     <span className="truncate">Saved Addresses ({savedAddresses.length})</span>
                   </span>
                   {openSection === 'addresses' ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
 
                 {openSection === 'addresses' && (
-                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-emerald-100">
+                  <div className="p-4 pt-0 space-y-3 bg-white border-t border-orange-100">
                     <div className="flex justify-between items-center pt-2">
                       <span className="font-bold text-slate-400 uppercase text-[10px]">Your Locations</span>
-                      <button onClick={() => setShowAddAddressBox(true)} className="text-emerald-600 font-black hover:underline cursor-pointer">
+                      <button onClick={() => setShowAddAddressBox(true)} className="text-orange-600 font-black hover:underline cursor-pointer">
                         + Add Address
                       </button>
                     </div>
 
                     {savedAddresses.map(addr => (
-                      <div key={addr.id} className="p-3.5 bg-emerald-50/20 rounded-2xl border border-emerald-200 flex justify-between items-start gap-2">
+                      <div key={addr.id} className="p-3.5 bg-orange-50/20 rounded-2xl border border-orange-200 flex justify-between items-start gap-2">
                         <div className="min-w-0">
                           <span className="font-black text-slate-900 block truncate">{addr.title}</span>
                           <span className="text-slate-600 block mt-0.5 leading-snug">{addr.address}</span>
@@ -1451,10 +1451,10 @@ export default function CustomerStorefront() {
 
               <button 
                 onClick={() => setIsFeedbackOpen(true)}
-                className="w-full bg-emerald-50/60 hover:bg-emerald-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-emerald-200 transition cursor-pointer"
+                className="w-full bg-orange-50/60 hover:bg-orange-100 text-slate-900 p-4 rounded-2xl font-black flex items-center justify-between border border-orange-200 transition cursor-pointer"
               >
                 <span className="flex items-center gap-2.5 truncate">
-                  <MessageSquarePlus size={16} className="text-emerald-600 shrink-0" /> 
+                  <MessageSquarePlus size={16} className="text-orange-600 shrink-0" /> 
                   <span className="truncate">Send Feedback & Suggestions</span>
                 </span>
                 <ChevronRight size={16} className="shrink-0" />
@@ -1462,7 +1462,7 @@ export default function CustomerStorefront() {
 
             </div>
 
-            <div className="p-6 border-t border-emerald-100 bg-emerald-50/50">
+            <div className="p-6 border-t border-orange-100 bg-orange-50/50">
               <button 
                 onClick={() => { supabase.auth.signOut(); setIsProfileOpen(false); }}
                 className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3.5 rounded-2xl transition duration-200 active:scale-95 flex items-center justify-center gap-2 text-xs border border-rose-200 cursor-pointer shadow-2xs"
@@ -1477,45 +1477,45 @@ export default function CustomerStorefront() {
       {/* Order Details Modal */}
       {selectedProfileOrder && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fadeIn font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-emerald-100 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-orange-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-orange-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">Order #{selectedProfileOrder.id.slice(0, 8)} Details</h3>
-              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
+              <button onClick={() => setSelectedProfileOrder(null)} className="p-1.5 bg-orange-50 rounded-full text-slate-600 hover:bg-orange-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 flex justify-between items-center">
+              <div className="bg-orange-50/40 p-3.5 rounded-2xl border border-orange-100 flex justify-between items-center">
                 <span className="text-slate-500 font-bold">Order Status:</span>
                 <span className={`px-2.5 py-0.5 rounded-full uppercase text-[9px] font-black ${
-                  selectedProfileOrder.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                  selectedProfileOrder.status === 'delivered' ? 'bg-orange-100 text-orange-800' :
                   selectedProfileOrder.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                 }`}>{selectedProfileOrder.status}</span>
               </div>
 
               {selectedProfileOrder.status !== 'delivered' && selectedProfileOrder.status !== 'cancelled' && (
-                <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
+                <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-orange-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs my-2">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 block">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-orange-800 block">
                       Delivery Verification OTP
                     </span>
                     <p className="text-[10px] text-stone-600 font-medium">
                       Share this code with the delivery partner
                     </p>
                   </div>
-                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300 font-mono font-black text-base text-emerald-700 tracking-widest shadow-sm">
+                  <div className="bg-white px-3.5 py-1.5 rounded-xl border border-orange-300 font-mono font-black text-base text-orange-700 tracking-widest shadow-sm">
                     {selectedProfileOrder.otp || '----'}
                   </div>
                 </div>
               )}
 
               {myComplaintsMap[selectedProfileOrder.id] && (
-                <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl border border-teal-200 space-y-1.5">
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-teal-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                      <LifeBuoy size={14} className="text-teal-600" /> Support Ticket Status
+                    <span className="text-amber-900 font-black uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                      <LifeBuoy size={14} className="text-orange-600" /> Support Ticket Status
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                      myComplaintsMap[selectedProfileOrder.id].status === 'resolved' ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'
+                      myComplaintsMap[selectedProfileOrder.id].status === 'resolved' ? 'bg-orange-200 text-orange-900' : 'bg-amber-200 text-amber-900'
                     }`}>
                       {myComplaintsMap[selectedProfileOrder.id].status || 'open'}
                     </span>
@@ -1538,10 +1538,10 @@ export default function CustomerStorefront() {
               {selectedProfileOrder.status === 'delivered' && !myComplaintsMap[selectedProfileOrder.id] && (
                 <button
                   onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: null })}
-                  className="w-full bg-teal-50 hover:bg-teal-100 text-teal-900 p-3 rounded-2xl border border-teal-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 p-3 rounded-2xl border border-amber-200 font-black flex items-center justify-between transition cursor-pointer shadow-2xs"
                 >
                   <span className="flex items-center gap-2">
-                    <LifeBuoy size={16} className="text-teal-600" /> Need Help with this Whole Order?
+                    <LifeBuoy size={16} className="text-orange-600" /> Need Help with this Whole Order?
                   </span>
                   <ChevronRight size={14} />
                 </button>
@@ -1549,7 +1549,7 @@ export default function CustomerStorefront() {
 
               <div className="space-y-1">
                 <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Ordered Items</span>
-                <div className="space-y-2 bg-emerald-50/30 p-3.5 rounded-2xl border border-emerald-100">
+                <div className="space-y-2 bg-orange-50/30 p-3.5 rounded-2xl border border-orange-100">
                   {selectedProfileOrder.order_items?.map(item => {
                     const itemImages = item.products?.images || item.products?.gallery || [item.products?.image_url].filter(Boolean);
                     const itemImg = itemImages[0] || '';
@@ -1576,15 +1576,15 @@ export default function CustomerStorefront() {
                     const discountPct = hasMrp ? Math.round(((itemMrp - itemPrice) / itemMrp) * 100) : 0;
 
                     return (
-                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-emerald-100 last:border-0">
+                      <div key={item.id} className="flex flex-col gap-2 py-2 border-b border-orange-100 last:border-0">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-emerald-200 bg-white shrink-0" />
+                            <img src={itemImg} alt="" className="w-11 h-11 object-cover rounded-xl border border-orange-200 bg-white shrink-0" />
                             <div className="min-w-0">
                               <span className="font-black text-slate-900 block truncate">{item.products?.name || 'Item'}</span>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 {item.variant_label && (
-                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                  <span className="text-[10px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-md">
                                     {item.variant_label}
                                   </span>
                                 )}
@@ -1595,7 +1595,7 @@ export default function CustomerStorefront() {
                                   <span className="text-stone-400 line-through text-[10px]">₹{itemMrp * item.quantity}</span>
                                 )}
                                 {discountPct > 0 && (
-                                  <span className="text-[9px] text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  <span className="text-[9px] text-orange-700 font-black bg-orange-50 px-1.5 py-0.2 rounded border border-orange-200">
                                     {discountPct}% OFF
                                   </span>
                                 )}
@@ -1607,7 +1607,7 @@ export default function CustomerStorefront() {
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 onClick={() => setOrderHelpTarget({ order: selectedProfileOrder, item: item.products })}
-                                className="p-2 rounded-xl font-bold text-[11px] bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100 transition flex items-center justify-center cursor-pointer"
+                                className="p-2 rounded-xl font-bold text-[11px] bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 transition flex items-center justify-center cursor-pointer"
                                 title="Item Help"
                               >
                                 <LifeBuoy size={14} className="shrink-0" />
@@ -1625,7 +1625,7 @@ export default function CustomerStorefront() {
                                 className={`p-2 rounded-xl font-bold text-[11px] transition flex items-center justify-center cursor-pointer ${
                                   hasReviewed 
                                     ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100' 
-                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
                                 }`}
                                 title={hasReviewed ? "Review" : "Rate"}
                               >
@@ -1640,14 +1640,14 @@ export default function CustomerStorefront() {
                 </div>
               </div>
 
-              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100 space-y-1">
+              <div className="bg-orange-50/40 p-3.5 rounded-2xl border border-orange-100 space-y-1">
                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Delivery Address</p>
                 <p className="text-slate-800 font-medium leading-snug">{selectedProfileOrder.delivery_address}</p>
               </div>
 
-              <div className="pt-2 border-t border-emerald-100 flex justify-between items-center font-black text-sm text-slate-900">
+              <div className="pt-2 border-t border-orange-100 flex justify-between items-center font-black text-sm text-slate-900">
                 <span>Total Amount Paid:</span>
-                <span className="text-emerald-600">₹{selectedProfileOrder.total_amount}</span>
+                <span className="text-orange-600">₹{selectedProfileOrder.total_amount}</span>
               </div>
             </div>
 
@@ -1673,21 +1673,21 @@ export default function CustomerStorefront() {
 
       {orderHelpTarget && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn font-sans">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-orange-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-orange-100 pb-3">
               <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                <LifeBuoy size={16} className="text-teal-600" />
+                <LifeBuoy size={16} className="text-orange-600" />
                 {orderHelpTarget.item ? 'Item Support Request' : 'Order Support Request'}
               </h3>
-              <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
+              <button onClick={() => setOrderHelpTarget(null)} className="p-1 bg-orange-50 rounded-full text-slate-600 hover:bg-orange-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
             <form onSubmit={handleSubmitOrderHelp} className="space-y-3.5 text-xs">
-              <div className="bg-teal-50/60 p-3 rounded-2xl border border-teal-200 space-y-1">
-                <span className="text-[10px] font-bold text-teal-900 uppercase tracking-wider block">Target Reference</span>
+              <div className="bg-orange-50/60 p-3 rounded-2xl border border-orange-200 space-y-1">
+                <span className="text-[10px] font-bold text-orange-900 uppercase tracking-wider block">Target Reference</span>
                 <p className="font-black text-slate-900">Order #{orderHelpTarget.order.id.slice(0, 8)}</p>
                 {orderHelpTarget.item && (
-                  <p className="text-teal-700 font-bold">Product: {orderHelpTarget.item.name}</p>
+                  <p className="text-orange-700 font-bold">Product: {orderHelpTarget.item.name}</p>
                 )}
               </div>
 
@@ -1696,7 +1696,7 @@ export default function CustomerStorefront() {
                 <select 
                   value={helpForm.issueType} 
                   onChange={e => setHelpForm({...helpForm, issueType: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                  className="w-full border border-orange-200 p-3 rounded-2xl bg-orange-50/30 text-slate-900 font-bold outline-none cursor-pointer"
                 >
                   <option value="Damaged / Defective Item">Damaged / Defective Item</option>
                   <option value="Missing Item from Package">Missing Item from Package</option>
@@ -1715,14 +1715,14 @@ export default function CustomerStorefront() {
                   required
                   value={helpForm.message}
                   onChange={e => setHelpForm({...helpForm, message: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                  className="w-full border border-orange-200 p-3 rounded-2xl bg-orange-50/30 text-slate-900 outline-none resize-none focus:border-orange-500"
                 />
               </div>
 
               <button 
                 type="submit" 
                 disabled={submittingHelp}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-teal-600/20 disabled:opacity-50 cursor-pointer"
+                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-orange-600/20 disabled:opacity-50 cursor-pointer"
               >
                 {submittingHelp ? 'Submitting Request...' : 'Submit Support Request'}
               </button>
@@ -1733,20 +1733,20 @@ export default function CustomerStorefront() {
 
       {reviewModalProduct && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-emerald-100 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-orange-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-orange-100 pb-3">
               <h3 className="font-black text-sm text-slate-900">
                 {userReviewsMap[reviewModalProduct.id] ? 'Edit Product Review' : 'Rate & Review Product'}
               </h3>
-              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-emerald-50 rounded-full text-slate-600 hover:bg-emerald-100 cursor-pointer" title="Close"><X size={16}/></button>
+              <button onClick={() => setReviewModalProduct(null)} className="p-1 bg-orange-50 rounded-full text-slate-600 hover:bg-orange-100 cursor-pointer" title="Close"><X size={16}/></button>
             </div>
 
             <form onSubmit={handleAddOrUpdateReview} className="space-y-3.5 text-xs">
-              <div className="flex items-center gap-3 bg-emerald-50/40 p-3 rounded-2xl border border-emerald-100">
+              <div className="flex items-center gap-3 bg-orange-50/40 p-3 rounded-2xl border border-orange-100">
                 <img 
                   src={reviewModalProduct.image_url || (reviewModalProduct.images && reviewModalProduct.images[0]) || ''} 
                   alt="" 
-                  className="w-11 h-11 object-cover rounded-xl bg-white border border-emerald-200" 
+                  className="w-11 h-11 object-cover rounded-xl bg-white border border-orange-200" 
                 />
                 <span className="font-bold text-slate-950 truncate">{reviewModalProduct.name}</span>
               </div>
@@ -1756,7 +1756,7 @@ export default function CustomerStorefront() {
                 <select 
                   value={newReviewForm.rating} 
                   onChange={e => setNewReviewForm({...newReviewForm, rating: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 font-bold outline-none cursor-pointer"
+                  className="w-full border border-orange-200 p-3 rounded-2xl bg-orange-50/30 text-slate-900 font-bold outline-none cursor-pointer"
                 >
                   <option value="5">⭐⭐⭐⭐⭐ (5/5 - Excellent)</option>
                   <option value="4">⭐⭐⭐⭐ (4/5 - Good)</option>
@@ -1774,11 +1774,11 @@ export default function CustomerStorefront() {
                   required
                   value={newReviewForm.review_text}
                   onChange={e => setNewReviewForm({...newReviewForm, review_text: e.target.value})}
-                  className="w-full border border-emerald-200 p-3 rounded-2xl bg-emerald-50/30 text-slate-900 outline-none resize-none focus:border-emerald-500"
+                  className="w-full border border-orange-200 p-3 rounded-2xl bg-orange-50/30 text-slate-900 outline-none resize-none focus:border-orange-500"
                 />
               </div>
 
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-emerald-600/20 cursor-pointer">
+              <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3.5 rounded-2xl font-black tracking-wider uppercase transition shadow-lg shadow-orange-600/20 cursor-pointer">
                 {userReviewsMap[reviewModalProduct.id] ? 'Update Review' : 'Submit Review'}
               </button>
             </form>
@@ -1789,7 +1789,7 @@ export default function CustomerStorefront() {
       {orderSuccess && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[300] animate-fadeIn">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-stone-100 space-y-4">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+            <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto border border-orange-100 shadow-xs">
               <CheckCircle size={40} className="stroke-[2.5]" />
             </div>
             <div className="space-y-1">
@@ -1799,7 +1799,7 @@ export default function CustomerStorefront() {
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={() => { setOrderSuccess(null); navigate('/account/orders'); }}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-orange-500/20 cursor-pointer"
               >
                 View Order Status
               </button>
@@ -1940,7 +1940,7 @@ export default function CustomerStorefront() {
                           key={idx}
                           onClick={() => setActiveGalleryImage(imgUrl)}
                           className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition cursor-pointer shrink-0 bg-stone-50 ${
-                            activeGalleryImage === imgUrl ? 'border-emerald-600 scale-105' : 'border-stone-200 opacity-70 hover:opacity-100'
+                            activeGalleryImage === imgUrl ? 'border-orange-600 scale-105' : 'border-stone-200 opacity-70 hover:opacity-100'
                           }`}
                         >
                           <img src={imgUrl} alt="" className="w-full h-full object-cover" />
@@ -1977,7 +1977,7 @@ export default function CustomerStorefront() {
                       <span className="text-stone-400 line-through font-bold text-sm">₹{modalMrp.toFixed(0)}</span>
                     )}
                     {discountPct > 0 && (
-                      <span className="bg-emerald-500 text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      <span className="bg-orange-500 text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
                         {discountPct}% OFF
                       </span>
                     )}
@@ -1998,7 +1998,7 @@ export default function CustomerStorefront() {
                               onClick={() => setSelectedVariants(prev => ({ ...prev, [selectedProductDetails.id]: vKey }))}
                               className={`px-3.5 py-2 rounded-2xl text-xs font-black border transition cursor-pointer ${
                                 isVarSelected 
-                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                                  ? 'bg-orange-600 text-white border-orange-600 shadow-sm' 
                                   : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
                               }`}
                             >
@@ -2022,7 +2022,7 @@ export default function CustomerStorefront() {
                       {selectedProductDetails.description.length > 160 && (
                         <button 
                           onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} 
-                          className="text-emerald-600 font-extrabold ml-1 hover:underline cursor-pointer"
+                          className="text-orange-600 font-extrabold ml-1 hover:underline cursor-pointer"
                         >
                           {isDescriptionExpanded ? 'Show less' : 'Read more'}
                         </button>
@@ -2060,7 +2060,7 @@ export default function CustomerStorefront() {
                               <span className="font-black text-sm text-slate-900">₹{pPrice.toFixed(0)}</span>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); addToCart(p, pVar); }}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
+                                className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl font-extrabold text-[10px] shadow-xs cursor-pointer transition"
                               >
                                 ADD
                               </button>
@@ -2110,10 +2110,10 @@ export default function CustomerStorefront() {
                     setIsCartOpen(true);
                     setSelectedProductDetails(null);
                   }}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+                  className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white py-3 px-5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-between shadow-lg shadow-orange-600/25 transition cursor-pointer"
                 >
                   <span>Add to Cart</span>
-                  <span className="border-l border-emerald-500 pl-3 font-mono text-xs">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
+                  <span className="border-l border-orange-500 pl-3 font-mono text-xs">₹{(modalPrice * (modalQty > 0 ? modalQty : 1)).toFixed(0)}</span>
                 </button>
               </div>
             </motion.div>
