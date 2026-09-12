@@ -166,9 +166,9 @@ export default function StoreHeader({
             </div>
           </div>
 
-          {/* Right Action Notification Bell */}
+          {/* Right Action Notification Bell (Icon only, no background/border container) */}
           <div className="flex items-center gap-2 shrink-0">
-            <NotificationBell session={session} size={18} className="text-orange-700 hover:bg-amber-100 p-2.5 rounded-2xl transition shadow-2xs border border-orange-300 bg-white" />
+            <NotificationBell session={session} size={22} className="text-white hover:text-amber-200 transition cursor-pointer bg-transparent border-0 p-0 shadow-none" />
           </div>
         </div>
       </div>
@@ -191,10 +191,10 @@ export default function StoreHeader({
             </div>
           )}
           
-          {/* Notification bell visible even when scrolled */}
+          {/* Notification bell visible even when scrolled (Icon only) */}
           {isScrolled && (
-            <div className="shrink-0">
-              <NotificationBell session={session} size={18} className="text-orange-700 hover:bg-amber-100 p-2.5 rounded-2xl transition border border-orange-300 bg-white shadow-xs" />
+            <div className="shrink-0 flex items-center">
+              <NotificationBell session={session} size={22} className="text-white hover:text-amber-200 transition cursor-pointer bg-transparent border-0 p-0 shadow-none" />
             </div>
           )}
         </div>

@@ -84,7 +84,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
               <div className="relative">
                 <Icon size={17} className={isActive ? 'stroke-[2.5] text-orange-600' : 'stroke-[2] text-stone-500'} />
                 {item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs border border-white/40 z-20">
+                  <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20">
                     {item.badge}
                   </span>
                 )}
@@ -95,7 +95,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
           );
         })}
 
-        {/* Animated Floating Cart Button matching exact style with item count badge */}
+        {/* Cart Tab with icon badge only (no surrounding border ring) */}
         <motion.button
           type="button"
           onClick={() => {
@@ -105,14 +105,14 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
               window.dispatchEvent(new CustomEvent('openCartDrawer'));
             }
           }}
-          whileTap={{ scale: 0.92 }}
-          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.88 }}
+          whileHover={{ scale: 1.05 }}
           className="relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-colors cursor-pointer text-stone-500 hover:text-stone-900 font-bold"
         >
           <div className="relative">
             <ShoppingBag size={17} className="stroke-[2] text-stone-500" />
             {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs border border-white/40 z-20">
+              <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20">
                 {totalItemsCount}
               </span>
             )}
