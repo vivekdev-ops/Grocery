@@ -1942,7 +1942,7 @@ export default function CustomerStorefront() {
               </div>
 
               {/* Modal Scrollable Content */}
-              <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 pb-24">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 pb-10">
                 
                 {/* Clean Product Image Carousel */}
                 <div className="space-y-3">

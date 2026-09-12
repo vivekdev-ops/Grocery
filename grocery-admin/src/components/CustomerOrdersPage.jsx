@@ -1185,7 +1185,7 @@ const CustomerOrdersPage = () => {
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {/* =================================================
-            FILTERS & SEARCH SECTION (Grouped as Compact Icon Pills)
+            FILTERS & SEARCH SECTION (Grouped as Icon-Only/Optimized Pills)
         ================================================= */}
         <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-orange-100 shadow-xl shadow-orange-950/5 p-3.5 sm:p-4 space-y-3">
           {/* Search Input Bar */}
@@ -1209,7 +1209,7 @@ const CustomerOrdersPage = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
-            {/* Status Filter Grouped Icons / Compact Pills */}
+            {/* Status Filter Grouped Icon-Only Tooltips / Compact Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               {[
                 { id: 'all', label: 'All', icon: Layers },
@@ -1222,14 +1222,15 @@ const CustomerOrdersPage = () => {
                   <button
                     key={tab.id}
                     onClick={() => setStatusFilter(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap shadow-2xs inline-flex items-center gap-1.5 ${
+                    title={tab.label}
+                    className={`p-2.5 sm:px-3 sm:py-1.5 rounded-xl font-black text-[11px] transition-all cursor-pointer whitespace-nowrap shadow-2xs inline-flex items-center justify-center gap-1.5 ${
                       statusFilter === tab.id
                         ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-orange-600/20'
                         : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
                     }`}
                   >
-                    <IconComponent size={13} />
-                    <span>{tab.label}</span>
+                    <IconComponent size={16} />
+                    <span className="hidden sm:inline">{tab.label}</span>
                   </button>
                 );
               })}

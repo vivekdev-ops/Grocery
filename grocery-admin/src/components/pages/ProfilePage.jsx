@@ -24,6 +24,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import PortalBottomNav from '../PortalBottomNav';
 import CartDrawer from '../store/CartDrawer';
+import { showToast } from '../../utils/toast';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -170,14 +171,14 @@ export default function ProfilePage() {
         .maybeSingle();
 
       if (error || !data) {
-        alert("Invalid or inactive coupon code.");
+        showToast("Invalid or inactive coupon code.");
         return;
       }
       setAppliedCoupon(data);
       setCouponInput('');
-      alert("Coupon applied successfully!");
+      showToast("Coupon applied successfully!");
     } catch (err) {
-      alert("Failed to apply coupon.");
+      showToast("Failed to apply coupon.");
     }
   };
 
@@ -186,7 +187,7 @@ export default function ProfilePage() {
     if (!session?.user) { navigate('/login'); return; }
 
     if (!cart || cart.length === 0) {
-      alert("Your cart is empty.");
+      showToast("Your cart is empty.");
       return;
     }
 
@@ -231,10 +232,10 @@ export default function ProfilePage() {
       window.dispatchEvent(new CustomEvent('cartUpdated', { detail: [] }));
       window.dispatchEvent(new Event('storage'));
       setIsCartOpen(false);
-      alert("Order placed successfully!");
+      showToast("Order placed successfully!");
       navigate('/account/orders');
     } catch (err) {
-      alert(`Checkout failed: ${err.message}`);
+      showToast(`Checkout failed: ${err.message}`);
     } finally {
       setCheckingOut(false);
     }
@@ -272,11 +273,11 @@ export default function ProfilePage() {
 
       if (error) throw error;
       
-      alert('Profile updated successfully!');
+      showToast('Profile updated successfully!');
       setActiveTab('menu');
     } catch (err) {
       console.error('Profile update failed:', err);
-      alert('Error updating profile: ' + (err.message || err));
+      showToast('Error updating profile: ' + (err.message || err));
     } finally {
       setSaving(false);
     }
@@ -291,7 +292,7 @@ export default function ProfilePage() {
       }).catch((err) => console.log('Error sharing:', err));
     } else {
       navigator.clipboard.writeText(window.location.origin);
-      alert('App link copied to clipboard!');
+      showToast('App link copied to clipboard!');
     }
   };
 
@@ -319,7 +320,7 @@ export default function ProfilePage() {
   const activeAvatar = avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 font-sans text-stone-900 pb-36 select-none flex flex-col w-full selection:bg-orange-600 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 font-sans text-stone-900 pb-10 select-none flex flex-col w-full selection:bg-orange-600 selection:text-white">
       
       {activeTab === 'edit' ? (
         <>

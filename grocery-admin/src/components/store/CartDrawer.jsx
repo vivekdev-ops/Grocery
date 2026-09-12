@@ -202,6 +202,21 @@ export default function CartDrawer({
             {/* SCROLLABLE BODY */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               
+              {/* TOTAL SAVINGS BANNER */}
+              {!isCartEmpty && totalCombinedDiscount > 0 && (
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-[2rem] p-4 shadow-md flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black text-sm">
+                      ₹
+                    </div>
+                    <div>
+                      <h3 className="font-black text-xs uppercase tracking-wider text-emerald-100">Total Savings</h3>
+                      <p className="text-base font-black tracking-tight mt-0.5">Your total saving on this order is ₹{totalCombinedDiscount.toFixed(0)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* CART ITEMS LIST */}
               {isCartEmpty ? (
                 <div className="bg-white rounded-[2rem] p-10 text-center border border-stone-200/80 shadow-xs space-y-3 my-auto">
@@ -283,11 +298,14 @@ export default function CartDrawer({
                           </div>
                         </div>
 
-                        {/* QUANTITY CONTROLS */}
+                        {/* QUANTITY CONTROLS WITH PROPAGATION STOP */}
                         <div className="flex items-center bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl overflow-hidden h-9 shadow-sm shrink-0">
                           <button
                             type="button"
-                            onClick={() => updateQuantity(uniqueKey, -1)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateQuantity(uniqueKey, -1);
+                            }}
                             disabled={isOutOfStock}
                             className="px-3 h-full hover:bg-orange-700 font-bold text-sm flex items-center justify-center cursor-pointer transition"
                           >
@@ -298,7 +316,10 @@ export default function CartDrawer({
                           </span>
                           <button
                             type="button"
-                            onClick={() => updateQuantity(uniqueKey, 1)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateQuantity(uniqueKey, 1);
+                            }}
                             disabled={!canIncrease}
                             className="px-3 h-full hover:bg-orange-700 font-bold text-sm flex items-center justify-center cursor-pointer transition"
                           >
@@ -460,6 +481,13 @@ export default function CartDrawer({
                       <span className="font-bold text-stone-500">Delivery Fee</span>
                       <span className="font-extrabold text-orange-600">FREE</span>
                     </div>
+
+                    {totalCombinedDiscount > 0 && (
+                      <div className="flex justify-between items-center bg-emerald-50 text-emerald-800 px-3 py-2 rounded-xl border border-emerald-200 font-bold">
+                        <span>Total Savings</span>
+                        <span className="font-black">₹{totalCombinedDiscount.toFixed(0)}</span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center pt-3 border-t border-stone-100 text-sm font-black text-stone-950">
                       <span>To Pay</span>
