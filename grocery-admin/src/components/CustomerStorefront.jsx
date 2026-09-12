@@ -735,23 +735,49 @@ export default function CustomerStorefront() {
     if (e && typeof e.stopPropagation === 'function') {
       e.stopPropagation();
     }
-    if (!session) { navigate('/login'); return; }
+    
+    if (!session?.user) { 
+      navigate('/login'); 
+      return; 
+    }
 
     const isAlreadyWishlisted = wishlistIds.includes(productId);
 
-    if (isAlreadyWishlisted) {
-      const { error } = await supabase.from('wishlists').delete().eq('user_id', session.user.id).eq('product_id', productId);
-      if (!error) {
+    try {
+      if (isAlreadyWishlisted) {
+        // Remove from wishlist
+        const { error } = await supabase
+          .from('wishlists')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('product_id', productId);
+
+        if (error) throw error;
+
         setWishlistIds(prev => prev.filter(id => id !== productId));
         setWishlistProducts(prev => prev.filter(p => p.id !== productId));
+      } else {
+        // Add to wishlist (using upsert/ignore duplicates to prevent 409 conflicts)
+        const { error } = await supabase
+          .from('wishlists')
+          .upsert(
+            [{ user_id: session.user.id, product_id: productId }],
+            { onConflict: 'user_id,product_id', ignoreDuplicates: true }
+          );
+
+        if (error) throw error;
+
+        if (!wishlistIds.includes(productId)) {
+          setWishlistIds(prev => [...prev, productId]);
+          const prodToAdd = products.find(p => p.id === productId);
+          if (prodToAdd && !wishlistProducts.some(p => p.id === productId)) {
+            setWishlistProducts(prev => [...prev, prodToAdd]);
+          }
+        }
       }
-    } else {
-      const { error } = await supabase.from('wishlists').insert([{ user_id: session.user.id, product_id: productId }]);
-      if (!error) {
-        setWishlistIds(prev => [...prev, productId]);
-        const prodToAdd = products.find(p => p.id === productId);
-        if (prodToAdd) setWishlistProducts(prev => [...prev, prodToAdd]);
-      }
+    } catch (err) {
+      console.error('Wishlist toggle error:', err.message);
+      alert('Could not update wishlist. Please try again.');
     }
   };
 

@@ -1,12 +1,42 @@
 // src/components/PortalBottomNav.jsx
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, User, ClipboardList, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { supabase } from '../supabaseClient';
 
-export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, onOpenCart }) {
+export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+  useEffect(() => {
+    const fetchWishlistCount = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { count, error } = await supabase
+        .from('wishlists')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id);
+
+      if (!error && count !== null) {
+        setWishlistCount(count);
+      }
+    };
+
+    fetchWishlistCount();
+
+    const handleWishlistUpdate = () => fetchWishlistCount();
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    window.addEventListener('storage', handleWishlistUpdate);
+
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+      window.removeEventListener('storage', handleWishlistUpdate);
+    };
+  }, []);
 
   if (currentPath.startsWith('/admin') || currentPath.startsWith('/shopkeeper') || currentPath.startsWith('/delivery')) {
     return null;
@@ -15,7 +45,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
   const navItems = [
     { label: 'Home', path: '/', icon: Home },
     { label: 'Orders', path: '/account/orders', icon: ClipboardList },
-    { label: 'Wishlist', path: '/account/wishlist', icon: Heart },
+    { label: 'Wishlist', path: '/account/wishlist', icon: Heart, badge: wishlistCount },
     { label: 'Profile', path: '/account/profile', icon: User },
   ];
 
@@ -50,13 +80,22 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
                   transition={{ type: "spring", stiffness: 450, damping: 32 }}
                 />
               )}
-              <Icon size={17} className={isActive ? 'stroke-[2.5] text-orange-600' : 'stroke-[2] text-stone-500'} />
+              
+              <div className="relative">
+                <Icon size={17} className={isActive ? 'stroke-[2.5] text-orange-600' : 'stroke-[2] text-stone-500'} />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs border border-white/40 z-20">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+
               <span className="text-[10px] tracking-tight mt-1">{item.label}</span>
             </motion.button>
           );
         })}
 
-        {/* Animated Floating Cart Button */}
+        {/* Animated Floating Cart Button matching exact style with item count badge */}
         <motion.button
           type="button"
           onClick={() => {
@@ -68,21 +107,17 @@ export default function PortalBottomNav({ totalItemsCount = 0, totalPrice = 0, o
           }}
           whileTap={{ scale: 0.92 }}
           whileHover={{ scale: 1.04 }}
-          className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white px-3.5 py-2 rounded-2xl shadow-lg shadow-orange-600/30 cursor-pointer font-black text-xs"
+          className="relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-colors cursor-pointer text-stone-500 hover:text-stone-900 font-bold"
         >
           <div className="relative">
-            <ShoppingBag size={17} className="text-white" />
+            <ShoppingBag size={17} className="stroke-[2] text-stone-500" />
             {totalItemsCount > 0 && (
-              <motion.span 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-2 -right-2.5 bg-white text-orange-600 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-xs border border-orange-200"
-              >
+              <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs border border-white/40 z-20">
                 {totalItemsCount}
-              </motion.span>
+              </span>
             )}
           </div>
-          <span>₹{totalPrice.toFixed(0)}</span>
+          <span className="text-[10px] tracking-tight mt-1">Cart</span>
         </motion.button>
 
       </div>

@@ -64,7 +64,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
       onClick={() => onSelectProduct(product)}
-      className="bg-white rounded-[2rem] border border-stone-200/85 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full p-4 justify-between"
+      className="bg-white rounded-[2rem] border border-orange-100 shadow-xl shadow-orange-950/5 hover:shadow-2xl transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full p-4 justify-between"
     >
       <button
         onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
@@ -77,7 +77,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
 
       <div className="relative w-full aspect-square bg-transparent rounded-2xl overflow-hidden flex items-center justify-center mb-3">
         {isBoughtBefore && (
-          <div className="absolute top-2.5 left-2.5 z-20 bg-sky-50 text-sky-800 border border-sky-200/80 shadow-xs px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 backdrop-blur-md">
+          <div className="absolute top-2.5 left-2.5 z-20 bg-orange-50 text-orange-800 border border-orange-200/80 shadow-xs px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 backdrop-blur-md">
             Bought Earlier
           </div>
         )}
@@ -88,7 +88,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out border-0 bg-transparent" 
         />
         {isOutOfStock && (
-          <div className="absolute inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center z-20">
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-20">
             <span className="bg-white text-stone-950 text-[10px] font-black px-3 py-1 rounded-full uppercase">Sold Out</span>
           </div>
         )}
@@ -102,7 +102,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
             <select
               value={currentVariantKey || ''}
               onChange={handleVariantChange}
-              className="w-full bg-transparent border border-stone-200 text-stone-700 text-[10px] font-bold rounded-xl px-2.5 py-2 outline-none cursor-pointer"
+              className="w-full bg-transparent border border-orange-200 text-stone-700 text-[10px] font-bold rounded-xl px-2.5 py-2 outline-none cursor-pointer focus:border-orange-600"
             >
               {variants.map((v, idx) => {
                 const vKey = v.id || v.label || v.unit_label || idx;
@@ -116,7 +116,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-2" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between pt-2 border-t border-orange-50" onClick={e => e.stopPropagation()}>
         <div className="flex items-baseline gap-1.5">
           <span className="font-black text-sm sm:text-base text-slate-900">₹{price.toFixed(0)}</span>
           {hasMrp && <span className="text-[10px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>}
@@ -124,16 +124,16 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
 
         {!isOutOfStock && (
           qtyInCart > 0 ? (
-            <div className="flex items-center bg-emerald-500 text-white rounded-2xl overflow-hidden h-9 shadow-md">
-              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-3 h-full hover:bg-emerald-600 font-bold text-sm flex items-center justify-center cursor-pointer"><Minus size={14} /></button>
+            <div className="flex items-center bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl overflow-hidden h-9 shadow-md">
+              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-3 h-full hover:bg-orange-700 font-bold text-sm flex items-center justify-center cursor-pointer"><Minus size={14} /></button>
               <span className="px-2 font-black text-xs">{qtyInCart}</span>
-              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-3 h-full hover:bg-emerald-600 font-bold text-sm flex items-center justify-center cursor-pointer"><Plus size={14} /></button>
+              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-3 h-full hover:bg-orange-700 font-bold text-sm flex items-center justify-center cursor-pointer"><Plus size={14} /></button>
             </div>
           ) : (
             <motion.button
               onClick={handleAdd}
               whileTap={{ scale: 0.95 }}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-2xl font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1 uppercase tracking-wider"
+              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-5 py-2 rounded-2xl font-black text-xs shadow-md shadow-orange-600/20 transition cursor-pointer flex items-center gap-1 uppercase tracking-wider"
             >
               ADD
             </motion.button>
@@ -239,7 +239,7 @@ export default function ProductGrid({
             <div className="flex flex-col space-y-2 sticky top-20 max-h-[calc(100vh-120px)] overflow-y-auto pr-1">
               
               {activeCategoryObj && (
-                <div className="bg-white p-3 rounded-2xl border border-emerald-500 shadow-sm flex flex-col items-center text-center mb-1">
+                <div className="bg-white/95 backdrop-blur-xl p-3 rounded-2xl border border-orange-500 shadow-sm flex flex-col items-center text-center mb-1">
                   <div className="w-12 h-12 rounded-xl bg-transparent overflow-hidden mb-1.5 flex items-center justify-center p-0.5">
                     <img src={activeCategoryObj.image_url || fallbackImages[0]} alt={activeCategoryObj.name} className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
                   </div>
@@ -251,14 +251,14 @@ export default function ProductGrid({
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
                 className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-2xl transition cursor-pointer relative border w-full text-left ${
                   activeSubcategoryId === 'All' 
-                    ? 'bg-emerald-50/90 border-emerald-500 text-emerald-950 font-black shadow-xs' 
-                    : 'bg-white border-stone-100 text-stone-600 hover:bg-stone-50 font-bold'
+                    ? 'bg-orange-50/90 border-orange-500 text-orange-950 font-black shadow-xs' 
+                    : 'bg-white/95 backdrop-blur-xl border-orange-100 text-stone-600 hover:bg-orange-50/40 font-bold'
                 }`}
               >
                 {activeSubcategoryId === 'All' && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-500 rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-orange-600 rounded-r-full" />
                 )}
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-black text-[10px]">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0 font-black text-[10px]">
                   All
                 </div>
                 <span className="text-[11px] leading-tight line-clamp-2 w-full">All {activeCategoryObj?.name || 'Items'}</span>
@@ -274,12 +274,12 @@ export default function ProductGrid({
                     onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
                     className={`flex items-center gap-2.5 p-2.5 sm:p-3 rounded-2xl transition cursor-pointer relative border w-full text-left ${
                       isSubSelected 
-                        ? 'bg-emerald-50/90 border-emerald-500 text-emerald-950 font-black shadow-xs' 
-                        : 'bg-white border-stone-100 text-stone-600 hover:bg-stone-50 font-bold'
+                        ? 'bg-orange-50/90 border-orange-500 text-orange-950 font-black shadow-xs' 
+                        : 'bg-white/95 backdrop-blur-xl border-orange-100 text-stone-600 hover:bg-orange-50/40 font-bold'
                     }`}
                   >
                     {isSubSelected && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-500 rounded-r-full" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-orange-600 rounded-r-full" />
                     )}
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-transparent overflow-hidden flex items-center justify-center shrink-0 p-0.5">
                       <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
@@ -293,7 +293,7 @@ export default function ProductGrid({
             {/* Products Grid */}
             <div className="flex-1 w-full space-y-4 min-w-0">
               {sourceProducts.length === 0 ? (
-                <div className="bg-white rounded-3xl p-16 border border-stone-200 text-center shadow-sm">
+                <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-16 border border-orange-100 text-center shadow-sm">
                   <Package size={48} className="text-stone-300 mx-auto mb-3" />
                   <p className="text-sm font-bold text-stone-700">No active products found in this subcategory.</p>
                 </div>
@@ -324,7 +324,7 @@ export default function ProductGrid({
         /* HOMEPAGE SECTIONS */
         <div className="space-y-12 w-full">
 
-          {/* Categories with Subcategories Section (2 rows on mobile, 1 row on web, horizontal scroll) */}
+          {/* Categories with Subcategories Section */}
           <div className="space-y-8">
             {parentCategories.map((parentCat, pIdx) => {
               const subcats = getSubcategories(parentCat.id);
@@ -334,14 +334,14 @@ export default function ProductGrid({
                 <div key={parentCat.id} className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                      <div className="w-2 h-6 bg-orange-600 rounded-full" />
                       <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">
                         {parentCat.name}
                       </h3>
                     </div>
                     <button 
                       onClick={() => { setActiveCategory(parentCat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} 
-                      className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer transition flex items-center gap-1"
+                      className="text-xs font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-1"
                     >
                       See All <ChevronRight size={14} />
                     </button>
@@ -378,14 +378,14 @@ export default function ProductGrid({
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                <div className="w-2 h-6 bg-orange-600 rounded-full" />
                 <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-1.5">
                   <Zap size={18} className="text-amber-500 fill-amber-500" /> Best Deal
                 </h3>
               </div>
               <button 
                 onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }} 
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer transition flex items-center gap-1"
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-1"
               >
                 See All <ChevronRight size={14} />
               </button>
@@ -414,14 +414,14 @@ export default function ProductGrid({
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                <div className="w-2 h-6 bg-orange-600 rounded-full" />
                 <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-1.5">
                   <Flame size={18} className="text-rose-500 fill-rose-500" /> Best Selling
                 </h3>
               </div>
               <button 
                 onClick={() => { setActiveCategory(parentCategories[1]?.id || parentCategories[0]?.id || 'All'); }} 
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer transition flex items-center gap-1"
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-1"
               >
                 See All <ChevronRight size={14} />
               </button>
@@ -449,7 +449,6 @@ export default function ProductGrid({
         </div>
       )}
 
-      
     </main>
   );
 }
