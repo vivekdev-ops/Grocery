@@ -383,6 +383,9 @@ const CustomerOrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 15;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, active, delivered, cancelled
@@ -491,7 +494,7 @@ const CustomerOrdersPage = () => {
 
         setUser(profile);
 
-        await loadOrders(currentUser.email);
+        await loadOrders(currentUser.email, currentUser.id, 0);
         await fetchSavedAddresses(currentUser.id);
         await fetchDeliveryRules();
       } catch (error) {
@@ -541,21 +544,27 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     LOAD ALL ORDERS WITH DECOUPLED STAFF PROFILE FETCHING
+     LOAD ALL ORDERS WITH PAGINATION & QUERY LIMITING
   ======================================================= */
 
-  const loadOrders = async (emailOverride = null) => {
+  const loadOrders = async (emailOverride = null, userIdOverride = null, pageIndex = 0) => {
     const email =
       emailOverride ||
       authUser?.email ||
       user?.email;
 
-    if (!email) return;
+    const userId =
+      userIdOverride ||
+      authUser?.id ||
+      user?.user_id;
+
+    if (!email && !userId) return;
 
     try {
       setLoadingOrders(true);
 
-      const { data: ordersData, error: ordersError } = await supabase
+      // Build query supporting both customer_email and customer_id matching with range pagination
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -568,15 +577,24 @@ const CustomerOrdersPage = () => {
               product_variants (*)
             )
           )
-        `)
-        .eq('customer_email', email)
-        .order('created_at', {
-          ascending: false,
-        });
+        `);
+
+      if (userId && email) {
+        query = query.or(`customer_id.eq.${userId},customer_email.eq.${email}`);
+      } else if (userId) {
+        query = query.eq('customer_id', userId);
+      } else {
+        query = query.eq('customer_email', email);
+      }
+
+      const { data: ordersData, error: ordersError } = await query
+        .order('created_at', { ascending: false })
+        .range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1);
 
       if (ordersError) throw ordersError;
 
       const rawOrders = Array.isArray(ordersData) ? ordersData : [];
+      if (rawOrders.length < pageSize) setHasMore(false);
 
       // Collect all potential staff identifier keys across delivery columns
       const staffIds = new Set();
@@ -611,13 +629,19 @@ const CustomerOrdersPage = () => {
         };
       });
 
-      setOrders(enrichedOrders);
+      setOrders(prev => pageIndex === 0 ? enrichedOrders : [...prev, ...enrichedOrders]);
     } catch (error) {
       console.error('Error loading orders:', error);
-      setOrders([]);
+      if (pageIndex === 0) setOrders([]);
     } finally {
       setLoadingOrders(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadOrders(null, null, nextPage);
   };
 
 
@@ -731,7 +755,7 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     FILTERED & SORTED ORDERS
+     FILTERED & SORTED ORDERS (WITH USEMEMO)
   ======================================================= */
 
   const filteredOrders = useMemo(() => {
@@ -825,7 +849,8 @@ const CustomerOrdersPage = () => {
 
       alert('Cancelled.');
       setSelectedOrder(null);
-      await loadOrders();
+      setPage(0);
+      await loadOrders(null, null, 0);
     } catch (error) {
       console.error('Cancel order error:', error);
       alert(`Error: ${error?.message || 'Failed'}`);
@@ -1253,13 +1278,14 @@ const CustomerOrdersPage = () => {
 
 
         {/* =================================================
-            ORDERS LIST SECTION
+            ORDERS LIST SECTION (WITH SKELETON LOADERS & PAGINATION)
         ================================================= */}
         <section>
-          {loadingOrders ? (
-            <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto mb-3" />
-              <p className="text-stone-500 font-bold">Loading orders...</p>
+          {loadingOrders && page === 0 ? (
+            <div className="space-y-3.5 w-full animate-pulse">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 h-40 w-full shadow-lg" />
+              ))}
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl space-y-3">
@@ -1408,6 +1434,20 @@ const CustomerOrdersPage = () => {
                   </div>
                 );
               })}
+
+              {/* Pagination Load More Button */}
+              {hasMore && (
+                <div className="text-center pt-4">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingOrders}
+                    className="bg-white/95 backdrop-blur-xl border border-orange-200 text-orange-700 hover:bg-orange-50 font-black px-6 py-3 rounded-2xl transition cursor-pointer text-xs shadow-md shadow-orange-950/5 inline-flex items-center gap-2"
+                  >
+                    {loadingOrders ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                    <span>Load More Orders</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>
