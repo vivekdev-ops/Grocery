@@ -67,6 +67,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
       className="bg-white rounded-[1.75rem] border border-orange-100 shadow-lg shadow-orange-950/5 hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer relative group overflow-hidden w-full p-2.5 sm:p-3.5 justify-between"
     >
       <button
+        type="button"
         onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
         className={`absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-20 p-1.5 sm:p-2 rounded-full transition-all duration-150 backdrop-blur-md bg-white/90 shadow-xs
           ${isWishlisted ? 'text-rose-500 scale-105' : 'text-stone-400 hover:text-rose-500'}`}
@@ -84,6 +85,7 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
         <img 
           src={displayImage} 
           alt={product.name} 
+          loading="lazy"
           onError={(e) => { e.target.onerror = null; e.target.src = fallbackDummyImages[0]; }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out border-0 bg-transparent" 
         />
@@ -125,12 +127,13 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
         {!isOutOfStock && (
           qtyInCart > 0 ? (
             <div className="flex items-center bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg overflow-hidden h-7 sm:h-8 shadow-sm shrink-0">
-              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-1.5 sm:px-2 h-full hover:bg-orange-700 font-bold text-xs flex items-center justify-center cursor-pointer"><Minus size={11} /></button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, -1); }} className="px-1.5 sm:px-2 h-full hover:bg-orange-700 font-bold text-xs flex items-center justify-center cursor-pointer"><Minus size={11} /></button>
               <span className="px-1 font-black text-[11px]">{qtyInCart}</span>
-              <button onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-1.5 sm:px-2 h-full hover:bg-orange-700 font-bold text-xs flex items-center justify-center cursor-pointer"><Plus size={11} /></button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); updateQuantity(cartItem.cartItemId, 1); }} className="px-1.5 sm:px-2 h-full hover:bg-orange-700 font-bold text-xs flex items-center justify-center cursor-pointer"><Plus size={11} /></button>
             </div>
           ) : (
             <motion.button
+              type="button"
               onClick={handleAdd}
               whileTap={{ scale: 0.95 }}
               className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-2.5 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-[11px] shadow-sm transition cursor-pointer flex items-center justify-center uppercase tracking-wider shrink-0"
@@ -167,7 +170,7 @@ export default function ProductGrid({
   const [boughtProductIds, setBoughtProductIds] = useState(new Set());
   
   // Filter and sort states
-  const [sortBy, setSortBy] = useState('default'); // 'default', 'price-low', 'price-high', 'discount'
+  const [sortBy, setSortBy] = useState('default');
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [maxPrice, setMaxPrice] = useState(1000);
 
@@ -210,10 +213,9 @@ export default function ProductGrid({
   const getSubcategories = (parentId) => activeCategories.filter(c => c.parent_id === parentId);
 
   const currentSubcategories = activeCategory !== 'All' ? getSubcategories(activeCategory) : [];
-
   const query = searchQuery.toLowerCase().trim();
 
-  // Filter products based on category, search query, discount, and price limit
+  // Filter products
   const sourceProducts = activeProducts.filter(p => {
     const matchesSearch = !query || p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
     if (!matchesSearch) return false;
@@ -258,6 +260,7 @@ export default function ProductGrid({
     return 0;
   });
 
+  const totalPages = Math.ceil(sortedProducts.length / productsPerPage) || 1;
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
   const currentProducts = sortedProducts.slice(indexOfFirstProduct, indexOfLastProduct);
@@ -267,15 +270,14 @@ export default function ProductGrid({
   return (
     <main className="w-full min-h-screen max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-10 mt-2 font-sans pb-36 text-slate-900 text-xs">
       
-      {/* ── STOREFRONT VIEW: WHEN A CATEGORY IS SELECTED OR SEARCHING ── */}
       {isAnyCategorySelected ? (
         <div className="space-y-4">
-
           <div className="grid grid-cols-[80px_1fr] sm:grid-cols-[140px_1fr] md:grid-cols-[180px_1fr] gap-2 sm:gap-6 items-start pt-1">
             
-            {/* Left Vertical Subcategory Sidebar (Image Top, Name Bottom layout) */}
+            {/* Subcategories Sidebar */}
             <div className="flex flex-col space-y-1.5 sticky top-20 max-h-[calc(100vh-120px)] overflow-y-auto pr-1">
               <button
+                type="button"
                 onClick={() => { setActiveSubcategoryId('All'); setCurrentPage(1); }}
                 className={`flex flex-col items-center p-2 rounded-xl transition cursor-pointer relative border w-full text-center ${
                   activeSubcategoryId === 'All' 
@@ -296,6 +298,7 @@ export default function ProductGrid({
                 return (
                   <button
                     key={sub.id}
+                    type="button"
                     onClick={() => { setActiveSubcategoryId(sub.id); setCurrentPage(1); }}
                     title={sub.name}
                     className={`flex flex-col items-center p-2 rounded-xl transition cursor-pointer relative border w-full text-center ${
@@ -305,7 +308,7 @@ export default function ProductGrid({
                     }`}
                   >
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-stone-50 overflow-hidden flex items-center justify-center shrink-0 p-0.5 mb-1 shadow-2xs border border-stone-100">
-                      <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-md" />
+                      <img src={subImg} alt={sub.name} loading="lazy" className="w-full h-full object-cover rounded-md" />
                     </div>
                     <span className="text-[9px] sm:text-[10px] leading-tight line-clamp-1 w-full">{sub.name}</span>
                   </button>
@@ -313,12 +316,11 @@ export default function ProductGrid({
               })}
             </div>
 
-            {/* Right Products Container with Top Icon Filters Bar */}
+            {/* Products Container */}
             <div className="flex-1 w-full space-y-3 min-w-0">
               
-              {/* TOP MOBILE-FRIENDLY ICON FILTERS BAR */}
+              {/* Filters Bar */}
               <div className="bg-white/95 backdrop-blur-xl p-2 sm:p-3 rounded-2xl border border-orange-100 shadow-sm flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none">
-                
                 <div className="flex items-center gap-1 shrink-0">
                   <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
                     <SlidersHorizontal size={13} />
@@ -327,12 +329,11 @@ export default function ProductGrid({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Sort Dropdown with Icon */}
                   <div className="relative flex items-center bg-stone-50 border border-stone-200 rounded-lg px-2 py-1">
                     <ArrowUpDown size={12} className="text-orange-600 mr-1 shrink-0" />
                     <select
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
+                      onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
                       className="bg-transparent text-stone-800 text-[10px] font-bold outline-none cursor-pointer"
                     >
                       <option value="default">Relevance</option>
@@ -342,10 +343,9 @@ export default function ProductGrid({
                     </select>
                   </div>
 
-                  {/* Discount Toggle Pill with Icon */}
                   <button
                     type="button"
-                    onClick={() => setOnlyDiscounted(!onlyDiscounted)}
+                    onClick={() => { setOnlyDiscounted(!onlyDiscounted); setCurrentPage(1); }}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold transition cursor-pointer ${
                       onlyDiscounted 
                         ? 'bg-orange-600 text-white border-orange-600 shadow-sm' 
@@ -357,7 +357,6 @@ export default function ProductGrid({
                     <span className="hidden sm:inline">Discount</span>
                   </button>
 
-                  {/* Price Range Compact Box with Icon */}
                   <div className="hidden md:flex items-center gap-1.5 bg-stone-50 px-2.5 py-1 rounded-lg border border-stone-200">
                     <Tag size={12} className="text-orange-600 shrink-0" />
                     <span className="text-[9px] font-black uppercase text-stone-500">Max: ₹{maxPrice}</span>
@@ -367,12 +366,11 @@ export default function ProductGrid({
                       max="2000"
                       step="50"
                       value={maxPrice}
-                      onChange={(e) => setMaxPrice(Number(e.target.value))}
+                      onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
                       className="w-16 accent-orange-600 cursor-pointer"
                     />
                   </div>
                 </div>
-
               </div>
 
               {/* Products Grid */}
@@ -382,33 +380,58 @@ export default function ProductGrid({
                   <p className="text-xs font-bold text-stone-700">No active products found matching your filters.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-                  {currentProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      wishlistIds={wishlistIds}
-                      toggleWishlist={toggleWishlist}
-                      selectedVariants={selectedVariants}
-                      setSelectedVariants={setSelectedVariants}
-                      cart={cart}
-                      addToCart={addToCart}
-                      updateQuantity={updateQuantity}
-                      onSelectProduct={onSelectProduct}
-                      boughtProductIds={boughtProductIds}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+                    {currentProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        wishlistIds={wishlistIds}
+                        toggleWishlist={toggleWishlist}
+                        selectedVariants={selectedVariants}
+                        setSelectedVariants={setSelectedVariants}
+                        cart={cart}
+                        addToCart={addToCart}
+                        updateQuantity={updateQuantity}
+                        onSelectProduct={onSelectProduct}
+                        boughtProductIds={boughtProductIds}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-4">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-stone-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        Prev
+                      </button>
+                      <span className="text-[11px] font-black text-stone-600 px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-stone-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
           </div>
         </div>
       ) : (
-        /* HOMEPAGE SECTIONS */
+        /* Homepage View */
         <div className="space-y-10 w-full">
-
-          {/* Categories with Subcategories Section */}
           <div className="space-y-6">
             {parentCategories.map((parentCat, pIdx) => {
               const subcats = getSubcategories(parentCat.id);
@@ -424,6 +447,7 @@ export default function ProductGrid({
                       </h3>
                     </div>
                     <button 
+                      type="button"
                       onClick={() => { setActiveCategory(parentCat.id); setActiveSubcategoryId('All'); setCurrentPage(1); }} 
                       className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-0.5"
                     >
@@ -438,6 +462,7 @@ export default function ProductGrid({
                         <motion.button
                           whileHover={{ y: -2 }}
                           key={sub.id}
+                          type="button"
                           onClick={() => { 
                             setActiveCategory(parentCat.id); 
                             setActiveSubcategoryId(sub.id); 
@@ -446,7 +471,7 @@ export default function ProductGrid({
                           className="flex flex-col items-center p-1.5 rounded-xl cursor-pointer transition-all bg-transparent text-slate-800 group"
                         >
                           <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-transparent overflow-hidden mb-1 shrink-0 flex items-center justify-center p-0.5 group-hover:scale-105 transition">
-                            <img src={subImg} alt={sub.name} className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
+                            <img src={subImg} alt={sub.name} loading="lazy" className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
                           </div>
                           <span className="text-[9px] sm:text-[10px] font-bold truncate w-full text-center leading-tight line-clamp-1">{sub.name}</span>
                         </motion.button>
@@ -458,7 +483,7 @@ export default function ProductGrid({
             })}
           </div>
 
-          {/* Best Deal Section */}
+          {/* Best Deal */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-1.5">
@@ -468,6 +493,7 @@ export default function ProductGrid({
                 </h3>
               </div>
               <button 
+                type="button"
                 onClick={() => { setActiveCategory(parentCategories[0]?.id || 'All'); }} 
                 className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-0.5"
               >
@@ -494,7 +520,7 @@ export default function ProductGrid({
             </div>
           </div>
 
-          {/* Best Selling Section */}
+          {/* Best Selling */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-1.5">
@@ -504,6 +530,7 @@ export default function ProductGrid({
                 </h3>
               </div>
               <button 
+                type="button"
                 onClick={() => { setActiveCategory(parentCategories[1]?.id || parentCategories[0]?.id || 'All'); }} 
                 className="text-[11px] font-bold text-orange-600 hover:text-orange-700 cursor-pointer transition flex items-center gap-0.5"
               >
@@ -529,7 +556,6 @@ export default function ProductGrid({
               ))}
             </div>
           </div>
-
         </div>
       )}
 
