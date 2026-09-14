@@ -1,7 +1,7 @@
 // src/components/store/ProductGrid.jsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Heart, Package, Star, ChevronRight, Flame, Zap, Plus, Minus, Home, ShoppingBag, User, SlidersHorizontal, ArrowUpDown, Tag, Percent } from 'lucide-react';
+import { Heart, Package, Star, ChevronRight, Flame, Zap, Plus, Minus, Home, ShoppingBag, User, SlidersHorizontal, ArrowUpDown, Tag, Percent, Leaf } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVariants, setSelectedVariants, cart = [], addToCart, updateQuantity, onSelectProduct, boughtProductIds }) {
@@ -59,6 +59,12 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
     setTimeout(() => setAddedFlash(false), 900);
   };
 
+  const handleWishlistClick = (e) => {
+    e.stopPropagation();
+    // Toggle wishlist properly so it persists across refreshes and updates counts
+    toggleWishlist(product.id, e);
+  };
+
   return (
     <motion.div
       whileHover={{ y: -3 }}
@@ -68,10 +74,10 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
     >
       <button
         type="button"
-        onClick={e => { e.stopPropagation(); toggleWishlist(product.id, e); }}
+        onClick={handleWishlistClick}
         className={`absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-20 p-1.5 sm:p-2 rounded-full transition-all duration-150 backdrop-blur-md bg-white/90 shadow-xs
           ${isWishlisted ? 'text-rose-500 scale-105' : 'text-stone-400 hover:text-rose-500'}`}
-        title="Wishlist"
+        title={isWishlisted ? "In Wishlist" : "Add to Wishlist"}
       >
         <Heart size={13} className={isWishlisted ? 'fill-rose-500' : ''} />
       </button>
@@ -147,6 +153,26 @@ function ProductCard({ product, wishlistIds = [], toggleWishlist, selectedVarian
   );
 }
 
+const SEARCH_PLACEHOLDERS = [
+  'Search "milk, bread, butter"...',
+  'Search "farm fresh eggs"...',
+  'Search "avocados & bananas"...',
+  'Search "potato chips & munchies"...',
+  'Search "artisan sourdough bread"...',
+  'Search "cold brew coffee"...',
+  'Search "greek yogurt & paneer"...',
+];
+
+const CATEGORY_STYLES = {
+  produce: { emoji: '🥑', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800' },
+  dairy: { emoji: '🥛', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800' },
+  bakery: { emoji: '🥐', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800' },
+  pantry: { emoji: '🥫', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800' },
+  beverages: { emoji: '🧃', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800' },
+  snacks: { emoji: '🥨', bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-800' },
+  meat: { emoji: '🥩', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800' },
+};
+
 export default function ProductGrid({
   banners, currentSlide, activeFlashSale, timeLeft, formatTime,
   categories, activeCategory, setActiveCategory, loading,
@@ -172,9 +198,19 @@ export default function ProductGrid({
   // Filter and sort states
   const [sortBy, setSortBy] = useState('default');
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
+  const [organicOnly, setOrganicOnly] = useState(false);
   const [maxPrice, setMaxPrice] = useState(1000);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   const productsPerPage = 12;
+
+  // Rotating search placeholder from ShopView design
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % SEARCH_PLACEHOLDERS.length);
+    }, 2600);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchUserPurchaseHistory = async () => {
@@ -235,6 +271,7 @@ export default function ProductGrid({
     const hasMrp = mrp > price;
 
     if (onlyDiscounted && !hasMrp) return false;
+    if (organicOnly && !p.is_organic && !p.name.toLowerCase().includes('organic')) return false;
     if (price > maxPrice) return false;
 
     return true;
@@ -254,9 +291,12 @@ export default function ProductGrid({
       return mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
     };
 
-    if (sortBy === 'price-low') return getPrice(a) - getPrice(b);
-    if (sortBy === 'price-high') return getPrice(b) - getPrice(a);
+    const getRating = (prod) => Number(prod.avgRating || prod.rating || 0);
+
+    if (sortBy === 'price-low' || sortBy === 'price_asc') return getPrice(a) - getPrice(b);
+    if (sortBy === 'price-high' || sortBy === 'price_desc') return getPrice(b) - getPrice(a);
     if (sortBy === 'discount') return getDiscountPct(b) - getDiscountPct(a);
+    if (sortBy === 'rating') return getRating(b) - getRating(a);
     return 0;
   });
 
@@ -319,47 +359,61 @@ export default function ProductGrid({
             {/* Products Container */}
             <div className="flex-1 w-full space-y-3 min-w-0">
               
-              {/* Filters Bar */}
-              <div className="bg-white/95 backdrop-blur-xl p-2 sm:p-3 rounded-2xl border border-orange-100 shadow-sm flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none">
-                <div className="flex items-center gap-1 shrink-0">
-                  <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
-                    <SlidersHorizontal size={13} />
+              {/* ShopView Inspired Filters Bar */}
+              <div className="bg-white/95 backdrop-blur-xl p-2.5 sm:p-3.5 rounded-2xl sm:rounded-3xl border border-orange-100 shadow-sm flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
+                    <SlidersHorizontal size={15} />
                   </div>
-                  <span className="text-[11px] font-black text-slate-900 hidden sm:inline">Filters</span>
+                  <span className="text-xs font-black text-slate-900 hidden sm:inline">Filters</span>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="relative flex items-center bg-stone-50 border border-stone-200 rounded-lg px-2 py-1">
-                    <ArrowUpDown size={12} className="text-orange-600 mr-1 shrink-0" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="relative flex items-center bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1.5">
+                    <ArrowUpDown size={13} className="text-orange-600 mr-1.5 shrink-0" />
                     <select
                       value={sortBy}
                       onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
-                      className="bg-transparent text-stone-800 text-[10px] font-bold outline-none cursor-pointer"
+                      className="bg-transparent text-stone-800 text-[11px] font-bold outline-none cursor-pointer"
                     >
-                      <option value="default">Relevance</option>
-                      <option value="price-low">Price: Low to High</option>
-                      <option value="price-high">Price: High to Low</option>
-                      <option value="discount">Highest Discount</option>
+                      <option value="default">✨ Bestsellers / Relevance</option>
+                      <option value="price-low">💵 Price: Low to High</option>
+                      <option value="price-high">💎 Price: High to Low</option>
+                      <option value="discount">🔥 Highest Discount</option>
+                      <option value="rating">⭐ Top Rated</option>
                     </select>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => { setOnlyDiscounted(!onlyDiscounted); setCurrentPage(1); }}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition cursor-pointer ${
                       onlyDiscounted 
                         ? 'bg-orange-600 text-white border-orange-600 shadow-sm' 
                         : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                     }`}
                     title="Discounts Only"
                   >
-                    <Percent size={12} />
+                    <Percent size={13} />
                     <span className="hidden sm:inline">Discount</span>
                   </button>
 
-                  <div className="hidden md:flex items-center gap-1.5 bg-stone-50 px-2.5 py-1 rounded-lg border border-stone-200">
-                    <Tag size={12} className="text-orange-600 shrink-0" />
-                    <span className="text-[9px] font-black uppercase text-stone-500">Max: ₹{maxPrice}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setOrganicOnly(!organicOnly); setCurrentPage(1); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all border ${
+                      organicOnly
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-xs'
+                        : 'bg-stone-50 text-stone-600 border-stone-200 hover:text-stone-900'
+                    }`}
+                  >
+                    <Leaf className={`w-3 h-3 ${organicOnly ? 'text-emerald-700' : 'text-stone-400'}`} />
+                    <span className="hidden sm:inline">100% Organic</span>
+                  </button>
+
+                  <div className="hidden md:flex items-center gap-2 bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200">
+                    <Tag size={13} className="text-orange-600 shrink-0" />
+                    <span className="text-[10px] font-black uppercase text-stone-500">Max: ₹{maxPrice}</span>
                     <input
                       type="range"
                       min="100"
@@ -367,7 +421,7 @@ export default function ProductGrid({
                       step="50"
                       value={maxPrice}
                       onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
-                      className="w-16 accent-orange-600 cursor-pointer"
+                      className="w-20 accent-orange-600 cursor-pointer"
                     />
                   </div>
                 </div>
@@ -430,9 +484,31 @@ export default function ProductGrid({
           </div>
         </div>
       ) : (
-        /* Homepage View */
+        /* Homepage View with ShopView Express Delivery Banner & Categories Rail */
         <div className="space-y-10 w-full">
-          <div className="space-y-6">
+          
+          {/* ShopView Express Delivery Banner */}
+          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-amber-50 via-emerald-50/60 to-white border border-amber-200/70 p-4 sm:p-5 flex items-center justify-between shadow-xs">
+            <div className="max-w-[75%] z-10">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-extrabold tracking-wider text-emerald-800">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span>Express 10-Min Delivery</span>
+              </div>
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 mt-1 leading-snug font-display">
+                Farm-Fresh Produce & Daily Staples
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 flex flex-wrap items-center gap-x-2">
+                <span>Free delivery on orders above ₹249</span>
+                <span className="text-emerald-700 font-semibold">• Quality Checked</span>
+              </p>
+            </div>
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-100/70 border border-amber-200 flex items-center justify-center text-3xl shrink-0 shadow-xs">
+              🛍️
+            </div>
+          </div>
+
+          {/* ShopView Categories Rail & Grid */}
+          <div className="space-y-8">
             {parentCategories.map((parentCat, pIdx) => {
               const subcats = getSubcategories(parentCat.id);
               if (subcats.length === 0) return null;
@@ -458,6 +534,8 @@ export default function ProductGrid({
                   <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col auto-cols-[65px] sm:auto-cols-[90px] gap-2 overflow-x-auto scrollbar-none pb-1">
                     {subcats.map((sub, sIdx) => {
                       const subImg = sub.image_url || fallbackImages[(pIdx + sIdx) % fallbackImages.length];
+                      const style = CATEGORY_STYLES[sub.slug] || { bg: 'bg-slate-50', border: 'border-slate-200' };
+
                       return (
                         <motion.button
                           whileHover={{ y: -2 }}
@@ -470,7 +548,7 @@ export default function ProductGrid({
                           }}
                           className="flex flex-col items-center p-1.5 rounded-xl cursor-pointer transition-all bg-transparent text-slate-800 group"
                         >
-                          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl bg-transparent overflow-hidden mb-1 shrink-0 flex items-center justify-center p-0.5 group-hover:scale-105 transition">
+                          <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl ${style.bg} border ${style.border} overflow-hidden mb-1 shrink-0 flex items-center justify-center p-0.5 group-hover:scale-105 transition shadow-2xs`}>
                             <img src={subImg} alt={sub.name} loading="lazy" className="w-full h-full object-cover rounded-lg border-0 bg-transparent" />
                           </div>
                           <span className="text-[9px] sm:text-[10px] font-bold truncate w-full text-center leading-tight line-clamp-1">{sub.name}</span>

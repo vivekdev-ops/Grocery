@@ -10,18 +10,62 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
   const location = useLocation();
   const currentPath = location.pathname;
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [liveCartCount, setLiveCartCount] = useState(totalItemsCount);
 
+  // Synchronize live cart count instantly from localStorage and custom events
   useEffect(() => {
+    const updateCartCount = () => {
+      try {
+        const saved = localStorage.getItem('cart_items');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const count = Array.isArray(parsed) ? parsed.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) : 0;
+          setLiveCartCount(count);
+        } else {
+          setLiveCartCount(0);
+        }
+      } catch (err) {
+        setLiveCartCount(totalItemsCount);
+      }
+    };
+
+    updateCartCount();
+
+    const handleCartEvent = (e) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        const count = e.detail.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        setLiveCartCount(count);
+      } else {
+        updateCartCount();
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartEvent);
+    window.addEventListener('storage', updateCartCount);
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartEvent);
+      window.removeEventListener('storage', updateCartCount);
+    };
+  }, [totalItemsCount]);
+
+  // Synchronize wishlist count dynamically and instantly
+  useEffect(() => {
+    let isMounted = true;
+
     const fetchWishlistCount = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) {
+        if (isMounted) setWishlistCount(0);
+        return;
+      }
 
       const { count, error } = await supabase
         .from('wishlists')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', session.user.id);
 
-      if (!error && count !== null) {
+      if (isMounted && !error && count !== null) {
         setWishlistCount(count);
       }
     };
@@ -33,6 +77,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
     window.addEventListener('storage', handleWishlistUpdate);
 
     return () => {
+      isMounted = false;
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
       window.removeEventListener('storage', handleWishlistUpdate);
     };
@@ -84,7 +129,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
               <div className="relative">
                 <Icon size={17} className={isActive ? 'stroke-[2.5] text-orange-600' : 'stroke-[2] text-stone-500'} />
                 {item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20">
+                  <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20 shadow-xs">
                     {item.badge}
                   </span>
                 )}
@@ -95,7 +140,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
           );
         })}
 
-        {/* Cart Tab with icon badge only (no surrounding border ring) */}
+        {/* Cart Tab Trigger */}
         <motion.button
           type="button"
           onClick={() => {
@@ -111,9 +156,9 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
         >
           <div className="relative">
             <ShoppingBag size={17} className="stroke-[2] text-stone-500" />
-            {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20">
-                {totalItemsCount}
+            {liveCartCount > 0 && (
+              <span className="absolute -top-1.5 -right-2.5 bg-rose-600 text-white font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center z-20 shadow-xs">
+                {liveCartCount}
               </span>
             )}
           </div>

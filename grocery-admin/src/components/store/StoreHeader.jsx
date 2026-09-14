@@ -112,6 +112,7 @@ export default function StoreHeader({
           {/* Logo & Delivery Location Picker */}
           <div className="flex items-center gap-3 min-w-0 relative shrink-0">
             <button
+              type="button"
               onClick={() => navigate('/')}
               className="flex items-center cursor-pointer group"
             >
@@ -128,6 +129,7 @@ export default function StoreHeader({
               </div>
               
               <button
+                type="button"
                 onClick={() => session?.user && savedAddresses.length > 0 && setIsAddressDropdownOpen(!isAddressDropdownOpen)}
                 className="text-[11px] text-amber-100 font-medium truncate flex items-center gap-1 hover:text-white transition cursor-pointer text-left leading-tight mt-1"
               >
@@ -143,6 +145,7 @@ export default function StoreHeader({
                   <div className="px-3 py-1.5 border-b border-stone-100 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Select Address</span>
                     <button 
+                      type="button"
                       onClick={() => { setIsAddressDropdownOpen(false); navigate('/account/address'); }}
                       className="text-[10px] font-bold text-orange-600 hover:underline cursor-pointer"
                     >
@@ -153,6 +156,7 @@ export default function StoreHeader({
                     {savedAddresses.map((addr, idx) => (
                       <button
                         key={addr.id || idx}
+                        type="button"
                         onClick={() => handleSelectAddress(addr)}
                         className="w-full text-left px-3 py-2 rounded-xl hover:bg-orange-50 transition flex items-center justify-between group cursor-pointer text-xs"
                       >
@@ -166,7 +170,7 @@ export default function StoreHeader({
             </div>
           </div>
 
-          {/* Right Action Notification Bell (Icon only, no background/border container) */}
+          {/* Right Action Notification Bell */}
           <div className="flex items-center gap-2 shrink-0">
             <NotificationBell session={session} size={22} className="text-white hover:text-amber-200 transition cursor-pointer bg-transparent border-0 p-0 shadow-none" />
           </div>
@@ -191,7 +195,7 @@ export default function StoreHeader({
             </div>
           )}
           
-          {/* Notification bell visible even when scrolled (Icon only) */}
+          {/* Notification bell visible even when scrolled */}
           {isScrolled && (
             <div className="shrink-0 flex items-center">
               <NotificationBell session={session} size={22} className="text-white hover:text-amber-200 transition cursor-pointer bg-transparent border-0 p-0 shadow-none" />
@@ -201,6 +205,7 @@ export default function StoreHeader({
 
         <div className="overflow-x-auto scrollbar-none flex items-center gap-3 sm:gap-6">
           <button
+            type="button"
             onClick={() => setActiveCategory && setActiveCategory('All')}
             className={`flex shrink-0 cursor-pointer group transition relative items-center text-center ${
               !isScrolled 
@@ -231,6 +236,7 @@ export default function StoreHeader({
             return (
               <button
                 key={cat.id || cat.name}
+                type="button"
                 onClick={() => setActiveCategory && setActiveCategory(cat.id)}
                 className={`flex shrink-0 cursor-pointer group transition relative items-center text-center ${
                   !isScrolled 
@@ -243,7 +249,7 @@ export default function StoreHeader({
                     isSelected ? 'bg-white border-white text-orange-700 shadow-xs' : 'bg-orange-700/60 border-orange-500/40 text-white'
                   }`}>
                     {catImage ? (
-                      <img src={catImage} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
+                      <img src={catImage} alt={cat.name} loading="lazy" className="w-full h-full object-cover rounded-xl" />
                     ) : (
                       <FallbackIconComponent size={20} className={isSelected ? 'text-orange-700' : 'text-white'} />
                     )}
