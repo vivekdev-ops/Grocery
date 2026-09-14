@@ -49,7 +49,7 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
     };
   }, [totalItemsCount]);
 
-  // Synchronize wishlist count dynamically and instantly
+  // Synchronize wishlist count dynamically and instantly with real-time subscription
   useEffect(() => {
     let isMounted = true;
 
@@ -72,12 +72,21 @@ export default function PortalBottomNav({ totalItemsCount = 0, onOpenCart }) {
 
     fetchWishlistCount();
 
+    // Setup Supabase real-time subscription for instant badge synchronization without delays
+    const channel = supabase
+      .channel('portal-wishlist-badge-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wishlists' }, () => {
+        fetchWishlistCount();
+      })
+      .subscribe();
+
     const handleWishlistUpdate = () => fetchWishlistCount();
     window.addEventListener('wishlistUpdated', handleWishlistUpdate);
     window.addEventListener('storage', handleWishlistUpdate);
 
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
       window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
       window.removeEventListener('storage', handleWishlistUpdate);
     };

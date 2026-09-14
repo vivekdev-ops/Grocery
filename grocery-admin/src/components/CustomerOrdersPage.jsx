@@ -1137,19 +1137,8 @@ const CustomerOrdersPage = () => {
 
 
   /* =======================================================
-     LOADING
+     DERIVED CART VALUES
   ======================================================= */
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-stone-50 font-sans text-xs flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto" />
-          <p className="text-stone-500 font-bold">Loading your orders...</p>
-        </div>
-      </div>
-    );
-  }
 
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -1168,6 +1157,52 @@ const CustomerOrdersPage = () => {
 
   const orderItemsSubtotal = getOrderItemsSubtotal(selectedOrder);
   const totalDiscountFromMrp = Math.max(0, totalMrpSum - orderItemsSubtotal);
+
+
+  /* =======================================================
+     LOADING SKELETON (INSTANT BLUR/SHIMMER UI)
+  ======================================================= */
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 text-stone-900 pb-36 font-sans text-xs antialiased">
+        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 py-3.5 flex items-center gap-3 sticky top-0 z-30 shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-white/20 animate-pulse" />
+          <div className="space-y-1">
+            <div className="w-24 h-4 bg-white/30 rounded animate-pulse" />
+            <div className="w-36 h-3 bg-white/20 rounded animate-pulse" />
+          </div>
+        </div>
+
+        <main className="max-w-xl mx-auto px-3 sm:px-4 py-4 space-y-4 animate-pulse">
+          <div className="bg-white/60 backdrop-blur-md rounded-2xl p-3 h-20 w-full" />
+          <div className="bg-white/60 backdrop-blur-md rounded-2xl p-3 h-14 w-full" />
+          <div className="space-y-3 pt-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="bg-white/70 backdrop-blur-md rounded-2xl border border-orange-100 h-36 w-full p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-stone-200" />
+                    <div className="space-y-1">
+                      <div className="w-28 h-3 bg-stone-200 rounded" />
+                      <div className="w-20 h-2.5 bg-stone-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="w-12 h-6 bg-stone-200 rounded-lg" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-14 h-14 rounded-xl bg-stone-100" />
+                  <div className="w-14 h-14 rounded-xl bg-stone-100" />
+                  <div className="w-14 h-14 rounded-xl bg-stone-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+        <PortalBottomNav totalItemsCount={totalItemsCount} totalPrice={cartTotal} onOpenCart={() => setIsCartOpen(true)} />
+      </div>
+    );
+  }
 
 
   /* =======================================================
