@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { ArrowLeft, Search, Heart, X, Star, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Search, Heart, X, Star, Plus, Minus, Trash2, ShoppingBag, Loader2 } from 'lucide-react';
 import PortalBottomNav from '../PortalBottomNav';
 import CartDrawer from '../store/CartDrawer';
 
@@ -227,6 +227,8 @@ export default function WishlistPage() {
 
       if (error) throw error;
       setWishlistItems(prev => prev.filter(item => item.id !== wishlistId));
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+      window.dispatchEvent(new Event('storage'));
     } catch (err) {
       console.error('Error removing item:', err.message);
     }
@@ -270,51 +272,32 @@ export default function WishlistPage() {
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
+      let updated;
       if (existing) {
-        return prev.map(item =>
+        updated = prev.map(item =>
           item.cartItemId === cartItemId
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
+      } else {
+        updated = [...prev, {
+          cartItemId,
+          product,
+          variant: activeVar,
+          id: product.id,
+          product_id: product.id,
+          title: product.name,
+          price: price,
+          quantity: quantity,
+          stock: 99,
+          image: itemImage
+        }];
       }
-      return [...prev, {
-        cartItemId,
-        product,
-        variant: activeVar,
-        id: product.id,
-        product_id: product.id,
-        title: product.name,
-        price: price,
-        quantity: quantity,
-        stock: 99,
-        image: itemImage
-      }];
+      localStorage.setItem('cart_items', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updated }));
+      window.dispatchEvent(new Event('storage'));
+      return updated;
     });
-
-    setTimeout(() => {
-      const currentCart = JSON.parse(localStorage.getItem('cart_items') || '[]');
-      const existing = currentCart.find(item => item.cartItemId === cartItemId);
-      const updatedCart = existing
-        ? currentCart.map(item =>
-            item.cartItemId === cartItemId
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          )
-        : [...currentCart, {
-            cartItemId,
-            product,
-            variant: activeVar,
-            id: product.id,
-            product_id: product.id,
-            title: product.name,
-            price: price,
-            quantity: quantity,
-            stock: 99,
-            image: itemImage
-          }];
-      localStorage.setItem('cart_items', JSON.stringify(updatedCart));
-      window.dispatchEvent(new CustomEvent('cartUpdated', { detail: updatedCart }));
-    }, 0);
 
     alert(`Added ${quantity} x ${product.name} to cart!`);
   };
@@ -323,124 +306,153 @@ export default function WishlistPage() {
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const wishlistCount = wishlistItems.length;
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 text-stone-900 pb-36 font-sans text-xs antialiased">
+        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 py-3.5 flex items-center gap-3 sticky top-0 z-30 shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-white/20 animate-pulse" />
+          <div className="space-y-1">
+            <div className="w-24 h-4 bg-white/30 rounded animate-pulse" />
+            <div className="w-36 h-3 bg-white/20 rounded animate-pulse" />
+          </div>
+        </div>
+
+        <main className="max-w-xl mx-auto px-3 sm:px-4 py-4 space-y-4 animate-pulse">
+          <div className="space-y-3 pt-2">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="bg-white/70 backdrop-blur-md rounded-2xl border border-orange-100 h-28 w-full p-4 flex items-center gap-3">
+                <div className="w-16 h-16 rounded-xl bg-stone-200 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="w-3/4 h-3 bg-stone-200 rounded" />
+                  <div className="w-1/2 h-2.5 bg-stone-100 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+        <PortalBottomNav totalItemsCount={totalItemsCount} totalPrice={cartTotal} wishlistCount={wishlistCount} onOpenCart={() => setIsCartOpen(true)} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 font-sans text-stone-900 pb-36 select-none flex flex-col w-full selection:bg-orange-600 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-orange-50/25 to-amber-100/30 font-sans text-stone-900 pb-36 select-none flex flex-col w-full selection:bg-orange-600 selection:text-white text-xs antialiased">
       
-      {/* Smaller Top Header matching dark orange aesthetic */}
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 md:px-12 py-3 flex items-center justify-between sticky top-0 z-30 shadow-md">
+      {/* Mobile-First Compact Top Header */}
+      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 py-3.5 flex items-center gap-3 sticky top-0 z-30 shadow-md">
         <button 
           onClick={() => navigate(-1)}
-          className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md hover:bg-white/30 text-white flex items-center justify-center transition cursor-pointer border border-white/30"
+          className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md hover:bg-white/30 text-white flex items-center justify-center transition active:scale-95 cursor-pointer border border-white/30 shrink-0"
           title="Back"
         >
-          <ArrowLeft size={16} className="stroke-[2.5]" />
+          <ArrowLeft size={18} className="stroke-[2.5]" />
         </button>
-        <h1 className="font-black text-white text-sm md:text-base tracking-tight">My Wishlist</h1>
-        <button 
-          onClick={() => navigate('/')}
-          className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md hover:bg-white/30 text-white flex items-center justify-center transition cursor-pointer border border-white/30"
-          title="Search"
-        >
-          <Search size={16} className="stroke-[2.5]" />
-        </button>
+        <div className="min-w-0">
+          <h1 className="font-black text-white text-sm sm:text-base tracking-tight truncate">My Wishlist</h1>
+          <p className="text-[10px] text-amber-100 font-medium truncate">Saved items ready for quick purchase</p>
+        </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 w-full">
-        {loading ? (
-          <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl">
-            <p className="text-stone-500 font-bold text-xs">Loading wishlist...</p>
-          </div>
-        ) : wishlistItems.length === 0 ? (
-          <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] border border-orange-100 p-12 text-center shadow-xl space-y-3">
-            <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-3xl flex items-center justify-center mx-auto border border-orange-100 shadow-inner">
-              <Heart size={28} />
+      <main className="max-w-xl mx-auto px-3 sm:px-4 py-4 space-y-4 w-full">
+        {wishlistItems.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-orange-100 p-8 text-center shadow-sm space-y-3 mt-4">
+            <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto border border-rose-100">
+              <Heart className="w-7 h-7 fill-rose-500" />
             </div>
             <div>
-              <h3 className="font-black text-stone-900 text-sm">Your wishlist is empty</h3>
-              <p className="text-stone-400 text-xs mt-1">Explore items and save your favorites here.</p>
+              <h3 className="font-black text-stone-900 text-xs">Your wishlist is empty</h3>
+              <p className="text-stone-400 text-[11px] mt-0.5">Tap the heart icon on any product to save items here.</p>
             </div>
             <button 
               onClick={() => navigate('/')}
-              className="mt-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black shadow-lg shadow-orange-600/20 cursor-pointer transition active:scale-95 uppercase tracking-wider text-xs"
+              className="mt-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white font-black shadow-sm cursor-pointer transition active:scale-95 uppercase tracking-wider text-[11px]"
             >
               Explore Products
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3.5">
-            {wishlistItems.map((item) => {
-              const product = item.products;
-              if (!product) return null;
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <span className="font-black uppercase tracking-wider text-[11px] text-stone-500">
+                Saved Items ({wishlistItems.length})
+              </span>
+            </div>
 
-              const variants = product.product_variants || product.variants || [];
-              const firstVariant = variants[0] || null;
+            <div className="grid grid-cols-2 gap-3">
+              {wishlistItems.map((item) => {
+                const product = item.products;
+                if (!product) return null;
 
-              const allImgs = getProductImages(product);
-              const prodImage = allImgs[0];
-              
-              const price = Number(firstVariant?.price ?? product.price ?? 0);
-              const mrp = Number(firstVariant?.mrp ?? product.mrp ?? 0);
-              const hasMrp = mrp > price;
-              const discountPct = hasMrp ? Math.round(((mrp - price) / mrp) * 100) : 0;
-              const unitLabel = firstVariant?.unit_label || firstVariant?.label || product.unit || '';
+                const variants = product.product_variants || product.variants || [];
+                const firstVariant = variants[0] || null;
 
-              return (
-                <div 
-                  key={item.id} 
-                  onClick={() => openProductModal(product)}
-                  className="bg-white/95 backdrop-blur-xl border border-orange-100 rounded-3xl p-4 flex flex-col justify-between relative shadow-xl shadow-orange-950/5 group hover:shadow-2xl transition duration-300 cursor-pointer"
-                >
-                  {/* Wishlist Heart Button */}
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleRemoveFromWishlist(item.id); }}
-                    className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200 transition cursor-pointer z-10 hover:bg-orange-100 shadow-2xs"
-                    title="Remove from wishlist"
+                const allImgs = getProductImages(product);
+                const prodImage = allImgs[0];
+                
+                const price = Number(firstVariant?.price ?? product.price ?? 0);
+                const mrp = Number(firstVariant?.mrp ?? product.mrp ?? 0);
+                const hasMrp = mrp > price;
+                const discountPct = hasMrp ? Math.round(((mrp - price) / mrp) * 100) : 0;
+                const unitLabel = firstVariant?.unit_label || firstVariant?.label || product.unit || '';
+
+                return (
+                  <div 
+                    key={item.id} 
+                    onClick={() => openProductModal(product)}
+                    className="bg-white rounded-2xl border border-orange-100 shadow-sm hover:shadow-md transition duration-200 overflow-hidden p-3.5 flex flex-col justify-between relative cursor-pointer"
                   >
-                    <Heart size={15} className="fill-orange-600" />
-                  </button>
-
-                  {/* Discount Badge if available */}
-                  {discountPct > 0 && (
-                    <div className="absolute top-3.5 left-3.5 z-10 bg-rose-600 text-white font-black text-[9px] px-2 py-0.5 rounded-md shadow-xs">
-                      {discountPct}% OFF
-                    </div>
-                  )}
-
-                  {/* Product Image */}
-                  <div className="w-full h-32 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center p-2 mb-3 border border-stone-100">
-                    <img 
-                      src={prodImage} 
-                      alt={product.name} 
-                      className="w-full h-full object-contain group-hover:scale-105 transition duration-300" 
-                    />
-                  </div>
-
-                  {/* Product Details */}
-                  <div className="space-y-1 mb-3">
-                    <h2 className="font-bold text-stone-900 text-xs line-clamp-2 leading-tight">{product.name}</h2>
-                    <p className="text-[11px] text-stone-400 font-medium">{unitLabel}</p>
-                  </div>
-
-                  {/* Price and Add Button */}
-                  <div className="flex items-center justify-between pt-1 border-t border-orange-50">
-                    <div className="flex flex-col">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="font-black text-slate-900 text-xs">₹{price.toFixed(0)}</span>
-                        {hasMrp && (
-                          <span className="text-[10px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>
-                        )}
-                      </div>
-                    </div>
+                    {/* Wishlist Remove Button */}
                     <button 
-                      onClick={(e) => addToCart(product, firstVariant, 1, e)}
-                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black px-4 py-2 rounded-xl text-[11px] transition cursor-pointer shadow-md shadow-orange-600/20 active:scale-95"
+                      onClick={(e) => { e.stopPropagation(); handleRemoveFromWishlist(item.id); }}
+                      className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-100 transition cursor-pointer z-10 hover:bg-rose-100 shadow-2xs"
+                      title="Remove from wishlist"
                     >
-                      Add
+                      <Heart size={13} className="fill-rose-500" />
                     </button>
+
+                    {discountPct > 0 && (
+                      <div className="absolute top-2.5 left-2.5 z-10 bg-rose-600 text-white font-black text-[8px] px-1.5 py-0.5 rounded shadow-xs">
+                        {discountPct}% OFF
+                      </div>
+                    )}
+
+                    {/* Product Image */}
+                    <div className="w-full h-28 bg-stone-50 rounded-xl overflow-hidden flex items-center justify-center p-2 mb-2.5 border border-stone-100">
+                      <img 
+                        src={prodImage} 
+                        alt={product.name} 
+                        className="w-full h-full object-contain hover:scale-105 transition duration-300" 
+                      />
+                    </div>
+
+                    {/* Product Details */}
+                    <div className="space-y-0.5 mb-2.5 min-w-0">
+                      <h2 className="font-bold text-stone-900 text-xs truncate leading-tight">{product.name}</h2>
+                      <p className="text-[10px] text-stone-400 font-medium truncate">{unitLabel}</p>
+                    </div>
+
+                    {/* Price and Add Button */}
+                    <div className="flex items-center justify-between pt-2 border-t border-orange-50 gap-1">
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-black text-slate-900 text-xs truncate">₹{price.toFixed(0)}</span>
+                          {hasMrp && (
+                            <span className="text-[9px] text-stone-400 line-through font-bold">₹{mrp.toFixed(0)}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => addToCart(product, firstVariant, 1, e)}
+                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black px-3 py-1.5 rounded-xl text-[10px] transition cursor-pointer shadow-xs active:scale-95 uppercase tracking-wider shrink-0 flex items-center gap-1"
+                      >
+                        <ShoppingBag size={11} />
+                        <span>Add</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </main>
@@ -457,25 +469,25 @@ export default function WishlistPage() {
         const allModalImages = getProductImages(selectedProductDetail);
 
         return (
-          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 text-xs font-sans">
-            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto border border-orange-100 p-5 space-y-4 relative">
+          <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-3 text-xs font-sans">
+            <div className="bg-white rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-orange-100 p-5 space-y-4 relative flex flex-col">
               
-              {/* Header row matching reference: Back/Close arrow, Title, Heart */}
+              {/* Header row */}
               <div className="flex items-center justify-between border-b border-stone-100 pb-3">
                 <button 
                   onClick={() => setSelectedProductDetail(null)}
-                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center cursor-pointer transition"
+                  className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center cursor-pointer transition"
                 >
                   <ArrowLeft size={16} className="stroke-[2.5]" />
                 </button>
                 <h3 className="font-black text-slate-900 text-sm tracking-tight">Product Details</h3>
-                <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-200">
-                  <Heart size={15} className="fill-orange-600" />
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-100">
+                  <Heart size={15} className="fill-rose-500" />
                 </div>
               </div>
 
               {/* Main Preview Image Container */}
-              <div className="w-full h-52 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center p-3 border border-orange-100 relative shadow-inner">
+              <div className="w-full h-48 bg-stone-50 rounded-2xl overflow-hidden flex items-center justify-center p-3 border border-orange-100 relative shadow-inner">
                 {modalDiscountPct > 0 && (
                   <div className="absolute top-3 left-3 bg-orange-600 text-white font-black text-[10px] px-2 py-0.5 rounded shadow-xs z-10">
                     {modalDiscountPct}% OFF
@@ -488,7 +500,7 @@ export default function WishlistPage() {
                 />
               </div>
 
-              {/* Thumbnails Row Below Main Image */}
+              {/* Thumbnails Row */}
               {allModalImages.length > 1 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                   {allModalImages.map((imgSrc, idx) => (
@@ -507,7 +519,7 @@ export default function WishlistPage() {
 
               {/* Product Info Block */}
               <div className="space-y-1.5 pt-1">
-                <h2 className="font-black text-slate-900 text-base leading-tight">{selectedProductDetail.name}</h2>
+                <h2 className="font-black text-slate-900 text-sm leading-tight">{selectedProductDetail.name}</h2>
                 <div className="flex items-center gap-1.5 text-stone-500 font-bold text-xs">
                   <div className="flex items-center text-amber-500">
                     <Star size={13} className="fill-amber-400" />
@@ -519,9 +531,8 @@ export default function WishlistPage() {
                   <span>4.0 (1 reviews)</span>
                 </div>
 
-                {/* Price and Discount Row */}
-                <div className="flex items-baseline gap-2.5 pt-1.5">
-                  <span className="font-black text-slate-900 text-xl">₹{modalPrice.toFixed(0)}</span>
+                <div className="flex items-baseline gap-2.5 pt-1">
+                  <span className="font-black text-slate-900 text-lg">₹{modalPrice.toFixed(0)}</span>
                   {modalHasMrp && (
                     <span className="text-xs text-stone-400 line-through font-bold">₹{modalMrp.toFixed(0)}</span>
                   )}
@@ -533,9 +544,9 @@ export default function WishlistPage() {
                 </div>
               </div>
 
-              {/* Variant Selector Section */}
+              {/* Variant Selector */}
               {modalVariants.length > 0 && (
-                <div className="space-y-2 pt-3 border-t border-stone-100">
+                <div className="space-y-2 pt-2 border-t border-stone-100">
                   <label className="block text-[10px] font-black text-stone-400 uppercase tracking-wider">Select Variant / Unit</label>
                   <div className="flex flex-wrap gap-2">
                     {modalVariants.map((v, vIdx) => {
@@ -546,10 +557,8 @@ export default function WishlistPage() {
                       return (
                         <button
                           key={vKey}
-                          onClick={() => {
-                            setModalSelectedVariantKey(vKey);
-                          }}
-                          className={`px-4 py-2.5 rounded-2xl font-black text-xs transition cursor-pointer border ${
+                          onClick={() => setModalSelectedVariantKey(vKey)}
+                          className={`px-3 py-2 rounded-xl font-black text-xs transition cursor-pointer border ${
                             isSelected 
                               ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white border-orange-600 shadow-sm' 
                               : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
@@ -563,29 +572,31 @@ export default function WishlistPage() {
                 </div>
               )}
 
-              {/* Product Description Section */}
-              <div className="space-y-1 pt-3 border-t border-stone-100">
-                <h4 className="font-black text-stone-700 text-[10px] uppercase tracking-wider">Description</h4>
-                <p className="text-stone-500 font-medium leading-relaxed text-xs">
-                  {selectedProductDetail.description || 'No detailed description available for this product.'}
-                </p>
-              </div>
+              {/* Description */}
+              {selectedProductDetail.description && (
+                <div className="space-y-1 pt-2 border-t border-stone-100">
+                  <h4 className="font-black text-stone-700 text-[10px] uppercase tracking-wider">Description</h4>
+                  <p className="text-stone-500 font-medium leading-relaxed text-xs line-clamp-3">
+                    {selectedProductDetail.description}
+                  </p>
+                </div>
+              )}
 
-              {/* Bottom Fixed-style Action Row: Quantity & Add to Cart */}
-              <div className="flex items-center gap-3 pt-4 border-t border-stone-100">
-                <div className="flex items-center border border-stone-200 rounded-2xl overflow-hidden bg-stone-50 h-11 shrink-0">
+              {/* Bottom Action Row */}
+              <div className="flex items-center gap-3 pt-3 border-t border-stone-100">
+                <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden bg-stone-50 h-10 shrink-0">
                   <button 
                     onClick={() => setModalQuantity(prev => Math.max(1, prev - 1))}
-                    className="px-3 h-full hover:bg-stone-200 text-stone-700 font-black transition cursor-pointer flex items-center justify-center"
+                    className="px-2.5 h-full hover:bg-stone-200 text-stone-700 font-black transition cursor-pointer flex items-center justify-center"
                   >
-                    <Minus size={14} />
+                    <Minus size={13} />
                   </button>
-                  <span className="px-3 font-black text-xs text-stone-900">{modalQuantity}</span>
+                  <span className="px-2.5 font-black text-xs text-stone-900">{modalQuantity}</span>
                   <button 
                     onClick={() => setModalQuantity(prev => prev + 1)}
-                    className="px-3 h-full hover:bg-stone-200 text-stone-700 font-black transition cursor-pointer flex items-center justify-center"
+                    className="px-2.5 h-full hover:bg-stone-200 text-stone-700 font-black transition cursor-pointer flex items-center justify-center"
                   >
-                    <Plus size={14} />
+                    <Plus size={13} />
                   </button>
                 </div>
 
@@ -594,7 +605,7 @@ export default function WishlistPage() {
                     addToCart(selectedProductDetail, activeVar, modalQuantity, e);
                     setSelectedProductDetail(null);
                   }}
-                  className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black h-11 rounded-2xl text-xs transition cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 uppercase tracking-wider flex items-center justify-between px-5"
+                  className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black h-10 rounded-xl text-xs transition cursor-pointer shadow-md shadow-orange-600/20 active:scale-95 uppercase tracking-wider flex items-center justify-between px-4"
                 >
                   <span>Add To Cart</span>
                   <span>₹{(modalPrice * modalQuantity).toFixed(0)}</span>
